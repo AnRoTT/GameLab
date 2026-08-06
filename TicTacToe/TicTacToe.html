@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TicTacToe</title>
+    <link rel="stylesheet" href="../theme.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="backIcon">⟵ Menü</div>
+
+    <h1>TicTacToe</h1>
+
+    <div class="score-header">
+        <span id="scoreX">X: 0</span>
+        <span id="scoreDraw">Unentsch: 0</span>
+        <span id="scoreO">O: 0</span>
+    </div>
+
+    <div class="settings">
+        <div class="cycle-group setting-row setting-row-wide" id="rowPlayers">
+            <span class="label setting-label">Spieler:</span>
+            <button class="cycle-button" id="btnPlayers"><span id="valPlayers">2 Spieler</span></button>
+        </div>
+        <div class="cycle-group setting-row setting-row-wide" id="rowRounds">
+            <span class="label setting-label">Runden:</span>
+            <button class="cycle-button" id="btnRounds"><span id="valRounds">1</span></button>
+        </div>
+        <div class="cycle-group setting-row setting-row-wide" id="rowMode">
+            <span class="label setting-label">Modus:</span>
+            <button class="cycle-button" id="btnMode"><span id="valMode">Verkürzt</span></button>
+        </div>
+        <div class="cycle-group setting-row setting-row-wide" id="rowDifficulty">
+            <span class="label setting-label">Level:</span>
+            <button class="cycle-button" id="btnDifficulty"><span id="valDifficulty">Mittel</span></button>
+        </div>
+        <div class="cycle-group setting-row setting-row-wide" id="rowAdapt">
+            <span class="label setting-label">Adaption:</span>
+            <button class="cycle-button" id="btnAdapt"><span id="valAdapt">Normal</span></button>
+        </div>
+    </div>
+
+    <div id="board" class="board"></div>
+	<div id="winnerBanner"></div>
+    <div id="status"></div>
+    <button id="reset" class="primary-button">Neu starten</button>
+
+    <footer class="footer">TicTacToe | by Andreas Rollinger | 2026.07.31</footer>
+
+    <script src="adaptiveBot.js"></script>
+    <script src="game.js"></script> <!-- BLEIBT SO -->
+    <script>
+        const playersOptions = ["1 Spieler", "2 Spieler"];
+        const roundsOptions = [1, 3, 5, 7];
+        const modeOptions = ["Verkürzt", "Komplette Runden", "Turnier"];
+        const difficultyOptions = ["Anfänger", "Hobbyspieler", "Vereinsspieler", "Meister", "Adaptiv"];
+        const adaptOptions = ["Langsam", "Normal", "Schnell"];
+
+        let playersIdx = 0, roundsIdx = 0, modeIdx = 0, diffIdx = 0, adaptIdx = 1;
+
+        let settingsLocked = false;
+
+        function updateSettingAvailability() {
+            const rowStates = {
+                rowPlayers: true,
+                rowRounds: true,
+                rowMode: roundsOptions[roundsIdx] > 1,
+                rowDifficulty: playersIdx === 0,
+                rowAdapt: playersIdx === 0 && diffIdx === 4
+            };
+
+            Object.entries(rowStates).forEach(([rowId, isAvailable]) => {
+                const row = document.getElementById(rowId);
+                const button = row.querySelector('.cycle-button');
+                row.classList.toggle('disabled', !isAvailable);
+                row.classList.toggle('locked', settingsLocked);
+                button.disabled = settingsLocked || !isAvailable;
+            });
+        }
+
+        window.setSettingsLocked = function(locked) {
+            settingsLocked = locked;
+            updateSettingAvailability();
+        };
+
+        function updateUI() {
+            document.getElementById('valPlayers').textContent = playersOptions[playersIdx];
+            document.getElementById('valRounds').textContent = roundsOptions[roundsIdx];
+            document.getElementById('valMode').textContent = modeOptions[modeIdx];
+            document.getElementById('valDifficulty').textContent = difficultyOptions[diffIdx];
+            document.getElementById('valAdapt').textContent = adaptOptions[adaptIdx];
+
+            window.currentPlayers = playersIdx === 0? 'bot' : 'human';
+            window.currentRounds = roundsOptions[roundsIdx];
+            window.currentMode = ['short', 'full', 'tournament'][modeIdx];
+            window.currentDifficulty = diffIdx + 1;
+            window.currentAdapt = ['slow', 'normal', 'fast'][adaptIdx];
+            updateSettingAvailability();
+        }
+
+        function cycle(arr, idx) { return (idx + 1) % arr.length; }
+
+        document.getElementById('btnPlayers').onclick = () => { playersIdx = cycle(playersOptions, playersIdx); updateUI(); };
+        document.getElementById('btnRounds').onclick = () => { roundsIdx = cycle(roundsOptions, roundsIdx); updateUI(); };
+        document.getElementById('btnMode').onclick = () => { modeIdx = cycle(modeOptions, modeIdx); updateUI(); };
+        document.getElementById('btnDifficulty').onclick = () => { diffIdx = cycle(difficultyOptions, diffIdx); updateUI(); };
+        document.getElementById('btnAdapt').onclick = () => { adaptIdx = cycle(adaptOptions, adaptIdx); updateUI(); };
+
+        window.updateScore = function(x, draw, o) {
+            document.getElementById('scoreX').textContent = `X: ${x}`;
+            document.getElementById('scoreDraw').textContent = `Unentsch: ${draw}`;
+            document.getElementById('scoreO').textContent = `O: ${o}`;
+        }
+
+        updateUI();
+    </script>
+	<script>
+document.getElementById("backIcon").style.display = 
+    new URLSearchParams(location.search).get('menu') === '1' ? 'block' : 'none';
+</script>
+</body>
+</html>
