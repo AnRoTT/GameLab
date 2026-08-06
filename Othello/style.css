@@ -175,6 +175,8 @@
         grid-template-rows: repeat(8, 11vw);
         max-width: 88vw;
         padding: 4px;
+        min-height: 0;
+        height: auto;
     }
     .cell {
         width: 11vw;
