@@ -4,6 +4,8 @@ const modeBtn = document.getElementById("modeBtn");
 const rulesBtn = document.getElementById("rulesBtn");
 const botLevelRow = document.getElementById("botLevelRow");
 const botLevelBtn = document.getElementById("botLevelBtn");
+const adaptSpeedRow = document.getElementById("adaptSpeedRow");
+const adaptSpeedBtn = document.getElementById("adaptSpeedBtn");
 const settingsPanel = document.getElementById("settingsPanel");
 const scoreBlackEl = document.getElementById("scoreBlack");
 const scoreWhiteEl = document.getElementById("scoreWhite");
@@ -33,6 +35,12 @@ let gameOver = false;
 let vsComputer = true;
 let botType = "adaptive";
 let botLevelIndex = 0;
+let adaptSpeedIndex = 1;
+const ADAPT_SPEEDS = [
+    { key: "slow", label: "Langsam" },
+    { key: "normal", label: "Normal" },
+    { key: "fast", label: "Schnell" }
+];
 let ruleMode = "standard";
 let gameStarted = false;
 let lastMoveWasPressure = false;
@@ -49,7 +57,10 @@ const dirs = [
 
 function initGame() {
     if (vsComputer && botType === "adaptive" && typeof startAdaptiveRound === "function") {
-        updateAdaptiveStrengthUI(startAdaptiveRound(window.othelloPlayerProfile));
+        updateAdaptiveStrengthUI(startAdaptiveRound(
+            window.othelloPlayerProfile,
+            ADAPT_SPEEDS[adaptSpeedIndex].key
+        ));
     }
     board = Array(8).fill(null).map(() => Array(8).fill(null));
     board[3][3] = "white";
@@ -104,6 +115,11 @@ function updateBotLevelUI() {
     botLevelBtn.classList.toggle("button-disabled", !vsComputer);
     botLevelBtn.textContent = BOT_LEVELS[botLevelIndex];
     botType = botLevelIndex === 4 ? "adaptive" : "manual";
+    const adaptiveEnabled = vsComputer && botType === "adaptive";
+    adaptSpeedRow.classList.toggle("disabled", !adaptiveEnabled);
+    adaptSpeedBtn.disabled = !adaptiveEnabled;
+    adaptSpeedBtn.classList.toggle("button-disabled", !adaptiveEnabled);
+    adaptSpeedBtn.textContent = ADAPT_SPEEDS[adaptSpeedIndex].label;
     updateAdaptiveStrengthUI();
 }
 
@@ -344,6 +360,13 @@ botLevelBtn.addEventListener("click", () => {
     if(gameStarted &&!gameOver) return;
     playSound(soundButton, 0.22);
     botLevelIndex = (botLevelIndex + 1) % BOT_LEVELS.length;
+    updateBotLevelUI();
+});
+
+adaptSpeedBtn.addEventListener("click", () => {
+    if (adaptSpeedBtn.disabled || (gameStarted && !gameOver)) return;
+    playSound(soundButton, 0.22);
+    adaptSpeedIndex = (adaptSpeedIndex + 1) % ADAPT_SPEEDS.length;
     updateBotLevelUI();
 });
 

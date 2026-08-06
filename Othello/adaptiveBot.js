@@ -35,7 +35,7 @@ function calculatePlayerPerformance(profile) {
     return Math.max(0, Math.min(100, score));
 }
 
-function startAdaptiveRound(profile) {
+function startAdaptiveRound(profile, speed = "normal") {
     // Der Bot passt sich an das Spielniveau des Spielers an:
     // Ein Spielersieg verlangt mehr Herausforderung, ein Bot-Sieg weniger.
     const performance = calculatePlayerPerformance(profile);
@@ -57,6 +57,8 @@ function startAdaptiveRound(profile) {
     }
 
     adjustment = Math.max(-7, Math.min(7, adjustment));
+    const speedFactor = speed === "slow" ? 0.5 : speed === "fast" ? 1.5 : 1;
+    adjustment *= speedFactor;
     adaptiveStrength = Math.max(1, Math.min(100, adaptiveStrength + adjustment));
     return adaptiveStrength;
 }
