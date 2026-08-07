@@ -1,13 +1,12 @@
 ﻿const board = document.getElementById("board");
+const TicTacToeAICore = window.TicTacToeAICore;
 const status = document.getElementById("status");
 const reset = document.getElementById("reset");
 const winnerBanner = document.getElementById("winnerBanner");
-const WINNING_LINES = [
-    [0, 1, 2], [3, 4, 5], [6, 7, 8],
-    [0, 3, 6], [1, 4, 7], [2, 5, 8],
-    [0, 4, 8], [2, 4, 6]
-];
-
+const adaptiveStrengthPanel = document.getElementById("adaptiveStrengthPanel");
+const adaptiveStrengthTrack = document.getElementById("adaptiveStrengthTrack");
+const adaptiveStrengthFill = document.getElementById("adaptiveStrengthFill");
+const adaptiveStrengthValue = document.getElementById("adaptiveStrengthValue");
 /* --- Sound System --- */
 const uiClickSound = new Audio("../assets/sounds/Button_Click.mp3");
 uiClickSound.volume = 0.35;
@@ -48,12 +47,7 @@ let winRowGlobal = null;
 let matchOver = false;
 let waitingForNextRound = false;
 let botMoveTimer = null;
-
-/* Legacy-Habits fÃ¼r die festen Bots 1-4 */
-let habits = {
-    favoriteCells: [0,0,0,0,0,0,0,0,0],
-    mistakes: 0
-};
+let keyboardCursor = 0;
 
 function readSettings() {
     activeMatch = {
@@ -63,15 +57,6 @@ function readSettings() {
         roundMode: window.currentMode ?? "short",
         adaptSpeed: window.currentAdapt ?? "normal"
     };
-}
-
-/* NEU: Array mischen */
-function shuffleArray(array) {
-    for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
-    }
-    return array;
 }
 
 /* Render Board */
@@ -90,6 +75,9 @@ function render() {
         if (winRowGlobal && winRowGlobal.includes(i)) {
             cell.classList.add("win");
         }
+        if (i === keyboardCursor) {
+            cell.classList.add("keyboard-focus");
+        }
         if (isPlayable) {
             cell.onclick = () => move(i);
             cell.style.cursor = "pointer";
@@ -99,6 +87,32 @@ function render() {
         board.appendChild(cell);
     });
 }
+
+board.tabIndex = -1;
+board.addEventListener("keydown", event => {
+    if (gameOver || waitingForNextRound || matchOver || board.classList.contains("locked")) return;
+
+    const row = Math.floor(keyboardCursor / 3);
+    const col = keyboardCursor % 3;
+    let nextRow = row;
+    let nextCol = col;
+
+    if (event.key === "ArrowUp") nextRow = Math.max(0, row - 1);
+    else if (event.key === "ArrowDown") nextRow = Math.min(2, row + 1);
+    else if (event.key === "ArrowLeft") nextCol = Math.max(0, col - 1);
+    else if (event.key === "ArrowRight") nextCol = Math.min(2, col + 1);
+    else if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        move(keyboardCursor);
+        return;
+    } else {
+        return;
+    }
+
+    event.preventDefault();
+    keyboardCursor = nextRow * 3 + nextCol;
+    render();
+});
 
 /* Particles */
 function spawnParticles(x, y) {
@@ -133,23 +147,29 @@ function canPlayerMove(index) {
     return Number.isInteger(index) && cells[index] === null && isHumanTurn && !gameOver && !waitingForNextRound && !matchOver && !board.classList.contains("locked");
 }
 
-function setSettingsLocked(locked) {
+function applySettingsLock(locked) {
     if (typeof window.setSettingsLocked === "function") {
         window.setSettingsLocked(locked);
     }
 }
 
-function renderAdaptiveStrengthBar(skillValue) {
-    const skill = Math.max(0, Math.min(100, Math.round(Number(skillValue) || 0)));
-    const label = "Bot-Stärke";
-    return `
-        <span class="adaptive-strength-label">${label}</span>
-        <span class="adaptive-strength-track" style="--skill:${skill}%" aria-label="${label} ${skill} von 100">
-            <span class="adaptive-strength-fill"></span>
-            <span class="adaptive-strength-knob"></span>
-        </span>
-    `;
-}
+window.updateTicTacToeAdaptiveStrengthUI = function (skillValue = null) {
+    const selectedAdaptive = window.currentPlayers === "bot" && window.currentDifficulty === 5;
+    const activeAdaptive = activeMatch.mode === "bot" && activeMatch.botLevel === 5;
+    const visible = selectedAdaptive || activeAdaptive;
+    adaptiveStrengthPanel.hidden = !visible;
+    adaptiveStrengthPanel.classList.toggle("hidden", !visible);
+    if (!visible) return;
+
+    const fallbackSkill = typeof AdaptiveBot !== "undefined" && typeof AdaptiveBot.getSkillValue === "function"
+        ? AdaptiveBot.getSkillValue()
+        : 50;
+    const skill = Math.max(0, Math.min(100, Math.round(Number(skillValue ?? fallbackSkill) || 0)));
+    adaptiveStrengthValue.textContent = `${skill}%`;
+    adaptiveStrengthTrack.style.setProperty("--skill", `${skill}%`);
+    adaptiveStrengthTrack.setAttribute("aria-label", `Botstärke ${skill} von 100`);
+    adaptiveStrengthFill.style.width = `${skill}%`;
+};
 
 function scheduleBotMove(delay, showPreview = true) {
     cancelPendingBotMove();
@@ -179,11 +199,12 @@ function getBotMove() {
     if (activeMatch.botLevel === 5) {
         return AdaptiveBot.getBotMove();
     }
-    if (activeMatch.botLevel === 1) return botRandom();
-    if (activeMatch.botLevel === 2) return botMedium();
-    if (activeMatch.botLevel === 3) return botHard();
-    if (activeMatch.botLevel === 4) return botPerfect(false);
-    return null;
+    return getTicTacToeManualMove({
+        board: cells,
+        level: activeMatch.botLevel,
+        player: "O",
+        opponent: "X"
+    });
 }
 
 function getBotDelay() {
@@ -191,13 +212,7 @@ function getBotDelay() {
         return AdaptiveBot.getBotDelay();
     }
 
-    const delays = {
-        1: 300 + Math.random() * 200,
-        2: 500 + Math.random() * 300,
-        3: 700 + Math.random() * 400,
-        4: 1000 + Math.random() * 500
-    };
-    return delays[activeMatch.botLevel] ?? 500;
+    return getTicTacToeManualThinkTime(activeMatch.botLevel);
 }
 
 function playMove(index, player) {
@@ -207,7 +222,7 @@ function playMove(index, player) {
     const rect = board.children[index].getBoundingClientRect();
     spawnParticles(rect.left + rect.width / 2, rect.top + rect.height / 2);
 
-    const winRow = checkWin(player);
+    const winRow = TicTacToeAICore.checkWin(player, cells);
     if (winRow) return endRound(player, winRow);
     if (!cells.includes(null)) return endRound("draw");
 
@@ -228,63 +243,26 @@ function move(i) {
 
     const cellsBeforeMove = cells.slice();
     const player = current;
-    if (activeMatch.mode === "bot") {
-        if (activeMatch.botLevel !== 5) {
-            updateHabits(i, player);
-            if (player === "X" && isMistake(i, player, cellsBeforeMove)) {
-                habits.mistakes++;
-            }
-        } else if (player === "X" && typeof AdaptiveBot !== "undefined" && typeof AdaptiveBot.observePlayerMove === "function") {
+    if (activeMatch.mode === "bot" && player === "X") {
+        TicTacToeAICore.trackPlayerMove(window.ticTacToePlayerProfile, i, cellsBeforeMove, player);
+
+        const missedWin = TicTacToeAICore.findCritical("X", cellsBeforeMove);
+        const missedBlock = TicTacToeAICore.findCritical("O", cellsBeforeMove);
+        if (missedWin !== null && missedWin !== i) {
+            TicTacToeAICore.recordPlayerEvent(window.ticTacToePlayerProfile, "missedWin");
+        }
+        if (missedBlock !== null && missedBlock !== i) {
+            TicTacToeAICore.recordPlayerEvent(window.ticTacToePlayerProfile, "missedBlock");
+        }
+        if (activeMatch.botLevel !== 5 && TicTacToeAICore.wouldFork(cellsBeforeMove, "X", i)) {
+            TicTacToeAICore.recordPlayerEvent(window.ticTacToePlayerProfile, "fork");
+        }
+
+        if (activeMatch.botLevel === 5 && typeof AdaptiveBot !== "undefined" && typeof AdaptiveBot.observePlayerMove === "function") {
             AdaptiveBot.observePlayerMove(i, cellsBeforeMove, player);
         }
     }
     playMove(i, player);
-}
-
-/* â­ HABIT HELPER */
-function updateHabits(move, player) {
-    if (player === "X") {
-        habits.favoriteCells[move]++;
-    }
-}
-
-function getTopFavoriteCells(n) {
-    return habits.favoriteCells
-       .map((v, i) => ({i, v}))
-       .sort((a,b) => b.v - a.v)
-       .slice(0, n)
-       .map(x => x.i);
-}
-
-function wouldFork(board, player, move) {
-    const test = board.slice();
-    test[move] = player;
-    let wins = 0;
-    for(let i=0; i<9; i++) {
-        if(test[i] === null) {
-            test[i] = player;
-            if(checkWin(player, test)) wins++;
-            test[i] = null;
-        }
-    }
-    return wins >= 2;
-}
-
-/* T2: Perfekte ErÃ¶ffnung */
-function getPerfectOpening() {
-    if (cells[4] === null) return 4; // Mitte
-    const corners = [0,2,6,8].filter(i => cells[i] === null);
-    if (corners.length) return corners[Math.floor(Math.random() * corners.length)];
-    return null;
-}
-
-/* T4: Ist Zug ein Fehler? */
-function isMistake(move, player, state) {
-    // Fehler = einen direkten Gewinnzug des Gegners nicht blocken
-    const opponent = player === "X" ? "O" : "X";
-    const block = findCritical(opponent, state);
-    if(block!== null && move!== block) return true;
-    return false;
 }
 
 /* Bot Move - MENSCHLICH */
@@ -297,332 +275,11 @@ function botMove(moveIndex) {
     playMove(moveIndex, "O");
 }
 
-/* === MENSCHLICHER BOT === */
-
-/* Hilfsfunktion: Freie Felder */
-function getFreeCells() {
-    return cells.map((v, i) => v === null? i : null).filter(v => v!== null);
-}
-
-/* NEU: Hilfsfunktion fÃ¼r Zufall aus Top N */
-function pickFromBest(moves, topN = 2) {
-    const count = Math.min(topN, moves.length);
-    if(count === 0) return null;
-    return moves[Math.floor(Math.random() * count)];
-}
-
-/* NEU: Gibt alle gleich guten Minimax ZÃ¼ge zurÃ¼ck - GEMISCHT */
-function getBestMovesFromMinimax(board, player) {
-    let bestScore = -Infinity;
-    let bestMoves = [];
-    const free = shuffleArray(board.map((v, i) => v === null? i : null).filter(v => v!== null));
-
-    for (let i of free) {
-        const newBoard = board.slice();
-        newBoard[i] = player;
-        const result = minimax(newBoard, player === "O"? "X" : "O");
-        const currentScore = player === "O"? result.score : -result.score;
-
-        if (currentScore > bestScore) {
-            bestScore = currentScore;
-            bestMoves = [i];
-        } else if (currentScore === bestScore) {
-            bestMoves.push(i);
-        }
-    }
-    return bestMoves;
-}
-
-/* GEÃ„NDERT: Menschliche Zug-PrioritÃ¤t: Mitte > Ecken > Kanten - JETZT GEMISCHT + 20% Kante statt Ecke */
-function getHumanPriorityMoves() {
-    const free = getFreeCells();
-    const corners = shuffleArray([0,2,6,8].filter(i => free.includes(i)));
-    const edges = shuffleArray([1,3,5,7].filter(i => free.includes(i)));
-
-    let priority = [];
-    if(free.includes(4)) priority.push(4);
-
-    // 80% Chance: klassisch Ecken vor Kanten
-    // 20% Chance: "Druckfehler" - Kanten vor Ecken
-    if(Math.random() < 0.8) {
-        priority.push(...corners);
-        priority.push(...edges);
-    } else {
-        priority.push(...edges);
-        priority.push(...corners);
-    }
-
-    return priority;
-}
-
-/* Bot Level 1: Zufall + 10% Lieblingsfeld */
-function botRandom() {
-    const free = getFreeCells();
-    const habitRoll = Math.random();
-
-    // 20% Glücksmoment: spielt einmal optimal per Minimax
-    if(Math.random() < 0.2) {
-        const bestMoves = getBestMovesFromMinimax(cells, "O");
-        if(bestMoves.length > 0) return bestMoves[Math.floor(Math.random() * bestMoves.length)];
-    }
-
-    // 10% nimmt Lieblingsfeld
-    if(habitRoll < 0.1) {
-        const fav = getTopFavoriteCells(1)[0];
-        if(fav!== undefined && cells[fav] === null) return fav;
-    }
-
-    // 20% dummer Kanten-Zug
-    if(Math.random() < 0.2) {
-        const badMoves = free.filter(i =>![0,2,4,6,8].includes(i));
-        if(badMoves.length > 0) return badMoves[Math.floor(Math.random() * badMoves.length)];
-    }
-	
-    // 30% spielt "menschlich": bevorzugt Ecken
-    if(Math.random() < 0.3) {
-        const corners = [0,2,6,8].filter(i => cells[i] === null);
-        if(corners.length > 0) return corners[Math.floor(Math.random() * corners.length)];
-    }
-    return free[Math.floor(Math.random() * free.length)];
-}
-
-/* Bot Level 2: 30% Lieblingsfeld blocken + Blocken/Gewinnen */
-function botMedium() {
-    const habitStrength = 0.6;
-
-    // 20% spielt Mitte wenn frei - sehr menschlich
-    if(cells[4] === null && Math.random() < 0.2) return 4;
-	
-    // 60% blockt Top-2 Lieblingsfelder
-    if(Math.random() < habitStrength) {
-        const favs = getTopFavoriteCells(2);
-        const favMove = favs.find(i => cells[i] === null);
-        if(favMove!== undefined) return favMove;
-    }
-
-    const win = findCritical("O");
-    if(win!== null && Math.random() < 0.7) return win;
-
-    const block = findCritical("X");
-    if(block!== null && Math.random() < 0.6) return block;
-
-    // 50% spielt optimal per Minimax
-    if(Math.random() < 0.5) {
-        const bestMoves = getBestMovesFromMinimax(cells, "O");
-        return pickFromBest(bestMoves, 2);
-    }
-
-    return pickFromBest(getHumanPriorityMoves(), 2) || botRandom();
-}
-
-/* Bot Level 3: Mittel */
-function botHard() { // L3 Mittel
-    const free = getFreeCells();
-
-    // 1. GEWINNEN IMMER
-    const win = findCritical("O");
-    if(win!== null) return win;
-
-    // 2. BLOCKEN IMMER
-    const block = findCritical("X");
-    if(block!== null) return block;
-
-    // 3. Erst dann der Rest
-
-    // 70% nimmt Lieblingsfeld Top-2
-    if(Math.random() < 0.7) {
-        const favs = getTopFavoriteCells(2);
-        const favMove = favs.find(i => cells[i] === null);
-        if(favMove!== undefined) return favMove;
-    }
-
-    // T1: 60% Gabel stellen
-    if(Math.random() < 0.6) {
-        const fork = free.find(i => wouldFork(cells, "O", i));
-        if(fork!== undefined) return fork;
-    }
-
-    // T3: 70% Gegen-Gabel
-    if(Math.random() < 0.7) {
-        const antiFork = free.find(i => wouldFork(cells, "X", i));
-        if(antiFork!== undefined) return free[Math.floor(Math.random() * free.length)];
-    }
-
-    // T4: Ab 3 Fehlern 60% aggressiv
-    if(habits.mistakes >= 3 && Math.random() < 0.6) {
-        const fork = free.find(i => wouldFork(cells, "O", i));
-        if(fork!== undefined) return fork;
-    }
-
-    // 70% spielt okay per Minimax
-    if(Math.random() < 0.7) {
-        const bestMoves = getBestMovesFromMinimax(cells, "O");
-        return pickFromBest(bestMoves, 2); // nimmt 1 von Top 2
-    }
-
-    return pickFromBest(getHumanPriorityMoves(), 3) || botRandom();
-}
-
-/* Bot Level 4: Schwer */
-function botPerfect(isGodmode = false) { // NEU: Parameter
-    // 1. GEWINNEN IMMER
-    const win = findCritical("O");
-    if(win!== null) return win;
-
-    // 2. BLOCKEN IMMER
-    const block = findCritical("X");
-    if(block!== null) return block;
-
-    // 3. Erst dann der Rest
-    const movesMade = cells.filter(c => c!== null).length;
-    if(movesMade < 2) {
-        const opening = getPerfectOpening();
-        if(opening!== null) return opening;
-    }
-
-    const favs = getTopFavoriteCells(3);
-    const favMove = favs.find(i => cells[i] === null);
-    if(favMove!== undefined && Math.random() < 0.85) return favMove;
-
-    const fork = getFreeCells().find(i => wouldFork(cells, "O", i));
-    if(fork!== undefined && Math.random() < 0.95) return fork;
-
-    const antiFork = getFreeCells().find(i => wouldFork(cells, "X", i));
-    if(antiFork!== undefined && Math.random() < 0.95) return antiFork;
-
-    if(habits.mistakes >= 1 && Math.random() < 0.9) {
-        const fork = getFreeCells().find(i => wouldFork(cells, "O", i));
-        if(fork!== undefined) return fork;
-    }
-
-    // PATZER NUR WENN KEIN GODMODE
-    if (!isGodmode) {
-        const patzerChance = 0.05;
-        if(Math.random() < patzerChance) {
-            const safeMoves = getFreeCells().filter(i => {
-                const testCells = [...cells];
-                testCells[i] = "O";
-                return findCritical("X", testCells) === null;
-            });
-            const free = safeMoves.length > 0? safeMoves : getFreeCells();
-            return free[Math.floor(Math.random() * free.length)];
-        }
-    }
-
-    const bestMoves = getBestMovesFromMinimax(cells, "O");
-    return bestMoves[0];
-}
-
-/* Bot Level 1.5: Mix L1/L2 */
-function botL1_5() {
-    return Math.random() < 0.5? botRandom() : botMedium();
-}
-
-/* Bot Level 2.5: Mix L2/L3 */
-function botL2_5() {
-    return Math.random() < 0.5? botMedium() : botHard();
-}
-
-/* Bot Level 3.5: Mix L3/L4 */
-function botL3_5() {
-    return Math.random() < 0.5? botHard() : botPerfect(false);
-}
-
-/* Bot Level 6: VERSTECKT - Perfekt */
-function botGodmode() {
-    const win = findCritical("O");
-    if(win!== null) return win;
-    const block = findCritical("X");
-    if(block!== null) return block;
-
-    const movesMade = cells.filter(c => c!== null).length;
-    if(movesMade < 2) {
-        const opening = getPerfectOpening();
-        if(opening!== null) return opening;
-    }
-
-    const free = getFreeCells();
-    const fork = free.find(i => wouldFork(cells, "O", i));
-    if(fork!== undefined) return fork;
-
-    const antiFork = free.find(i => wouldFork(cells, "X", i));
-    if(antiFork!== undefined) return antiFork;
-
-    const bestMoves = getBestMovesFromMinimax(cells, "O");
-    return bestMoves[0];
-}
-
-/* findCritical bleibt gleich */
-function findCritical(player, state = cells) {
-    for (let w of WINNING_LINES) {
-        const [a,b,c] = w;
-        const line = [state[a], state[b], state[c]];
-        if (line.filter(v => v === player).length === 2 && line.includes(null)) {
-            return w[line.indexOf(null)];
-        }
-    }
-    return null;
-}
-
-/* Minimax bleibt gleich */
-function minimax(boardState, player) {
-    const free = boardState.map((v, i) => v === null? i : null).filter(v => v!== null);
-    if (checkWin("X", boardState)) return { score: -10 };
-    if (checkWin("O", boardState)) return { score: 10 };
-    if (free.length === 0) return { score: 0 };
-    const moves = [];
-    for (let i of free) {
-        const newState = [...boardState];
-        newState[i] = player;
-        const result = minimax(newState, player === "O"? "X" : "O");
-        moves.push({ index: i, score: result.score });
-    }
-    return player === "O"? moves.reduce((best, m) => m.score > best.score? m : best) : moves.reduce((best, m) => m.score < best.score? m : best);
-}
-
-/* Win Check */
-function checkWin(p, state = cells) {
-    for (let w of WINNING_LINES) {
-        if (w.every(i => state[i] === p)) {
-            return w;
-        }
-    }
-    return null;
-}
-
-/* Shake Board */
-function shakeBoard() {
-    board.classList.add("shake");
-    setTimeout(() => board.classList.remove("shake"), 500);
-}
-
-/* Firework Effect */
-function fireworkEffect() {
-    const container = document.body;
-    const centerX = window.innerWidth / 2;
-    const centerY = board.offsetTop + board.offsetHeight / 2;
-    const colors = ["#3d7dff", "#00e5ff", "#a970ff", "#34C759", "#ffcc00", "#ff2a2a"];
-    for (let i = 0; i < 60; i++) {
-        const fw = document.createElement("div");
-        fw.className = "firework";
-        const angle = Math.random() * Math.PI * 2;
-        const distance = 120 + Math.random() * 180;
-        fw.style.left = centerX + "px";
-        fw.style.top = centerY + "px";
-        fw.style.background = colors[Math.floor(Math.random() * colors.length)];
-        const size = 6 + Math.random() * 14;
-        fw.style.width = fw.style.height = size + "px";
-        fw.style.setProperty("--dx", Math.cos(angle) * distance + "px");
-        fw.style.setProperty("--dy", Math.sin(angle) * distance + "px");
-        container.appendChild(fw);
-        setTimeout(() => fw.remove(), 1000);
-    }
-}
-
 /* End Round - MIT UNENTSCHIEDEN */
 function endRound(winner, winRow = null) {
     gameOver = true;
     waitingForNextRound = true;
+    board.tabIndex = -1;
     winRowGlobal = winRow || null;
     render();
 
@@ -630,12 +287,13 @@ function endRound(winner, winRow = null) {
     if (winner === "O") scoreO++;
     if (winner === "draw") scoreDraw++;
     roundsPlayed++;
-    updateScore(scoreX, scoreDraw, scoreO);
-
     if (activeMatch.mode === "bot") {
-        if (winner === "O") shakeBoard();
-        if (winner === "X") fireworkEffect();
+        window.ticTacToePlayerProfile.gamesAgainstBot++;
     }
+    updateScore(scoreX, scoreDraw, scoreO);
+    document.getElementById("scoreX").classList.toggle("winner", winner === "X");
+    document.getElementById("scoreDraw").classList.toggle("winner", winner === "draw");
+    document.getElementById("scoreO").classList.toggle("winner", winner === "O");
 
     startingPlayer = startingPlayer === "X"? "O" : "X";
 
@@ -683,7 +341,7 @@ function endRound(winner, winRow = null) {
     }
 
     matchOver = matchFinished;
-    setSettingsLocked(!matchFinished);
+    applySettingsLock(!matchFinished);
 
 if(matchFinished){
     let parts = [];
@@ -706,17 +364,22 @@ if(matchFinished){
 
 /* Reset - ÃœBERARBEITET */
 function resetGame(full = true) {
+    ["scoreX", "scoreDraw", "scoreO"].forEach(id => document.getElementById(id).classList.remove("winner"));
     cancelPendingBotMove();
     if (full) {
         readSettings();
     }
-    setSettingsLocked(true);
+    applySettingsLock(true);
     cells = Array(9).fill(null);
+    keyboardCursor = 0;
     waitingForNextRound = false;
     winRowGlobal = null;
 
     gameOver = false;
     board.classList.remove("locked");
+    board.tabIndex = 0;
+    board.style.pointerEvents = "auto";
+    board.style.opacity = "";
 
     if (full) {
 		status.classList.remove("winner");
@@ -742,11 +405,8 @@ function resetGame(full = true) {
         })
         : "";
     const roundLabel = full ? `Runde 1/${activeMatch.totalRounds}` : `Runde ${roundsPlayed + 1}/${activeMatch.totalRounds}`;
-    if (activeMatch.mode === "bot" && activeMatch.botLevel === 5 && adaptiveSkillValue !== "") {
-        status.innerHTML = `${roundLabel} - ${current} beginnt. ${renderAdaptiveStrengthBar(adaptiveSkillValue)}`;
-    } else {
-        status.textContent = `${roundLabel} - ${current} beginnt`;
-    }
+    status.textContent = `${roundLabel} - ${current} beginnt`;
+    window.updateTicTacToeAdaptiveStrengthUI(adaptiveSkillValue);
     reset.textContent = "Match abbrechen";
     render();
 
@@ -758,6 +418,7 @@ function resetGame(full = true) {
 function abortMatch() {
     cancelPendingBotMove();
     cells = Array(9).fill(null);
+    keyboardCursor = 0;
     current = "X";
     gameOver = true;
     waitingForNextRound = false;
@@ -770,20 +431,19 @@ function abortMatch() {
     roundsPlayed = 0;
 
     board.classList.add("locked");
+    board.tabIndex = -1;
     updateScore(scoreX, scoreDraw, scoreO);
     winnerBanner.classList.remove("show");
     winnerBanner.textContent = "";
     status.textContent = "Einstellungen ändern und 'Neues Spiel' klicken";
     reset.textContent = "Neues Spiel";
-    setSettingsLocked(false);
+    applySettingsLock(false);
     render();
 }
 
 /* NEU: Reset Button Logik */
 reset.onclick = () => {
-    if (gameOver && board.classList.contains("locked")) {
-        resetGame(true);
-    } else if(matchOver) {
+    if (gameOver || matchOver) {
         resetGame(true);
     } else if(waitingForNextRound) {
         resetGame(false);
@@ -796,10 +456,12 @@ reset.onclick = () => {
 function init() {
     readSettings();
     cells = Array(9).fill(null);
+    keyboardCursor = 0;
     gameOver = true;
     waitingForNextRound = false;
     winRowGlobal = null;
     board.classList.add('locked');
+    board.tabIndex = -1;
     matchOver = false;
     status.textContent = "Einstellungen wählen und 'Neues Spiel' klicken";
     reset.textContent = "Neues Spiel";

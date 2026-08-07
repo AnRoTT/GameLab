@@ -45,6 +45,7 @@
                         <span id="adaptive-strength-fill" class="adaptive-strength-fill"></span>
                         <span class="adaptive-strength-knob"></span>
                     </span>
+                    <span id="adaptive-strength-value" class="adaptive-strength-value">50%</span>
                 </div>
             </div>
             <div class="scoreboard">
@@ -73,12 +74,15 @@
         </section>
     </main>
 
-    <footer class="footer">4 Gewinnt | by Andreas Rollinger | 2026.07.31</footer>
+    <footer class="footer">4 Gewinnt | by Andreas Rollinger | 2026.08.07</footer>
 
 </div>
 
-<script src="adaptiveBot.js"></script>
-<script src="game.js"></script>
+    <script src="aiCore.js"></script>
+    <script src="manuellBot.js"></script>
+    <script src="adaptiveBot.js"></script>
+    <script src="settings.js"></script>
+    <script src="game.js"></script>
 <script>
 document.getElementById("backIcon").style.display =
     new URLSearchParams(location.search).get('menu') === '1' ? 'block' : 'none';

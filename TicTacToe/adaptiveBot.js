@@ -1,4 +1,5 @@
 (function () {
+    const TicTacToeAdaptiveCore = window.TicTacToeAICore;
     const state = {
         adaptiveRoundStatus: "",
         adaptiveRoundSnapshot: null,
@@ -10,21 +11,8 @@
             mistakeChance: 0.12,
             creativity: 0.50
         },
-        playerProfile: {
-            favoriteCells: [0, 0, 0, 0, 0, 0, 0, 0, 0],
-            openingCells: [0, 0, 0, 0, 0, 0, 0, 0, 0],
-            rowPreference: [0, 0, 0],
-            colPreference: [0, 0, 0],
-            positionPreference: { center: 0, corner: 0, edge: 0 },
-            style: { aggressive: 0, defensive: 0 },
-            mistakes: 0,
-            missedBlocks: 0,
-            missedWins: 0,
-            forksSeen: 0,
-            forksMissed: 0,
-            tacticalGood: 0,
-            tacticalBad: 0
-        }
+        // Das Profil wird zentral in aiCore.js erstellt und hier nur gelesen.
+        playerProfile: window.ticTacToePlayerProfile
     };
 
     function getLearningRate() {
@@ -108,49 +96,26 @@
         return "edge";
     }
 
-    function trackAdaptivePlayerMove(move, stateBeforeMove, player) {
-        const row = Math.floor(move / 3);
-        const col = move % 3;
-        const type = adaptiveCellType(move);
-        const turnNumber = stateBeforeMove.filter(v => v !== null).length;
-
-        state.playerProfile.favoriteCells[move] += 1;
-        if (turnNumber === 0) {
-            state.playerProfile.openingCells[move] += 1;
-        }
-        state.playerProfile.rowPreference[row] += 1;
-        state.playerProfile.colPreference[col] += 1;
-        state.playerProfile.positionPreference[type] += 1;
-
-        if (player === "X") {
-            if (move === 4) state.playerProfile.style.defensive += 0.3;
-            if ([0, 2, 6, 8].includes(move)) state.playerProfile.style.aggressive += 0.2;
-        }
-    }
-
     function registerAdaptiveMissedWin(move, stateBeforeMove) {
-        const win = findCritical("X", stateBeforeMove);
+        const win = TicTacToeAdaptiveCore.findCritical("X", stateBeforeMove);
         if (win !== null && move !== win) {
-            state.playerProfile.missedWins += 1;
-            state.playerProfile.tacticalBad += 1;
             return true;
         }
         return false;
     }
 
     function registerAdaptiveMissedBlock(move, stateBeforeMove) {
-        const block = findCritical("O", stateBeforeMove);
+        const block = TicTacToeAdaptiveCore.findCritical("O", stateBeforeMove);
         if (block !== null && move !== block) {
-            state.playerProfile.missedBlocks += 1;
-            state.playerProfile.tacticalBad += 1;
             return true;
         }
         return false;
     }
 
-    function registerAdaptiveForkSignals(stateBeforeMove) {
-        const forkThreat = getFreeCells().some(i => wouldFork(stateBeforeMove, "O", i));
-        if (forkThreat) state.playerProfile.forksSeen += 1;
+    function registerAdaptiveForkSignals(move, stateBeforeMove) {
+        if (TicTacToeAdaptiveCore.wouldFork(stateBeforeMove, "X", move)) {
+            state.playerProfile.forksSeen += 1;
+        }
     }
 
     function getAdaptiveHabitScore(move) {
@@ -174,21 +139,21 @@
     }
 
     function getAdaptiveBestMove() {
-        const free = getFreeCells();
+        const free = TicTacToeAdaptiveCore.getFreeCells(cells);
         const curve = adaptiveCurve();
         const band = getAdaptiveSkillBand();
-        const win = findCritical("O");
+        const win = TicTacToeAdaptiveCore.findCritical("O", cells);
         if (win !== null) return win;
-        const block = findCritical("X");
+        const block = TicTacToeAdaptiveCore.findCritical("X", cells);
         if (block !== null) return block;
 
         const tacticMultiplier = [0.28, 0.42, 0.58, 0.72, 0.88, 1.0][band];
         const tacticsRoll = Math.random();
         const tacticChance = state.adaptiveAI.tactics * (0.12 + curve * tacticMultiplier);
         if (tacticsRoll < tacticChance) {
-            const fork = free.find(i => wouldFork(cells, "O", i));
+            const fork = free.find(i => TicTacToeAdaptiveCore.wouldFork(cells, "O", i));
             if (fork !== undefined) return fork;
-            const antiFork = free.find(i => wouldFork(cells, "X", i));
+            const antiFork = free.find(i => TicTacToeAdaptiveCore.wouldFork(cells, "X", i));
             if (antiFork !== undefined) return antiFork;
         }
 
@@ -200,13 +165,15 @@
             if (habitMove !== null) return habitMove;
         }
 
-        const opening = getPerfectOpening();
+        const opening = cells[4] === null
+            ? 4
+            : [0, 2, 6, 8].filter(index => cells[index] === null)[0] ?? null;
         const openingChance = [0.12, 0.18, 0.28, 0.38, 0.48, 0.60][band] * (0.55 + curve * 0.45);
         if (cells.filter(v => v !== null).length < 2 && opening !== null && Math.random() < openingChance) {
             return opening;
         }
 
-        const bestMoves = getBestMovesFromMinimax(cells, "O");
+        const bestMoves = TicTacToeAdaptiveCore.getBestMoves(cells, "O");
         if (!bestMoves.length) return free[0] ?? null;
 
         const accuracyMultiplier = [0.12, 0.20, 0.34, 0.52, 0.74, 0.92][band];
@@ -230,7 +197,7 @@
 
     function botAdaptive() {
         const bestMove = getAdaptiveBestMove();
-        const free = getFreeCells();
+        const free = TicTacToeAdaptiveCore.getFreeCells(cells);
         if (bestMove === null || !Number.isInteger(bestMove) || !free.includes(bestMove)) {
             return free[0] ?? null;
         }
@@ -306,11 +273,10 @@
 
     function observePlayerMove(move, stateBeforeMove, player) {
         if (player !== "X") return;
-        trackAdaptivePlayerMove(move, stateBeforeMove, player);
-        registerAdaptiveForkSignals(stateBeforeMove);
+        registerAdaptiveForkSignals(move, stateBeforeMove);
         const missedWin = registerAdaptiveMissedWin(move, stateBeforeMove);
         const missedBlock = registerAdaptiveMissedBlock(move, stateBeforeMove);
-        if (missedWin || missedBlock || isMistake(move, player, stateBeforeMove)) {
+        if (missedWin || missedBlock) {
             state.playerProfile.mistakes += 1;
         } else {
             state.playerProfile.tacticalGood += 1;

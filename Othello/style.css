@@ -41,6 +41,17 @@
     background: #22b24a; /* Beim Hover heller werden */
 }
 
+.board:focus-visible .cell.keyboard-focus {
+    outline: 2px solid #ffffff;
+    outline-offset: -2px;
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.7);
+}
+
+.board:focus-visible {
+    outline: 2px solid #78a5ff;
+    outline-offset: 6px;
+}
+
 /* -----------------------------------------
    Steine mit 3D Look
    ----------------------------------------- */
@@ -171,16 +182,18 @@
    ----------------------------------------- */
 @media (max-width: 520px) {
     .board {
-        grid-template-columns: repeat(8, 11vw); /* Skaliert mit Bildschirm */
-        grid-template-rows: repeat(8, 11vw);
+        width: 88vw;
+        height: 88vw;
         max-width: 88vw;
+        max-height: 88vw;
+        grid-template-columns: repeat(8, minmax(0, 1fr));
+        grid-template-rows: repeat(8, minmax(0, 1fr));
         padding: 4px;
         min-height: 0;
-        height: auto;
     }
     .cell {
-        width: 11vw;
-        height: 11vw;
+        width: auto;
+        height: auto;
     }
     .piece { /* HIER GEÄNDERT */
         width: 9vw;
@@ -232,6 +245,14 @@
     margin: 0 auto;
 }
 
+.cycle-group-double.setting-row {
+    display: grid;
+    grid-template-columns: auto;
+    gap: 8px;
+    width: fit-content;
+    padding: 4px 10px;
+}
+
 .setting-row.disabled {
     opacity: 0.45;
     pointer-events: none;
@@ -271,24 +292,44 @@
 }
 
 .adaptive-strength {
-    min-width: 220px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
     margin-top: 9px;
 }
 
+.adaptive-strength[hidden] {
+    display: none;
+}
+
 .adaptive-strength-label {
-    margin-bottom: 5px;
+    white-space: nowrap;
+    font-weight: 600;
     font-size: 0.85rem;
     color: var(--text-main);
 }
 
+.adaptive-strength-value {
+    min-width: 3.2rem;
+    color: var(--text-main);
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+    text-align: left;
+}
+
 .adaptive-strength-track {
+    width: min(48vw, 220px);
     height: 8px;
     overflow: hidden;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.16);
 }
 
-.adaptive-strength-track > div {
+.adaptive-strength-track > span {
+    display: block;
     width: 50%;
     height: 100%;
     border-radius: inherit;
@@ -301,3 +342,38 @@
 .score-bar > span:last-child { color: #111111; }
 .score-bar > span:first-child > span { color: #ffffff; }
 .score-bar > span:last-child > span { color: #111111; }
+
+.score-bar > span.winner {
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+    border-color: #ffffff;
+}
+
+@media (max-height: 700px) {
+    body {
+        align-items: flex-start;
+        padding-top: 8px;
+    }
+
+    #settingsPanel {
+        margin-bottom: 12px;
+    }
+
+    #startBtn {
+        margin-bottom: 8px;
+    }
+
+    .game-info {
+        margin-top: 8px;
+        margin-bottom: 12px;
+        padding: 7px 10px;
+    }
+
+    .board {
+        margin-top: 0;
+    }
+
+    .footer {
+        margin-top: 12px;
+        padding: 8px 12px;
+    }
+}

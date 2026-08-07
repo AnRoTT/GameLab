@@ -2,9 +2,7 @@
 const startBtn = document.getElementById("startBtn");
 const modeBtn = document.getElementById("modeBtn");
 const rulesBtn = document.getElementById("rulesBtn");
-const botLevelRow = document.getElementById("botLevelRow");
 const botLevelBtn = document.getElementById("botLevelBtn");
-const adaptSpeedRow = document.getElementById("adaptSpeedRow");
 const adaptSpeedBtn = document.getElementById("adaptSpeedBtn");
 const settingsPanel = document.getElementById("settingsPanel");
 const scoreBlackEl = document.getElementById("scoreBlack");
@@ -32,20 +30,14 @@ function playSound(sound, volume = 0.25) {
 let board = [];
 let currentPlayer = "black";
 let gameOver = false;
-let vsComputer = true;
-let botType = "adaptive";
-let botLevelIndex = 0;
-let adaptSpeedIndex = 1;
-const ADAPT_SPEEDS = [
-    { key: "slow", label: "Langsam" },
-    { key: "normal", label: "Normal" },
-    { key: "fast", label: "Schnell" }
-];
-let ruleMode = "standard";
 let gameStarted = false;
 let lastMoveWasPressure = false;
-
-const BOT_LEVELS = ["Anfänger", "Hobbyspieler", "Vereinsspieler", "Meister", "Adaptiv"];
+let botMoveTimer = null;
+let nextTurnTimer = null;
+let passTimer = null;
+let gameToken = 0;
+let keyboardRow = 3;
+let keyboardCol = 3;
 
 window.othelloPlayerProfile = createOthelloPlayerProfile();
 
@@ -56,6 +48,8 @@ const dirs = [
 ];
 
 function initGame() {
+    cancelPendingTurnTimers();
+    const token = gameToken;
     if (vsComputer && botType === "adaptive" && typeof startAdaptiveRound === "function") {
         updateAdaptiveStrengthUI(startAdaptiveRound(
             window.othelloPlayerProfile,
@@ -69,9 +63,12 @@ function initGame() {
     board[4][4] = "white";
 
     currentPlayer = "black";
+    keyboardRow = 3;
+    keyboardCol = 3;
     gameOver = false;
     gameStarted = true;
     boardEl.classList.remove("disabled");
+    boardEl.tabIndex = 0;
     // settingsPanel.classList.add("disabled"); // NICHT sperren wegen Abbrechen
 modeBtn.classList.add("disabled"); // nur Modus sperren
 rulesBtn.classList.add("disabled"); // nur Regeln sperren
@@ -82,14 +79,44 @@ rulesBtn.classList.add("disabled"); // nur Regeln sperren
     lastMoveWasPressure = false;
 
     updateBotLevelUI();
-    if(vsComputer && currentPlayer === "white") botMove(); // Sofort Bot wenn er anfängt
+    if(vsComputer && currentPlayer === "white") botMove(token); // Sofort Bot wenn er anfängt
+}
+
+function cancelPendingTurnTimers() {
+    if (botMoveTimer !== null) {
+        clearTimeout(botMoveTimer);
+        botMoveTimer = null;
+    }
+    if (nextTurnTimer !== null) {
+        clearTimeout(nextTurnTimer);
+        nextTurnTimer = null;
+    }
+    if (passTimer !== null) {
+        clearTimeout(passTimer);
+        passTimer = null;
+    }
+    gameToken += 1;
+}
+
+function scheduleNextTurn(delay, token = gameToken) {
+    if (nextTurnTimer !== null) clearTimeout(nextTurnTimer);
+    nextTurnTimer = setTimeout(() => {
+        nextTurnTimer = null;
+        if (token !== gameToken || !gameStarted || gameOver) return;
+        nextTurn();
+    }, delay);
 }
 
 function resetGame() {
+    cancelPendingTurnTimers();
+    [scoreBlackEl.parentElement, scoreWhiteEl.parentElement].forEach(element => element.classList.remove("winner"));
     board = Array(8).fill(null).map(() => Array(8).fill(null));
+    keyboardRow = 3;
+    keyboardCol = 3;
     gameStarted = false;
     gameOver = false;
     boardEl.classList.add("disabled");
+    boardEl.tabIndex = -1;
 modeBtn.classList.remove("disabled"); // nur Modus wieder frei
 rulesBtn.classList.remove("disabled"); // nur Regeln wieder frei
     renderBoard();
@@ -97,37 +124,16 @@ rulesBtn.classList.remove("disabled"); // nur Regeln wieder frei
     statusEl.textContent = "Klick 'Jetzt spielen' um zu starten";
     startBtn.textContent = "Jetzt spielen";
     lastMoveWasPressure = false;
-    if (window.othelloPlayerProfile) window.othelloPlayerProfile.gamesPlayed += 1;
     updateBotLevelUI();
-}
-
-function updateAdaptiveStrengthUI(strength = getAdaptiveStrength()) {
-    const visible = vsComputer && botType === "adaptive";
-    adaptiveStrengthPanel.hidden = !visible;
-    if (!visible) return;
-    adaptiveStrengthValue.textContent = `${Math.round(strength)}%`;
-    adaptiveStrengthBar.style.width = `${Math.max(1, Math.min(100, strength))}%`;
-}
-
-function updateBotLevelUI() {
-    botLevelRow.classList.toggle("disabled", !vsComputer);
-    botLevelBtn.disabled = !vsComputer;
-    botLevelBtn.classList.toggle("button-disabled", !vsComputer);
-    botLevelBtn.textContent = BOT_LEVELS[botLevelIndex];
-    botType = botLevelIndex === 4 ? "adaptive" : "manual";
-    const adaptiveEnabled = vsComputer && botType === "adaptive";
-    adaptSpeedRow.classList.toggle("disabled", !adaptiveEnabled);
-    adaptSpeedBtn.disabled = !adaptiveEnabled;
-    adaptSpeedBtn.classList.toggle("button-disabled", !adaptiveEnabled);
-    adaptSpeedBtn.textContent = ADAPT_SPEEDS[adaptSpeedIndex].label;
-    updateAdaptiveStrengthUI();
 }
 
 function renderBoard() {
     boardEl.innerHTML = "";
     // Gültige Züge sind in beiden Regelmodi identisch. Der Turniermodus
     // verändert nur die Wertung der verbliebenen leeren Felder.
-    const validMoves = (gameStarted && !gameOver) ? getAllValidMoves(currentPlayer) : [];
+    const validMoves = (gameStarted && !gameOver && ruleMode !== "tournament")
+        ? getAllValidMoves(currentPlayer)
+        : [];
 
     for(let r = 0; r < 8; r++) {
         for(let c = 0; c < 8; c++) {
@@ -135,6 +141,10 @@ function renderBoard() {
             cell.className = "cell";
             cell.dataset.r = r;
             cell.dataset.c = c;
+
+            if (r === keyboardRow && c === keyboardCol) {
+                cell.classList.add("keyboard-focus");
+            }
 
             if(board[r][c]) {
                 const piece = document.createElement("div");
@@ -147,6 +157,31 @@ function renderBoard() {
         }
     }
 }
+
+boardEl.tabIndex = -1;
+boardEl.addEventListener("keydown", event => {
+    if (gameOver || !gameStarted || boardEl.classList.contains("disabled")) return;
+    if (vsComputer && currentPlayer === "white") return;
+
+    let nextRow = keyboardRow;
+    let nextCol = keyboardCol;
+    if (event.key === "ArrowUp") nextRow = Math.max(0, keyboardRow - 1);
+    else if (event.key === "ArrowDown") nextRow = Math.min(7, keyboardRow + 1);
+    else if (event.key === "ArrowLeft") nextCol = Math.max(0, keyboardCol - 1);
+    else if (event.key === "ArrowRight") nextCol = Math.min(7, keyboardCol + 1);
+    else if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        boardEl.querySelector(`.cell[data-r="${keyboardRow}"][data-c="${keyboardCol}"]`)?.click();
+        return;
+    } else {
+        return;
+    }
+
+    event.preventDefault();
+    keyboardRow = nextRow;
+    keyboardCol = nextCol;
+    renderBoard();
+});
 
 function animateMove(move, flips, player) {
     const opponent = player === "black" ? "white" : "black";
@@ -240,6 +275,7 @@ function nextTurn() { // NEU: Zentrale Funktion für Spielerwechsel + Bot
     if(checkGameOver()) return;
 
     currentPlayer = currentPlayer === "black"? "white" : "black";
+    let passMessage = null;
 
     // Hat der nächste Spieler keinen Zug, muss er aussetzen. Der Wechsel
     // passiert hier zentral, damit kein doppelter Spielerwechsel entsteht.
@@ -252,28 +288,52 @@ function nextTurn() { // NEU: Zentrale Funktion für Spielerwechsel + Bot
             return;
         }
 
-        statusEl.textContent = `${passedPlayer === "black"? "Schwarz" : "Weiß"} muss aussetzen`;
+        passMessage = `${passedPlayer === "black"? "Schwarz" : "Weiß"} muss aussetzen`;
         currentPlayer = otherPlayer;
     }
 
-    statusEl.textContent = `${currentPlayer === "black"? "Schwarz" : "Weiß"} am Zug`;
-    renderBoard();
+    const continueTurn = () => {
+        passTimer = null;
+        if (gameOver || !gameStarted) return;
 
-    // Wenn Bot dran ist und Spiel läuft: sofort ziehen
-    if(vsComputer && currentPlayer === "white" &&!gameOver) {
-        const moves = getAllValidMoves("white");
-        if(moves.length > 0) {
-            const thinkTime = botType === "adaptive" && typeof getAdaptiveBotThinkTime === "function"
-                ? getAdaptiveBotThinkTime()
-                : typeof getOthelloBotThinkTime === "function"
-                ? getOthelloBotThinkTime(botLevelIndex + 1, "white")
-                : 300;
-            setTimeout(botMove, thinkTime);
+        statusEl.textContent = `${currentPlayer === "black"? "Schwarz" : "Weiß"} am Zug`;
+        renderBoard();
+
+        // Wenn Bot dran ist und Spiel läuft: nach seiner Denkzeit ziehen.
+        if(vsComputer && currentPlayer === "white") {
+            const moves = getAllValidMoves("white");
+            if(moves.length > 0) {
+                const thinkTime = botType === "adaptive" && typeof getAdaptiveBotThinkTime === "function"
+                    ? getAdaptiveBotThinkTime()
+                    : typeof getOthelloBotThinkTime === "function"
+                    ? getOthelloBotThinkTime(botLevelIndex + 1, "white")
+                    : 300;
+                const token = gameToken;
+                botMoveTimer = setTimeout(() => {
+                    botMoveTimer = null;
+                    if (token !== gameToken || !gameStarted || gameOver) return;
+                    botMove(token);
+                }, thinkTime);
+            }
         }
+    };
+
+    if (passMessage) {
+        statusEl.textContent = passMessage;
+        renderBoard();
+        const token = gameToken;
+        passTimer = setTimeout(() => {
+            if (token !== gameToken) return;
+            continueTurn();
+        }, 800);
+        return;
     }
+
+    continueTurn();
 }
 
-function botMove() { // Bot zieht und ruft dann nextTurn
+function botMove(token = gameToken) { // Bot zieht und ruft dann nextTurn
+    if (token !== gameToken || !gameStarted || gameOver) return;
     const moves = getAllValidMoves("white");
     if(moves.length === 0) {
         nextTurn(); // Falls doch kein Zug da ist
@@ -282,14 +342,21 @@ function botMove() { // Bot zieht und ruft dann nextTurn
     const m = botType === "adaptive"
         ? getAdaptiveBotMove(board, "white", window.othelloPlayerProfile)
         : getOthelloBotMove(botLevelIndex + 1, "white");
-    const selectedMove = m || moves[Math.floor(Math.random() * moves.length)];
+    const selectedMove = m && moves.some(move => move.r === m.r && move.c === m.c)
+        ? m
+        : moves[Math.floor(Math.random() * moves.length)];
     const result = makeMove(selectedMove.r, selectedMove.c, "white");
+    if (!result) {
+        playSound(soundError, 0.22);
+        scheduleNextTurn(0, token);
+        return;
+    }
     playSound(soundMove, 0.28);
     updateScore();
     renderBoard();
     animateMove(result.move, result.flips, "white");
     lastMoveWasPressure = getPressureState("white");
-    setTimeout(() => nextTurn(), 430 + result.flips.length * 65); // Nach der Animation ist Schwarz dran
+    scheduleNextTurn(430 + result.flips.length * 65, token); // Nach der Animation ist Schwarz dran
 }
 
 function checkGameOver() {
@@ -307,7 +374,13 @@ function checkGameOver() {
     return false;
 }
 function endGame() {
+    if (gameOver) return;
     gameOver = true;
+    boardEl.tabIndex = -1;
+    cancelPendingTurnTimers();
+    if (vsComputer && window.othelloPlayerProfile) {
+        window.othelloPlayerProfile.gamesPlayed += 1;
+    }
     boardEl.classList.add("disabled");
     settingsPanel.classList.remove("disabled"); // WICHTIG: wieder freigeben
     modeBtn.classList.remove("disabled");
@@ -324,51 +397,13 @@ function endGame() {
     }
 
     let winner = black > white? "Schwarz gewinnt!" : white > black? "Weiß gewinnt!" : "Unentschieden!";
+    scoreBlackEl.parentElement.classList.toggle("winner", black > white);
+    scoreWhiteEl.parentElement.classList.toggle("winner", white > black);
     if (window.othelloPlayerProfile && vsComputer && botType === "adaptive") {
         window.othelloPlayerProfile.lastResult = black > white ? "playerWin" : white > black ? "botWin" : "draw";
     }
     statusEl.textContent = `Spiel vorbei! ${winner} ${black}:${white}`;
 }
-
-// Events
-startBtn.addEventListener("click", () => {
-    playSound(soundButton, 0.22);
-    if(gameStarted &&!gameOver) {
-        resetGame();
-        return;
-    }
-    initGame();
-});
-
-modeBtn.addEventListener("click", () => {
-    if(gameStarted &&!gameOver) return;
-    playSound(soundButton, 0.22);
-    vsComputer =!vsComputer;
-    modeBtn.textContent = vsComputer? "1 Spieler" : "2 Spieler";
-    updateBotLevelUI();
-    console.log("Modus:", vsComputer ? "1 Spieler" : "2 Spieler"); // zum Testen
-});
-
-rulesBtn.addEventListener("click", () => {
-    if(gameStarted &&!gameOver) return;
-    playSound(soundButton, 0.22);
-    ruleMode = ruleMode === "standard"? "tournament" : "standard";
-    rulesBtn.textContent = ruleMode === "standard"? "Standard" : "Turnier";
-});
-
-botLevelBtn.addEventListener("click", () => {
-    if(gameStarted &&!gameOver) return;
-    playSound(soundButton, 0.22);
-    botLevelIndex = (botLevelIndex + 1) % BOT_LEVELS.length;
-    updateBotLevelUI();
-});
-
-adaptSpeedBtn.addEventListener("click", () => {
-    if (adaptSpeedBtn.disabled || (gameStarted && !gameOver)) return;
-    playSound(soundButton, 0.22);
-    adaptSpeedIndex = (adaptSpeedIndex + 1) % ADAPT_SPEEDS.length;
-    updateBotLevelUI();
-});
 
 boardEl.addEventListener("click", (e) => {
     if(gameOver ||!gameStarted) return;
@@ -409,7 +444,7 @@ boardEl.addEventListener("click", (e) => {
         renderBoard();
         animateMove(result.move, result.flips, currentPlayer);
         lastMoveWasPressure = getPressureState(currentPlayer);
-        setTimeout(() => nextTurn(), 430 + result.flips.length * 65); // Erst nach der Animation wechseln
+        scheduleNextTurn(430 + result.flips.length * 65); // Erst nach der Animation wechseln
     } else {
         playSound(soundError, 0.22);
     }

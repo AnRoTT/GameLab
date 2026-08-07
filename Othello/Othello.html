@@ -24,12 +24,9 @@
             <div class="label">Regelmodus</div>
             <button id="rulesBtn" class="cycle-button">Standard</button>
         </div>
-        <div id="botLevelRow" class="cycle-group setting-row">
-            <div class="label">Level</div>
+        <div id="botOpponentRow" class="cycle-group cycle-group-double setting-row">
+            <div class="label">Gegner:</div>
             <button id="botLevelBtn" class="cycle-button">Anfänger</button>
-        </div>
-        <div id="adaptSpeedRow" class="cycle-group setting-row">
-            <div class="label">Anpassung</div>
             <button id="adaptSpeedBtn" class="cycle-button">Normal</button>
         </div>
         <button id="startBtn" class="primary-button">Jetzt spielen</button>
@@ -43,8 +40,11 @@
         <span>Weiß: <span id="scoreWhite">2</span></span>
     </div>
     <div id="adaptiveStrengthPanel" class="adaptive-strength" hidden>
-        <div class="adaptive-strength-label">Botstärke <span id="adaptiveStrengthValue">50%</span></div>
-        <div class="adaptive-strength-track"><div id="adaptiveStrengthBar"></div></div>
+        <span class="adaptive-strength-label">Botstärke</span>
+        <span class="adaptive-strength-track" aria-label="Botstärke 50 von 100">
+            <span id="adaptiveStrengthBar"></span>
+        </span>
+        <span id="adaptiveStrengthValue" class="adaptive-strength-value">50%</span>
     </div>
 </div>
 
@@ -53,12 +53,13 @@
         <div id="board" class="board disabled"></div>
     </div>
 
-    <footer class="footer">Othello | by Andreas Rollinger | 2026.08.06</footer>
+    <footer class="footer">Othello | by Andreas Rollinger | 2026.08.07</footer>
 </div>
 
 <script src="aiCore.js"></script>
 <script src="manuellBot.js"></script>
 <script src="adaptiveBot.js"></script>
+<script src="settings.js"></script>
 <script src="game.js"></script>
 <script>
     const backIcon = document.getElementById("backIcon");

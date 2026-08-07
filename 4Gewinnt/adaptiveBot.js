@@ -33,24 +33,33 @@ var adaptiveAI = {
     creativity: 0.42
 };
 
-var playerProfile = {
-    spieleGegenBot: 0,
-    spalten: Array(7).fill(0),
-    ersterZugMitte: 0,
-    ersterZugEcke: 0,
-    ersterZugRand: 0,
-    eroeffnungZuege: 0,
-    mittelspielZuege: 0,
-    endspielZuege: 0,
-    gingInGabel: 0,
-    hatGewinnzugVerpasst: 0,
-    druckZuege: 0,
-    druckVerlaesst: 0,
-    defensivZuege: 0,
-    offensivZuege: 0,
-    angriffsZuege: 0,
-    gesamtZuege: 0
-};
+// Das Spielerprofil wird zentral in aiCore.js angelegt. Die alten deutschen
+// Feldnamen sind dort nur noch kompatible Verweise auf dieselben Werte.
+const playerProfile = window.connectFourPlayerProfile;
+
+function adaptiveRandomMove() {
+    const columns = window.ConnectFourAICore.getAvailableColumns(board);
+    return columns.length ? columns[Math.floor(Math.random() * columns.length)] : -1;
+}
+
+function adaptiveFreeRow(col) {
+    return window.ConnectFourAICore.getFreeRow(board, col);
+}
+
+function adaptiveHasWinner(player) {
+    return window.ConnectFourAICore.hasWinner(board, player);
+}
+
+function adaptiveMinimaxMove(depth) {
+    const result = window.ConnectFourAICore.minimax(
+        board,
+        depth,
+        true,
+        PLAYER_YELLOW,
+        PLAYER_RED
+    );
+    return result.col ?? -1;
+}
 
 function adaptiveClamp(v) {
     return Math.max(0, Math.min(1, v));
@@ -84,10 +93,17 @@ function getAdaptiveStrengthGate(skillValue) {
 }
 
 function getAdaptivePlayerSkillEstimate() {
-    const totalMoves = Math.max(1, playerProfile.gesamtZuege);
-    const patternScore = (playerProfile.hatGewinnzugVerpasst + playerProfile.gingInGabel * 1.15 + playerProfile.angriffsZuege * 0.16) / totalMoves;
-    const pressureScore = (playerProfile.druckVerlaesst + playerProfile.druckZuege * 0.4) / totalMoves;
-    const phaseScore = (playerProfile.eroeffnungZuege * 0.15 + playerProfile.mittelspielZuege * 0.33 + playerProfile.endspielZuege * 0.52) / totalMoves;
+    const coreProfile = window.connectFourPlayerProfile;
+    const totalMoves = Math.max(1, coreProfile?.totalMoves ?? playerProfile.gesamtZuege);
+    const patternScore = coreProfile
+        ? (coreProfile.tactics.missedWins + coreProfile.tactics.forks * 1.15 + coreProfile.style.offensive * 0.16) / totalMoves
+        : (playerProfile.hatGewinnzugVerpasst + playerProfile.gingInGabel * 1.15 + playerProfile.angriffsZuege * 0.16) / totalMoves;
+    const pressureScore = coreProfile
+        ? (coreProfile.tactics.pressureMoves * 0.4 + coreProfile.style.offensive * 0.2) / totalMoves
+        : (playerProfile.druckVerlaesst + playerProfile.druckZuege * 0.4) / totalMoves;
+    const phaseScore = coreProfile
+        ? (coreProfile.phases.opening * 0.15 + coreProfile.phases.midgame * 0.33 + coreProfile.phases.endgame * 0.52) / totalMoves
+        : (playerProfile.eroeffnungZuege * 0.15 + playerProfile.mittelspielZuege * 0.33 + playerProfile.endspielZuege * 0.52) / totalMoves;
     const resultTrend = adaptiveLearn.resultBias;
     const roundTrend = adaptiveLearn.roundForm;
 
@@ -149,24 +165,7 @@ function resetAdaptiveState() {
         mistakeChance: 0.12,
         creativity: 0.42
     };
-    playerProfile = {
-        spieleGegenBot: 0,
-        spalten: Array(7).fill(0),
-        ersterZugMitte: 0,
-        ersterZugEcke: 0,
-        ersterZugRand: 0,
-        eroeffnungZuege: 0,
-        mittelspielZuege: 0,
-        endspielZuege: 0,
-        gingInGabel: 0,
-        hatGewinnzugVerpasst: 0,
-        druckZuege: 0,
-        druckVerlaesst: 0,
-        defensivZuege: 0,
-        offensivZuege: 0,
-        angriffsZuege: 0,
-        gesamtZuege: 0
-    };
+    window.ConnectFourAICore.resetPlayerProfile(playerProfile);
 }
 
 function getAdaptivePhase() {
@@ -421,71 +420,11 @@ function decayAdaptiveMemory() {
 }
 
 function getFavoritePlayerColumn() {
-    let bestCol = null;
-    let bestValue = -Infinity;
-    for (let c = 0; c < COLS; c++) {
-        const value = playerProfile.spalten[c] || 0;
-        if (value > bestValue) {
-            bestValue = value;
-            bestCol = c;
-        }
-    }
-    return bestValue > 0 ? bestCol : null;
-}
-
-function updateSpielerProfil(col, zugBewertung) {
-    playerProfile.gesamtZuege++;
-    playerProfile.spalten[col]++;
-    adaptiveLearn.memory.favoriteColumns[col] += 1;
-
-    const moveNumber = playerProfile.gesamtZuege;
-    if (moveNumber <= 6) playerProfile.eroeffnungZuege++;
-    else if (moveNumber <= 18) playerProfile.mittelspielZuege++;
-    else playerProfile.endspielZuege++;
-    if (moveNumber <= 6) adaptiveLearn.memory.openingStyle += 1;
-    else if (moveNumber <= 18) adaptiveLearn.memory.midgameStyle += 1;
-    else adaptiveLearn.memory.endgameStyle += 1;
-
-    if (moveNumber === 1) {
-        if (col === 3) playerProfile.ersterZugMitte++;
-        else if (col === 0 || col === 6) playerProfile.ersterZugEcke++;
-        else playerProfile.ersterZugRand++;
-    }
-
-    if (zugBewertung >= 15) playerProfile.druckZuege++;
-    if (zugBewertung >= 13) playerProfile.angriffsZuege++;
-    if (zugBewertung <= 0) playerProfile.defensivZuege++;
-    if (zugBewertung >= 17) playerProfile.offensivZuege++;
-    if (zugBewertung >= 15) adaptiveLearn.memory.pressureResponse += 0.2;
-    if (zugBewertung <= 0) adaptiveLearn.memory.mistakes += 0.2;
-
-    const stage = getAdaptiveLearningStage();
-    const shouldRefreshText = playerProfile.gesamtZuege === 1
-        || playerProfile.gesamtZuege - adaptiveLearn.lastUiMove >= 7
-        || (adaptiveLearn.lastUiMove > 0 && (adaptiveLearn.lastUiMove < 12 && playerProfile.gesamtZuege >= 12))
-        || (adaptiveLearn.lastUiMove < 20 && playerProfile.gesamtZuege >= 20);
-
-    if (shouldRefreshText) {
-        const phase = getAdaptivePhase();
-        const skillBand = getPlayerSkillBand();
-        const text = `${buildAdaptiveLeadText(stage, skillBand)}, ${getAdaptiveLevelText(skillBand)} und ${buildAdaptiveTailText(phase, skillBand)}`;
-        adaptiveLearn.uiText = text;
-        adaptiveLearn.lastUiMove = playerProfile.gesamtZuege;
-    }
-}
-
-function bewertenZugVomSpieler(col, row) {
-    if (typeof board === "undefined") return 0;
-    const previous = board[row][col];
-    let delta = 0;
-
-    board[row][col] = PLAYER_RED;
-    if (typeof checkWinnerTemp === "function" && checkWinnerTemp() === PLAYER_RED) delta += 15;
-    if (col === 3) delta += 2;
-    if (col === 2 || col === 4) delta += 1;
-    board[row][col] = previous;
-
-    return delta;
+    if (playerProfile.totalMoves <= 0) return null;
+    const bestValue = Math.max(...playerProfile.favoriteColumns);
+    return bestValue > 0
+        ? playerProfile.favoriteColumns.indexOf(bestValue)
+        : null;
 }
 
 function updateAdaptiveAfterMatch(resultSign) {
@@ -609,7 +548,7 @@ function getAdaptiveBotMove() {
 
     const dumbMode = skillValue <= 18 || adaptiveLearn.lossStreak >= 8 || adaptiveSkill <= 12;
     if (dumbMode) {
-        const randomCol = botRandom();
+        const randomCol = adaptiveRandomMove();
         if (randomCol !== -1) {
             adaptiveMoveCounter++;
             adaptiveRoundDelta -= 2;
@@ -619,7 +558,7 @@ function getAdaptiveBotMove() {
     }
 
     if (Math.random() < earlyMistakeChance) {
-        const randomCol = botRandom();
+        const randomCol = adaptiveRandomMove();
         if (randomCol !== -1) {
             adaptiveMoveCounter++;
             adaptiveRoundDelta -= weakPhase ? 1 : 0;
@@ -629,7 +568,7 @@ function getAdaptiveBotMove() {
     }
 
     if (skillValue < 25) {
-        const randomCol = botRandom();
+        const randomCol = adaptiveRandomMove();
         if (randomCol !== -1) {
             adaptiveMoveCounter++;
             adaptiveRoundDelta -= 1;
@@ -639,7 +578,7 @@ function getAdaptiveBotMove() {
     }
 
     if (skillValue < 40 && Math.random() < 0.55) {
-        const randomCol = botRandom();
+        const randomCol = adaptiveRandomMove();
         if (randomCol !== -1) {
             adaptiveMoveCounter++;
             adaptiveRoundDelta -= 1;
@@ -649,7 +588,7 @@ function getAdaptiveBotMove() {
     }
 
     if (skillValue < 60 && Math.random() < 0.30) {
-        const randomCol = botRandom();
+        const randomCol = adaptiveRandomMove();
         if (randomCol !== -1) {
             adaptiveMoveCounter++;
             adaptiveRoundDelta -= 0;
@@ -659,10 +598,10 @@ function getAdaptiveBotMove() {
     }
 
     for (let c = 0; c < COLS; c++) {
-        const r = findFreeRow(c);
+        const r = adaptiveFreeRow(c);
         if (r === -1) continue;
         board[r][c] = PLAYER_YELLOW;
-        if (checkWinnerTemp() === PLAYER_YELLOW) {
+        if (adaptiveHasWinner(PLAYER_YELLOW)) {
             board[r][c] = 0;
             adaptiveMoveCounter++;
             adaptiveRoundDelta += stage === "observe" ? 2 : 4;
@@ -673,10 +612,10 @@ function getAdaptiveBotMove() {
     }
 
     for (let c = 0; c < COLS; c++) {
-        const r = findFreeRow(c);
+        const r = adaptiveFreeRow(c);
         if (r === -1) continue;
         board[r][c] = PLAYER_RED;
-        if (checkWinnerTemp() === PLAYER_RED) {
+        if (adaptiveHasWinner(PLAYER_RED)) {
             board[r][c] = 0;
             adaptiveMoveCounter++;
             adaptiveRoundDelta -= skillBand === "low" ? 1 : 3;
@@ -688,19 +627,19 @@ function getAdaptiveBotMove() {
 
     let tacticalBest = -1;
     if (learningGate > 0) {
-        tacticalBest = botMinimax(depth);
+        tacticalBest = adaptiveMinimaxMove(depth);
     }
-    if (tacticalBest === -1 && learningGate > 0.45) tacticalBest = botRandom();
+    if (tacticalBest === -1 && learningGate > 0.45) tacticalBest = adaptiveRandomMove();
     if (tacticalBest === -1) return -1;
 
     const candidates = [];
     for (let c = 0; c < COLS; c++) {
-        const r = findFreeRow(c);
+        const r = adaptiveFreeRow(c);
         if (r === -1) continue;
 
         board[r][c] = PLAYER_YELLOW;
         let score = 0;
-        const redWins = countDirectWinningMoves(PLAYER_RED);
+        const redWins = window.ConnectFourAICore.countWinningMoves(board, PLAYER_RED);
 
         if (stage === "apply") {
             if (c === 3) score += weakPhase ? 0.12 : 0.8;
