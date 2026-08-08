@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8" />
+    <title>4 Gewinnt</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="../theme.css" />
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div id="backIcon">⟵ Menü</div>
+<div class="app">
+<header class="top-bar">
+    <h1 class="title-center">4 Gewinnt</h1>
+
+    <div class="controls-vertical">
+        <div class="cycle-group">
+            <span class="label">Spieler:</span>
+            <button id="modeButton" class="cycle-button" data-index="1">1 Spieler</button>
+        </div>
+
+        <div class="cycle-group">
+            <span class="label">Wechsel:</span>
+            <button id="startRuleButton" class="cycle-button" data-index="0">Verlierer beginnt</button>
+        </div>
+
+        <div class="cycle-group cycle-group-double">
+            <span class="label">Gegner:</span>
+            <button id="botLevelButton" class="cycle-button" data-index="0">Anfänger</button>
+            <button id="adaptSpeedButton" class="cycle-button" data-index="0" disabled>—</button>
+        </div>
+
+        <button id="resetGameButton" class="primary-button" data-index="0">Spiel starten</button>
+        <button id="newGameButton" class="primary-button button-disabled">Neue Runde</button>
+    </div>
+</header>
+
+    <main>
+        <section class="status-panel">
+            <div id="statusText" class="status-text">
+                <div id="statusLine1">Bereit für Connect 4</div>
+                <div id="adaptive-strength-legacy" class="adaptive-strength hidden">
+                    <span class="adaptive-strength-label">Botstärke</span>
+                    <span id="adaptive-strength-track-legacy" class="adaptive-strength-track" style="--skill:50%" aria-label="Botstärke 50 von 100">
+                        <span id="adaptive-strength-fill-legacy" class="adaptive-strength-fill"></span>
+                        <span class="adaptive-strength-knob"></span>
+                    </span>
+                    <span id="adaptive-strength-value-legacy" class="adaptive-strength-value">50%</span>
+                </div>
+            </div>
+            <div class="scoreboard">
+                <div class="score">
+                    <span class="score-label">Rot</span>
+                    <span id="scoreRed" class="score-value">0</span>
+                </div>
+                <div class="score">
+                    <span class="score-label">Gelb</span>
+                    <span id="scoreYellow" class="score-value">0</span>
+                </div>
+            </div>
+            <div id="winner-banner" class="winner-info hidden">
+                <span class="winner-icon"></span>
+                <span id="winner-text">Rot hat gewonnen!</span>
+                <button id="next-round-btn">Nächste Runde</button>
+            </div>
+            <div id="adaptive-strength" class="adaptive-strength hidden">
+                <span class="adaptive-strength-label">Botstärke</span>
+                <span id="adaptive-strength-track" class="adaptive-strength-track" style="--skill:50%" aria-label="Botstärke 50 von 100">
+                    <span id="adaptive-strength-fill" class="adaptive-strength-fill"></span>
+                    <span class="adaptive-strength-knob"></span>
+                </span>
+                <span id="adaptive-strength-value" class="adaptive-strength-value">50%</span>
+            </div>
+        </section>
+
+        <section id="winner-banner-legacy" class="winner-banner hidden">
+            <span class="winner-icon">🏆</span>
+            <span id="winner-text-legacy">Rot hat gewonnen!</span>
+            <button id="next-round-btn-legacy">Nächste Runde</button>
+        </section>
+
+        <section class="board-wrapper">
+            <div id="board" class="board">
+                <!-- 7 x 6 Grid -->
+                <!-- rows: 0..5, cols: 0..6 -->
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">4 Gewinnt | by Andreas Rollinger | 2026.08.08</footer>
+
+</div>
+
+    <script src="aiCore.js"></script>
+    <script src="manuellBot.js"></script>
+    <script src="adaptiveBot.js"></script>
+    <script src="settings.js"></script>
+    <script src="game.js"></script>
+<script>
+document.getElementById("backIcon").style.display =
+    new URLSearchParams(location.search).get('menu') === '1' ? 'block' : 'none';
+
+document.getElementById("backIcon").onclick = () => {
+    setTimeout(() => {
+        window.location.href = "../index.html?menu=1";
+    }, 100);
+};
+</script>
+</body>
+</html>
