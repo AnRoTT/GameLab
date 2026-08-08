@@ -28,8 +28,7 @@
     }
 
     function adaptiveCurve() {
-        const t = adaptiveClamp(state.adaptiveSkill);
-        return t * t * (3 - 2 * t);
+        return TicTacToeAdaptiveCore.getDifficultyProfile(getAdaptiveSkillValue()).challenge;
     }
 
     function getAdaptiveSkillBand() {
@@ -47,6 +46,7 @@
 
     function captureAdaptiveRoundSnapshot() {
         state.adaptiveRoundSnapshot = {
+            totalMoves: state.playerProfile.totalMoves,
             mistakes: state.playerProfile.mistakes,
             missedBlocks: state.playerProfile.missedBlocks,
             missedWins: state.playerProfile.missedWins,
@@ -82,9 +82,9 @@
     }
 
     function getBotDelay() {
-        const curve = adaptiveCurve();
+        const profile = TicTacToeAdaptiveCore.getDifficultyProfile(getAdaptiveSkillValue());
         const base = 160;
-        const skillDelay = Math.pow(curve, 1.55) * 1500;
+        const skillDelay = profile.challenge * 1500;
         const tacticsDelay = state.adaptiveAI.tactics * 180;
         const creativityDelay = state.adaptiveAI.creativity * 90;
         return base + skillDelay + tacticsDelay + creativityDelay;
@@ -141,15 +141,13 @@
     function getAdaptiveBestMove() {
         const free = TicTacToeAdaptiveCore.getFreeCells(cells);
         const curve = adaptiveCurve();
-        const band = getAdaptiveSkillBand();
         const win = TicTacToeAdaptiveCore.findCritical("O", cells);
         if (win !== null) return win;
         const block = TicTacToeAdaptiveCore.findCritical("X", cells);
         if (block !== null) return block;
 
-        const tacticMultiplier = [0.28, 0.42, 0.58, 0.72, 0.88, 1.0][band];
         const tacticsRoll = Math.random();
-        const tacticChance = state.adaptiveAI.tactics * (0.12 + curve * tacticMultiplier);
+        const tacticChance = state.adaptiveAI.tactics * (0.12 + curve * 0.88);
         if (tacticsRoll < tacticChance) {
             const fork = free.find(i => TicTacToeAdaptiveCore.wouldFork(cells, "O", i));
             if (fork !== undefined) return fork;
@@ -157,9 +155,8 @@
             if (antiFork !== undefined) return antiFork;
         }
 
-        const habitMultiplier = [0.20, 0.32, 0.48, 0.66, 0.82, 1.0][band];
         const habitRoll = Math.random();
-        const habitChance = state.adaptiveAI.habitUsage * (0.06 + curve * habitMultiplier);
+        const habitChance = state.adaptiveAI.habitUsage * (0.06 + curve * 0.72);
         if (habitRoll < habitChance) {
             const habitMove = adaptiveChooseFromCandidates(free);
             if (habitMove !== null) return habitMove;
@@ -168,7 +165,7 @@
         const opening = cells[4] === null
             ? 4
             : [0, 2, 6, 8].filter(index => cells[index] === null)[0] ?? null;
-        const openingChance = [0.12, 0.18, 0.28, 0.38, 0.48, 0.60][band] * (0.55 + curve * 0.45);
+        const openingChance = (0.12 + curve * 0.48) * (0.55 + curve * 0.45);
         if (cells.filter(v => v !== null).length < 2 && opening !== null && Math.random() < openingChance) {
             return opening;
         }
@@ -176,8 +173,7 @@
         const bestMoves = TicTacToeAdaptiveCore.getBestMoves(cells, "O");
         if (!bestMoves.length) return free[0] ?? null;
 
-        const accuracyMultiplier = [0.12, 0.20, 0.34, 0.52, 0.74, 0.92][band];
-        const accuracyChance = state.adaptiveAI.accuracy * (0.08 + curve * accuracyMultiplier);
+        const accuracyChance = state.adaptiveAI.accuracy * (0.08 + curve * 0.84);
         if (Math.random() < accuracyChance) {
             const sorted = bestMoves
                 .map(index => ({ index, habit: getAdaptiveHabitScore(index) }))
@@ -207,13 +203,12 @@
         }
 
         const curve = adaptiveCurve();
-        const band = getAdaptiveSkillBand();
+        const difficultyProfile = TicTacToeAdaptiveCore.getDifficultyProfile(getAdaptiveSkillValue());
         const skillFactor = 1 - curve;
         const styleFactor = (1 - state.adaptiveAI.accuracy) * 0.18 + (1 - state.adaptiveAI.tactics) * 0.08 + (1 - state.adaptiveAI.creativity) * 0.06;
-        const bandMistakeBoost = [0.18, 0.14, 0.10, 0.07, 0.04, 0.01][band];
         const errorChance = Math.max(
-            0.04,
-            Math.min(0.38, 0.05 + skillFactor * 0.28 + state.adaptiveAI.mistakeChance * bandMistakeBoost + styleFactor)
+            0.02,
+            Math.min(0.38, difficultyProfile.errorRate + state.adaptiveAI.mistakeChance * 0.12 + styleFactor * 0.35)
         );
         if (Math.random() < errorChance) {
             const imperfectPool = free.filter(i => i !== bestMove);
@@ -226,6 +221,7 @@
     function updateAdaptiveAfterMatch(winner) {
         const rate = getLearningRate();
         const snap = state.adaptiveRoundSnapshot ?? {
+            totalMoves: 0,
             mistakes: 0,
             missedBlocks: 0,
             missedWins: 0,
@@ -234,13 +230,16 @@
             tacticalGood: 0,
             tacticalBad: 0
         };
-        const roundGood = Math.max(0, state.playerProfile.tacticalGood - snap.tacticalGood);
-        const roundBad = Math.max(0, state.playerProfile.tacticalBad - snap.tacticalBad);
+        const profileReady = state.playerProfile.totalMoves >= 12;
+        const roundGood = profileReady ? Math.max(0, state.playerProfile.tacticalGood - snap.tacticalGood) : 0;
+        const roundBad = profileReady ? Math.max(0, state.playerProfile.tacticalBad - snap.tacticalBad) : 0;
         const roundRisk = Math.max(
             0,
-            (state.playerProfile.missedWins - snap.missedWins) +
-            (state.playerProfile.missedBlocks - snap.missedBlocks) +
-            (state.playerProfile.forksMissed - snap.forksMissed)
+            profileReady
+                ? (state.playerProfile.missedWins - snap.missedWins) +
+                  (state.playerProfile.missedBlocks - snap.missedBlocks) +
+                  (state.playerProfile.forksMissed - snap.forksMissed)
+                : 0
         );
 
         let delta = 0;
@@ -254,8 +253,10 @@
 
         state.adaptiveSkill = adaptiveClamp(state.adaptiveSkill + delta);
         state.adaptiveAI.accuracy = adaptiveClamp(state.adaptiveAI.accuracy + delta * 0.25);
-        state.adaptiveAI.tactics = adaptiveClamp(state.adaptiveAI.tactics + (state.playerProfile.forksMissed * -0.001 + state.playerProfile.forksSeen * 0.0005) * rate);
-        state.adaptiveAI.habitUsage = adaptiveClamp(state.adaptiveAI.habitUsage + (state.playerProfile.favoriteCells.reduce((a, b) => a + b, 0) > 0 ? 0.0008 * rate : 0));
+        if (profileReady) {
+            state.adaptiveAI.tactics = adaptiveClamp(state.adaptiveAI.tactics + (state.playerProfile.forksMissed * -0.001 + state.playerProfile.forksSeen * 0.0005) * rate);
+            state.adaptiveAI.habitUsage = adaptiveClamp(state.adaptiveAI.habitUsage + (state.playerProfile.favoriteCells.reduce((a, b) => a + b, 0) > 0 ? 0.0008 * rate : 0));
+        }
         state.adaptiveAI.mistakeChance = adaptiveClamp(state.adaptiveAI.mistakeChance + (winner === "X" ? -0.0015 : 0.0008) * rate);
         state.adaptiveAI.creativity = adaptiveClamp(state.adaptiveAI.creativity + (winner === "draw" ? 0.0015 : 0.0005) * rate);
 

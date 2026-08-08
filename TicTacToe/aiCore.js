@@ -81,6 +81,21 @@ function getTicTacToeBestMoves(board, player) {
     return bestMoves;
 }
 
+function getTicTacToeDifficultyProfile(skill) {
+    const normalized = Math.max(0, Math.min(100, Number(skill) || 0)) / 100;
+    const challenge = normalized <= 0.75
+        ? 0.75 * ((normalized / 0.75) ** 2 * (3 - 2 * (normalized / 0.75)))
+        : 0.75 + ((normalized - 0.75) / 0.25) ** 1.8 * 0.25;
+
+    return {
+        challenge,
+        randomness: Math.max(0.02, 0.42 - challenge * 0.38),
+        errorRate: Math.max(0.02, 0.34 - challenge * 0.30),
+        tacticalAccuracy: Math.min(0.98, 0.35 + challenge * 0.60),
+        thinkTime: 160 + challenge * 1500
+    };
+}
+
 function createTicTacToePlayerProfile() {
     return {
         totalMoves: 0,
@@ -139,6 +154,7 @@ window.TicTacToeAICore = {
     wouldFork: wouldTicTacToeFork,
     minimax: ticTacToeMinimax,
     getBestMoves: getTicTacToeBestMoves,
+    getDifficultyProfile: getTicTacToeDifficultyProfile,
     createPlayerProfile: createTicTacToePlayerProfile,
     getPositionType: getTicTacToePositionType,
     trackPlayerMove: trackTicTacToePlayerMove,

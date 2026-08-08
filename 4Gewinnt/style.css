@@ -205,6 +205,8 @@ main {
     align-items: center;
     gap: 10px;
     width: min(100%, 520px);
+    min-height: 128px;
+    box-sizing: border-box;
     margin: 0 auto;
     background: var(--bg-panel);
     border-radius: var(--radius-lg);
@@ -235,6 +237,13 @@ main {
 
 .adaptive-strength.hidden {
     display: none;
+}
+
+.status-panel .adaptive-strength.hidden {
+    display: flex;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
 }
 
 .adaptive-strength-label {
@@ -553,7 +562,50 @@ main {
 }
 
 .winner-banner.hidden {
-    display: none; /* startet ausgeblendet */
+    display: flex;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+}
+
+#winner-banner-legacy,
+#adaptive-strength-legacy {
+    display: none !important;
+}
+
+.winner-info {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 38px;
+    padding: 5px 8px;
+    color: var(--text-main);
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-md);
+    background: rgba(79, 140, 255, 0.08);
+    font-weight: 600;
+}
+
+.winner-info.hidden {
+    display: flex;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.winner-info .winner-icon {
+    display: none;
+}
+
+.winner-info #winner-text {
+    font-size: 0.9rem;
+}
+
+.winner-info #next-round-btn {
+    padding: 5px 9px;
+    font-size: 0.8rem;
 }
 
 .winner-icon {

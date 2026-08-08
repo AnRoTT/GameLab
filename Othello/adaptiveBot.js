@@ -56,9 +56,8 @@ function startAdaptiveRound(profile, speed = "normal") {
         adjustment = (performance - 50) * 0.04;
     }
 
-    adjustment = Math.max(-7, Math.min(7, adjustment));
     const speedFactor = speed === "slow" ? 0.5 : speed === "fast" ? 1.5 : 1;
-    adjustment *= speedFactor;
+    adjustment = Math.max(-6, Math.min(6, adjustment * speedFactor));
     adaptiveStrength = Math.max(1, Math.min(100, adaptiveStrength + adjustment));
     return adaptiveStrength;
 }
@@ -68,24 +67,13 @@ function getAdaptiveStrength() {
 }
 
 function getAdaptiveCurve(skill) {
-    const s = Math.max(0, Math.min(100, skill)) / 100;
-    const shaped = s < 0.55
-        ? Math.pow(s / 0.55, 1.35) * 0.55
-        : 0.55 + Math.pow((s - 0.55) / 0.45, 0.72) * 0.45;
-    return {
-        position: 0.8 + shaped,
-        mobility: 5 + shaped * 14,
-        pieces: shaped > 0.7 ? 2 : 0.5,
-        randomness: 0.34 - shaped * 0.32
-    };
+    return OthelloAdaptiveCore.getDifficultyProfile(skill);
 }
 
 function getAdaptiveSearchDepth(skill) {
-    if (skill < 35) return 0;
-    if (skill < 50) return 1;
-    if (skill < 62) return 2;
-    if (skill < 82) return 3;
-    return 4;
+    if (skill < 20) return 0;
+    const challenge = getAdaptiveCurve(skill).challenge;
+    return Math.max(1, Math.min(4, Math.floor(1 + Math.pow(challenge, 2.0) * 3)));
 }
 
 function getAdaptiveBotMove(state, player = "white", profile = null) {
@@ -118,7 +106,8 @@ function getAdaptiveBotMove(state, player = "white", profile = null) {
 }
 
 function getAdaptiveBotThinkTime() {
-    const minimum = 300 + adaptiveStrength * 4;
-    const variation = 180 + (100 - adaptiveStrength) * 2;
+    const challenge = getAdaptiveCurve(adaptiveStrength).challenge;
+    const minimum = 300 + challenge * 900;
+    const variation = 180 + (1 - challenge) * 220;
     return Math.round(minimum + Math.random() * variation);
 }

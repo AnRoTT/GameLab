@@ -39,13 +39,13 @@
         <section class="status-panel">
             <div id="statusText" class="status-text">
                 <div id="statusLine1">Bereit für Connect 4</div>
-                <div id="adaptive-strength" class="adaptive-strength hidden">
+                <div id="adaptive-strength-legacy" class="adaptive-strength hidden">
                     <span class="adaptive-strength-label">Botstärke</span>
-                    <span id="adaptive-strength-track" class="adaptive-strength-track" style="--skill:50%" aria-label="Botstärke 50 von 100">
-                        <span id="adaptive-strength-fill" class="adaptive-strength-fill"></span>
+                    <span id="adaptive-strength-track-legacy" class="adaptive-strength-track" style="--skill:50%" aria-label="Botstärke 50 von 100">
+                        <span id="adaptive-strength-fill-legacy" class="adaptive-strength-fill"></span>
                         <span class="adaptive-strength-knob"></span>
                     </span>
-                    <span id="adaptive-strength-value" class="adaptive-strength-value">50%</span>
+                    <span id="adaptive-strength-value-legacy" class="adaptive-strength-value">50%</span>
                 </div>
             </div>
             <div class="scoreboard">
@@ -58,12 +58,25 @@
                     <span id="scoreYellow" class="score-value">0</span>
                 </div>
             </div>
+            <div id="winner-banner" class="winner-info hidden">
+                <span class="winner-icon"></span>
+                <span id="winner-text">Rot hat gewonnen!</span>
+                <button id="next-round-btn">Nächste Runde</button>
+            </div>
+            <div id="adaptive-strength" class="adaptive-strength hidden">
+                <span class="adaptive-strength-label">Botstärke</span>
+                <span id="adaptive-strength-track" class="adaptive-strength-track" style="--skill:50%" aria-label="Botstärke 50 von 100">
+                    <span id="adaptive-strength-fill" class="adaptive-strength-fill"></span>
+                    <span class="adaptive-strength-knob"></span>
+                </span>
+                <span id="adaptive-strength-value" class="adaptive-strength-value">50%</span>
+            </div>
         </section>
 
-        <section id="winner-banner" class="winner-banner hidden">
+        <section id="winner-banner-legacy" class="winner-banner hidden">
             <span class="winner-icon">🏆</span>
-            <span id="winner-text">Rot hat gewonnen!</span>
-            <button id="next-round-btn">Nächste Runde</button>
+            <span id="winner-text-legacy">Rot hat gewonnen!</span>
+            <button id="next-round-btn-legacy">Nächste Runde</button>
         </section>
 
         <section class="board-wrapper">
@@ -74,7 +87,7 @@
         </section>
     </main>
 
-    <footer class="footer">4 Gewinnt | by Andreas Rollinger | 2026.08.07</footer>
+    <footer class="footer">4 Gewinnt | by Andreas Rollinger | 2026.08.08</footer>
 
 </div>
 

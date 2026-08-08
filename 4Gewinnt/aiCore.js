@@ -254,6 +254,28 @@ function hasMissedConnectFourWin(board, chosenCol, player) {
     return false;
 }
 
+function getConnectFourDifficultyProfile(skill) {
+    const normalized = Math.max(0, Math.min(100, Number(skill) || 0)) / 100;
+    const early = normalized <= 0.75
+        ? 0.75 * ((normalized / 0.75) ** 2 * (3 - 2 * (normalized / 0.75)))
+        : 0.75 + ((normalized - 0.75) / 0.25) ** 1.8 * 0.25;
+
+    return {
+        challenge: early,
+        smooth: early,
+        learningWeight: 0.03 + early * 0.55,
+        minimaxWeight: 0.06 + early * 0.79,
+        tacticWeight: 0.06 + early * 0.74,
+        randomness: Math.max(0.03, 0.42 - early * 0.39),
+        errorRate: Math.max(0.02, 0.34 - early * 0.30),
+        tacticalAccuracy: Math.min(0.98, 0.34 + early * 0.62),
+        thinkTimeWeight: early,
+        searchIntensity: early,
+        maxDepth: 5,
+        thinkTime: 260 + early * 1050
+    };
+}
+
 window.ConnectFourAICore = {
     ROWS: CONNECT_FOUR_ROWS,
     COLS: CONNECT_FOUR_COLS,
@@ -272,7 +294,8 @@ window.ConnectFourAICore = {
     recordPlayerEvent: recordConnectFourPlayerEvent,
     evaluatePlayerMove: evaluateConnectFourPlayerMove,
     countWinningMoves: countConnectFourWinningMoves,
-    hasMissedWin: hasMissedConnectFourWin
+    hasMissedWin: hasMissedConnectFourWin,
+    getDifficultyProfile: getConnectFourDifficultyProfile
 };
 
 // Das Profil muss vor adaptiveBot.js und game.js existieren, weil beide

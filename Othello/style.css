@@ -124,7 +124,10 @@
    Infoleiste über dem Brett - Handy First
    ----------------------------------------- */
 .game-info {
-    width: fit-content;
+    width: min(100%, 360px);
+    max-width: 100%;
+    min-height: 120px;
+    box-sizing: border-box;
     margin: 0 auto 10px auto;
     padding: 10px 16px;
     background: var(--bg-panel);
@@ -321,7 +324,9 @@
 }
 
 .adaptive-strength-track {
-    width: min(48vw, 220px);
+    width: auto;
+    flex: 1 1 180px;
+    min-width: 0;
     height: 8px;
     overflow: hidden;
     border-radius: 999px;

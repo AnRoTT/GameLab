@@ -74,18 +74,7 @@ function adaptiveLerp(current, target, factor) {
 }
 
 function adaptiveCurve(skill) {
-    const s = adaptiveClamp((typeof skill === "number" ? skill : 48) / 100);
-    const late = Math.pow(s, 2.35);
-    const smooth = late * late * (3 - 2 * late);
-    return {
-        smooth,
-        learningWeight: adaptiveLerp(0.03, 0.58, smooth),
-        minimaxWeight: adaptiveLerp(0.06, 0.85, smooth),
-        tacticWeight: adaptiveLerp(0.06, 0.80, smooth),
-        randomness: adaptiveLerp(0.42, 0.03, smooth),
-        errorRate: adaptiveLerp(0.40, 0.02, smooth),
-        thinkTimeWeight: smooth
-    };
+    return window.ConnectFourAICore.getDifficultyProfile(typeof skill === "number" ? skill : 48);
 }
 
 function getAdaptiveStrengthGate(skillValue) {
@@ -95,6 +84,7 @@ function getAdaptiveStrengthGate(skillValue) {
 function getAdaptivePlayerSkillEstimate() {
     const coreProfile = window.connectFourPlayerProfile;
     const totalMoves = Math.max(1, coreProfile?.totalMoves ?? playerProfile.gesamtZuege);
+    if (totalMoves < 12) return 50;
     const patternScore = coreProfile
         ? (coreProfile.tactics.missedWins + coreProfile.tactics.forks * 1.15 + coreProfile.style.offensive * 0.16) / totalMoves
         : (playerProfile.hatGewinnzugVerpasst + playerProfile.gingInGabel * 1.15 + playerProfile.angriffsZuege * 0.16) / totalMoves;
@@ -207,37 +197,23 @@ function getAdaptiveThinkTime() {
 }
 
 function getAdaptiveSearchDepth() {
-    const skillBand = getAdaptiveBotSkillBand();
     const stage = getAdaptiveLearningStage();
     const skillValue = getAdaptiveBotSkillValue();
     const curve = adaptiveCurve(skillValue);
-    let depth;
-
-    if (skillBand === "low") depth = 1;
-    else if (skillBand === "mid") depth = 1;
-    else if (skillBand === "adapted") depth = 1;
-    else if (skillBand === "strong") depth = 3;
-    else depth = 5;
-
-    if (stage === "observe") depth = Math.max(1, depth - 1);
-    else if (stage === "learn") depth = Math.max(1, depth);
-    else depth = Math.min(6, depth + 1);
-
-    return depth;
+    let searchIntensity = curve.searchIntensity;
+    if (stage === "observe") searchIntensity *= 0.86;
+    else if (stage === "apply") searchIntensity = Math.min(1, searchIntensity + 0.04);
+    return Math.max(1, Math.min(curve.maxDepth,
+        Math.floor(1 + Math.pow(searchIntensity, 2.4) * (curve.maxDepth - 1))));
 }
 
 function getAdaptiveStochasticity(skillBand, stage) {
     const skillValue = getAdaptiveBotSkillValue();
     const curve = adaptiveCurve(skillValue);
-    if (skillBand === "low") return stage === "observe" ? 0.55 : 0.45;
-    if (skillBand === "mid") return stage === "observe" ? 0.45 : 0.35;
-    if (skillBand === "adapted") return adaptiveLerp(
-        stage === "observe" ? 0.22 : 0.16,
-        stage === "observe" ? 0.12 : 0.08,
-        curve.smooth
-    );
-    if (skillBand === "strong") return stage === "observe" ? 0.05 : 0.03;
-    return stage === "observe" ? 0.02 : 0.005;
+    let stochasticity = adaptiveLerp(0.48, 0.03, curve.smooth);
+    if (stage === "observe") stochasticity += 0.08;
+    else if (stage === "learn") stochasticity += 0.03;
+    return Math.max(0.02, Math.min(0.58, stochasticity));
 }
 
 function pickAdaptiveSentence(options) {
@@ -475,6 +451,7 @@ function updateAdaptiveAfterMatch(resultSign) {
 function getAdaptiveSkillFromProfile() {
     const stage = getAdaptiveLearningStage();
     const totalMoves = Math.max(1, playerProfile.gesamtZuege);
+    if (totalMoves < 12) return 50;
     const curve = adaptiveCurve(getAdaptivePlayerSkillEstimate());
     const patternScore = (playerProfile.hatGewinnzugVerpasst + playerProfile.gingInGabel * 1.1 + playerProfile.angriffsZuege * 0.15) / totalMoves;
     const pressureScore = (playerProfile.druckVerlaesst + playerProfile.druckZuege * 0.35) / totalMoves;
@@ -501,6 +478,7 @@ function getAdaptiveSkillFromProfile() {
 function getAdaptiveTargetSkill() {
     const curve = adaptiveCurve(getAdaptivePlayerSkillEstimate());
     const totalMoves = Math.max(1, playerProfile.gesamtZuege);
+    if (totalMoves < 12) return adaptiveSkill;
     const profilePressure = (playerProfile.druckZuege + playerProfile.offensivZuege * 1.2 + playerProfile.gingInGabel * 1.5) / totalMoves;
     const profileWeakness = (playerProfile.defensivZuege + playerProfile.hatGewinnzugVerpasst * 1.2) / totalMoves;
     const profileBalance = (playerProfile.eroeffnungZuege * 0.15 + playerProfile.mittelspielZuege * 0.35 + playerProfile.endspielZuege * 0.50) / totalMoves;
@@ -538,13 +516,9 @@ function getAdaptiveBotMove() {
     const stochasticity = getAdaptiveStochasticity(skillBand, stage);
     const weakPhase = skillValue < 60;
     const learningGate = getAdaptiveStrengthGate(skillValue);
-    const earlyMistakeChance = skillValue <= 20
-        ? 0.72
-        : skillValue < 40
-            ? 0.48
-            : weakPhase
-                ? adaptiveLerp(0.34, 0.18, skillValue / 60)
-                : 0.04;
+    const earlyMistakeChance = Math.max(0.02, Math.min(0.58,
+        curve.errorRate * (stage === "observe" ? 1.25 : stage === "learn" ? 1.05 : 0.9)
+    ));
 
     const dumbMode = skillValue <= 18 || adaptiveLearn.lossStreak >= 8 || adaptiveSkill <= 12;
     if (dumbMode) {
@@ -572,26 +546,6 @@ function getAdaptiveBotMove() {
         if (randomCol !== -1) {
             adaptiveMoveCounter++;
             adaptiveRoundDelta -= 1;
-            adaptiveLearn.lastBotCol = randomCol;
-        }
-        return randomCol;
-    }
-
-    if (skillValue < 40 && Math.random() < 0.55) {
-        const randomCol = adaptiveRandomMove();
-        if (randomCol !== -1) {
-            adaptiveMoveCounter++;
-            adaptiveRoundDelta -= 1;
-            adaptiveLearn.lastBotCol = randomCol;
-        }
-        return randomCol;
-    }
-
-    if (skillValue < 60 && Math.random() < 0.30) {
-        const randomCol = adaptiveRandomMove();
-        if (randomCol !== -1) {
-            adaptiveMoveCounter++;
-            adaptiveRoundDelta -= 0;
             adaptiveLearn.lastBotCol = randomCol;
         }
         return randomCol;

@@ -72,8 +72,16 @@ button {
 
 .title {
     font-size: 2rem;
-    margin-bottom: 32px;
+    margin-bottom: 8px;
     text-shadow: 0 0 15px var(--accent);
+    text-align: center;
+}
+
+.subtitle {
+    margin: 0 0 28px;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    line-height: 1.4;
     text-align: center;
 }
 
@@ -322,7 +330,12 @@ button {
 
     .title {
         font-size: 1.8rem;
+        margin-bottom: 6px;
+    }
+
+    .subtitle {
         margin-bottom: 22px;
+        font-size: 0.85rem;
     }
 
     .menu {

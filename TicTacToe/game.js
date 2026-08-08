@@ -1,6 +1,7 @@
 ﻿const board = document.getElementById("board");
 const TicTacToeAICore = window.TicTacToeAICore;
 const status = document.getElementById("status");
+const roundCountdown = document.getElementById("roundCountdown");
 const reset = document.getElementById("reset");
 const winnerBanner = document.getElementById("winnerBanner");
 const adaptiveStrengthPanel = document.getElementById("adaptiveStrengthPanel");
@@ -47,6 +48,7 @@ let winRowGlobal = null;
 let matchOver = false;
 let waitingForNextRound = false;
 let botMoveTimer = null;
+let nextRoundCountdownTimer = null;
 let keyboardCursor = 0;
 
 function readSettings() {
@@ -136,6 +138,34 @@ function cancelPendingBotMove() {
         botMoveTimer = null;
     }
     board.classList.remove("bot-thinking");
+}
+
+function cancelNextRoundCountdown() {
+    if (nextRoundCountdownTimer !== null) {
+        clearInterval(nextRoundCountdownTimer);
+        nextRoundCountdownTimer = null;
+    }
+    roundCountdown.hidden = true;
+    roundCountdown.textContent = "";
+}
+
+function startNextRoundCountdown() {
+    cancelNextRoundCountdown();
+    if (matchOver || activeMatch.totalRounds <= 1 || !waitingForNextRound) return;
+
+    let seconds = 3;
+    roundCountdown.hidden = false;
+    roundCountdown.textContent = `Nächste Runde in ${seconds}...`;
+
+    nextRoundCountdownTimer = setInterval(() => {
+        seconds -= 1;
+        if (seconds <= 0) {
+            cancelNextRoundCountdown();
+            if (waitingForNextRound && !matchOver) resetGame(false);
+            return;
+        }
+        roundCountdown.textContent = `Nächste Runde in ${seconds}...`;
+    }, 1000);
 }
 
 function canBotMove() {
@@ -344,21 +374,20 @@ function endRound(winner, winRow = null) {
     applySettingsLock(!matchFinished);
 
 if(matchFinished){
-    let parts = [];
-    parts.push(`Match beendet`);
-    status.textContent = parts.join(" ") + ". Klicke 'Neues Spiel'";
     let winnerText = "";
     if (scoreX > scoreO) winnerText = "Gesamtsieger: X";
     else if (scoreO > scoreX) winnerText = "Gesamtsieger: O";
     else winnerText = "Gesamt: Unentschieden!";
+    status.textContent = `${winnerText} · Klicke 'Neues Spiel'`;
     winnerBanner.textContent = winnerText;
     winnerBanner.classList.add("show");
     reset.textContent = "Neues Spiel";
 } else {
-    status.textContent = message + ". Klicke 'Neue Runde'";
+    status.textContent = message;
     winnerBanner.classList.remove("show");
     winnerBanner.textContent = "";
     reset.textContent = "Neue Runde";
+    startNextRoundCountdown();
 }
 }
 
@@ -366,6 +395,7 @@ if(matchFinished){
 function resetGame(full = true) {
     ["scoreX", "scoreDraw", "scoreO"].forEach(id => document.getElementById(id).classList.remove("winner"));
     cancelPendingBotMove();
+    cancelNextRoundCountdown();
     if (full) {
         readSettings();
     }
@@ -417,6 +447,7 @@ function resetGame(full = true) {
 
 function abortMatch() {
     cancelPendingBotMove();
+    cancelNextRoundCountdown();
     cells = Array(9).fill(null);
     keyboardCursor = 0;
     current = "X";
@@ -443,10 +474,12 @@ function abortMatch() {
 
 /* NEU: Reset Button Logik */
 reset.onclick = () => {
-    if (gameOver || matchOver) {
+    if (matchOver) {
         resetGame(true);
     } else if(waitingForNextRound) {
         resetGame(false);
+    } else if (gameOver) {
+        resetGame(true);
     } else {
         abortMatch();
     }

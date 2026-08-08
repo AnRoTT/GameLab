@@ -131,7 +131,8 @@ function renderBoard() {
     boardEl.innerHTML = "";
     // Gültige Züge sind in beiden Regelmodi identisch. Der Turniermodus
     // verändert nur die Wertung der verbliebenen leeren Felder.
-    const validMoves = (gameStarted && !gameOver && ruleMode !== "tournament")
+    const humanMayMove = !vsComputer || currentPlayer === "black";
+    const validMoves = (gameStarted && !gameOver && ruleMode !== "tournament" && humanMayMove)
         ? getAllValidMoves(currentPlayer)
         : [];
 

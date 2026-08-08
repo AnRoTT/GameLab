@@ -299,6 +299,24 @@ function othelloChooseMinimaxMove(state, player, depth = 3, randomness = 0, weig
     return candidates[Math.floor(Math.random() * candidates.length)].move;
 }
 
+function getOthelloDifficultyProfile(skill) {
+    const normalized = Math.max(0, Math.min(100, Number(skill) || 0)) / 100;
+    const challenge = normalized <= 0.75
+        ? 0.75 * ((normalized / 0.75) ** 2 * (3 - 2 * (normalized / 0.75)))
+        : 0.75 + ((normalized - 0.75) / 0.25) ** 1.8 * 0.25;
+
+    return {
+        challenge,
+        randomness: Math.max(0.03, 0.38 - challenge * 0.34),
+        tacticalAccuracy: Math.min(0.98, 0.32 + challenge * 0.64),
+        position: 0.8 + challenge * 1.0,
+        mobility: 5 + challenge * 14,
+        pieces: 0.5 + challenge * 1.5,
+        maxDepth: 4,
+        thinkTime: 300 + challenge * 900
+    };
+}
+
 window.OthelloAICore = {
     createOthelloPlayerProfile,
     getOthelloZone,
@@ -314,6 +332,7 @@ window.OthelloAICore = {
     OTHELLO_POSITION_MATRIX,
     othelloEvaluateState,
     othelloChooseMinimaxMove,
+    getDifficultyProfile: getOthelloDifficultyProfile,
     getAllValidMovesForState,
     isValidMoveState
 };
