@@ -184,6 +184,13 @@
    Responsive für Handy
    ----------------------------------------- */
 @media (max-width: 520px) {
+    #backIcon {
+        top: 10px;
+        left: 10px;
+        max-width: calc(100vw - 20px);
+        padding: 6px 12px;
+        font-size: 16px;
+    }
     .board {
         width: 88vw;
         height: 88vw;
