@@ -2,7 +2,6 @@ var adaptiveSkill = 48;
 var adaptiveMomentum = 0;
 var adaptiveMoveCounter = 0;
 var adaptiveRoundDelta = 0;
-var adaptiveRoundsSinceAdjust = 0;
 var adaptiveLearn = {
     skill: 48,
     roundForm: 0,
@@ -125,7 +124,6 @@ function resetAdaptiveState() {
     adaptiveMomentum = 0;
     adaptiveMoveCounter = 0;
     adaptiveRoundDelta = 0;
-    adaptiveRoundsSinceAdjust = 0;
     adaptiveLearn = {
         skill: 48,
         roundForm: 0,
@@ -689,27 +687,24 @@ function getAdaptiveBotMove() {
 function finalizeAdaptiveRound(resultSign) {
     updateAdaptiveAfterMatch(resultSign);
     const targetSkill = getAdaptiveTargetSkill();
-    const responseGate = adaptiveClamp((adaptiveSkill - 45) / 25);
-    const resultDelta = resultSign > 0
-        ? adaptiveLerp(5, 10, responseGate)
-        : resultSign < 0
-            ? -adaptiveLerp(5, 10, responseGate)
-            : -2;
-    const styleDelta = adaptiveRoundDelta > 0
-        ? Math.min(4, adaptiveRoundDelta)
-        : Math.max(-3, adaptiveRoundDelta);
-    const streakDelta = resultSign > 0
-        ? Math.min(6, adaptiveLearn.winStreak * adaptiveLerp(1.2, 2.0, responseGate))
-        : resultSign < 0
-            ? -Math.min(10, adaptiveLearn.lossStreak * adaptiveLerp(1.8, 2.6, responseGate))
-            : 0;
-    adaptiveRoundsSinceAdjust += 1;
-    const floorSkill = adaptiveSkill >= 60 ? 24 : adaptiveSkill >= 35 ? 16 : 10;
-    const adjustedTarget = Math.max(floorSkill, Math.min(100, targetSkill + resultDelta + styleDelta + streakDelta));
+    const resultDelta = resultSign > 0 ? 3 : resultSign < 0 ? -3 : 0;
+    const playerSkill = getAdaptivePlayerSkillEstimate();
+    const qualityDelta = resultSign === 0
+        ? 0
+        : Math.max(-0.75, Math.min(0.75, resultSign * (playerSkill - 50) * 0.015));
+    const streakCount = resultSign > 0 ? adaptiveLearn.winStreak : adaptiveLearn.lossStreak;
+    const streakDelta = resultSign === 0
+        ? 0
+        : resultSign * Math.min(0.5, Math.max(0, streakCount - 1) * 0.25);
+    const profileDelta = Math.max(-0.75, Math.min(0.75, (targetSkill - adaptiveSkill) * 0.06));
+    const styleDelta = Math.max(-0.5, Math.min(0.5, adaptiveRoundDelta * 0.12));
+    const learningStage = getAdaptiveLearningStage();
+    const learningRate = learningStage === "observe" ? 0.45 : learningStage === "learn" ? 0.75 : 1;
+    const totalDelta = Math.max(-4, Math.min(4,
+        (resultDelta + qualityDelta + streakDelta + profileDelta + styleDelta) * learningRate
+    ));
 
-    const roundPull = adaptiveLerp(0.34, 0.52, responseGate) + (adaptiveRoundsSinceAdjust >= 2 ? 0.10 : 0);
-    adaptiveSkill = Math.max(floorSkill, Math.min(100, adaptiveLerp(adaptiveSkill, adjustedTarget, roundPull)));
-    if (adaptiveRoundsSinceAdjust >= 2) adaptiveRoundsSinceAdjust = 0;
+    adaptiveSkill = Math.max(1, Math.min(100, adaptiveSkill + totalDelta));
     adaptiveLearn.skill = adaptiveSkill;
     if (typeof updateAdaptiveStrengthUI === "function") updateAdaptiveStrengthUI();
     adaptiveMoveCounter = 0;
