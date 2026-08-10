@@ -159,9 +159,11 @@ function othelloIsEdgeMove(move) {
     return move.r === 0 || move.r === 7 || move.c === 0 || move.c === 7;
 }
 
-function othelloApplyMoveToState(state, move, player) {
+function othelloApplyMove(state, move, player) {
+    if (!isValidMoveState(move.r, move.c, player, state)) return null;
     const next = othelloCloneBoard(state);
     const opponent = player === "black" ? "white" : "black";
+    const flips = [];
     next[move.r][move.c] = player;
 
     for (const [dr, dc] of OTHELLO_DIRECTIONS) {
@@ -177,9 +179,15 @@ function othelloApplyMoveToState(state, move, player) {
             toFlip.forEach(([r, c]) => {
                 next[r][c] = player;
             });
+            flips.push(...toFlip);
         }
     }
-    return next;
+    return { board: next, move: { r: move.r, c: move.c }, flips };
+}
+
+function othelloApplyMoveToState(state, move, player) {
+    const result = othelloApplyMove(state, move, player);
+    return result ? result.board : null;
 }
 
 function getAllValidMovesForState(player, state) {
@@ -328,11 +336,14 @@ window.OthelloAICore = {
     othelloIsCornerMove,
     othelloIsEdgeMove,
     othelloApplyMoveToState,
+    applyMove: othelloApplyMove,
     othelloScoreMove,
     OTHELLO_POSITION_MATRIX,
     othelloEvaluateState,
     othelloChooseMinimaxMove,
     getDifficultyProfile: getOthelloDifficultyProfile,
     getAllValidMovesForState,
-    isValidMoveState
+    isValidMoveState,
+    getAllValidMoves: getAllValidMovesForState,
+    isValidMove: isValidMoveState
 };

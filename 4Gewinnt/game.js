@@ -415,12 +415,7 @@ function botMove(token) {
 // --- Hilfsfunktionen -------------------------------------------------------
 
 function findFreeRow(col) {
-    for (let r = ROWS - 1; r >= 0; r--) {
-        if (board[r][col] === 0) {
-            return r;
-        }
-    }
-    return -1;
+    return connectFourAICore.getFreeRow(board, col);
 }
 
 function placeChip(row, col, player) {
@@ -640,60 +635,16 @@ function switchPlayer() {
 }
 
 function isBoardFull() {
-    for (let c = 0; c < COLS; c++) {
-        if (findFreeRow(c) !== -1) return false;
-    }
-    return true;
+    return connectFourAICore.isBoardFull(board);
 }
 
 // --- Gewinnprüfung ---------------------------------------------------------
 
 function checkWinner() {
-    // Horizontal
-    for (let r = 0; r < ROWS; r++) {
-        for (let c = 0; c <= COLS - 4; c++) {
-            const v = board[r][c];
-            if (v && v === board[r][c + 1] && v === board[r][c + 2] && v === board[r][c + 3]) {
-                highlightWin([[r, c], [r, c + 1], [r, c + 2], [r, c + 3]]);
-                return v;
-            }
-        }
-    }
-
-    // Vertikal
-    for (let c = 0; c < COLS; c++) {
-        for (let r = 0; r <= ROWS - 4; r++) {
-            const v = board[r][c];
-            if (v && v === board[r + 1][c] && v === board[r + 2][c] && v === board[r + 3][c]) {
-                highlightWin([[r, c], [r + 1, c], [r + 2, c], [r + 3, c]]);
-                return v;
-            }
-        }
-    }
-
-    // Diagonal (â†˜)
-    for (let r = 0; r <= ROWS - 4; r++) {
-        for (let c = 0; c <= COLS - 4; c++) {
-            const v = board[r][c];
-            if (v && v === board[r + 1][c + 1] && v === board[r + 2][c + 2] && v === board[r + 3][c + 3]) {
-                highlightWin([[r, c], [r + 1, c + 1], [r + 2, c + 2], [r + 3, c + 3]]);
-                return v;
-            }
-        }
-    }
-
-    // Diagonal (â†™)
-    for (let r = 3; r < ROWS; r++) {
-        for (let c = 0; c <= COLS - 4; c++) {
-            const v = board[r][c];
-            if (v && v === board[r - 1][c + 1] && v === board[r - 2][c + 2] && v === board[r - 3][c + 3]) {
-                highlightWin([[r, c], [r - 1, c + 1], [r - 2, c + 2], [r - 3, c + 3]]);
-                return v;
-            }
-        }
-    }
-
-    return null;
+    const winner = connectFourAICore.findWinner(board);
+    if (!winner) return null;
+    highlightWin(winner.coordinates);
+    return winner.player;
 }
 
 function highlightWin(coords) {

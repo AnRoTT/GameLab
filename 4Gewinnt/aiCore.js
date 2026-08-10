@@ -45,20 +45,38 @@ function connectFourCountDirection(board, row, col, rowStep, colStep, player) {
     return count;
 }
 
-function connectFourHasWinner(board, player) {
+function findConnectFourWinner(board) {
     for (let row = 0; row < CONNECT_FOUR_ROWS; row++) {
         for (let col = 0; col < CONNECT_FOUR_COLS; col++) {
-            if (board[row][col] !== player) continue;
+            const player = board[row][col];
+            if (player === CONNECT_FOUR_EMPTY) continue;
             const lines = [
                 [0, 1], [1, 0], [1, 1], [1, -1]
             ];
-            if (lines.some(([dr, dc]) =>
-                1 + connectFourCountDirection(board, row, col, dr, dc, player)
-                  + connectFourCountDirection(board, row, col, -dr, -dc, player) >= 4
-            )) return true;
+            for (const [dr, dc] of lines) {
+                const count = 1
+                    + connectFourCountDirection(board, row, col, dr, dc, player)
+                    + connectFourCountDirection(board, row, col, -dr, -dc, player);
+                if (count >= 4) {
+                    const coordinates = [];
+                    for (let step = -3; step <= 3; step += 1) {
+                        const nextRow = row + dr * step;
+                        const nextCol = col + dc * step;
+                        if (nextRow >= 0 && nextRow < CONNECT_FOUR_ROWS && nextCol >= 0 && nextCol < CONNECT_FOUR_COLS && board[nextRow][nextCol] === player) {
+                            coordinates.push([nextRow, nextCol]);
+                        }
+                    }
+                    return { player, coordinates };
+                }
+            }
         }
     }
-    return false;
+    return null;
+}
+
+function connectFourHasWinner(board, player) {
+    const winner = findConnectFourWinner(board);
+    return Boolean(winner && winner.player === player);
 }
 
 function isConnectFourBoardFull(board) {
@@ -285,6 +303,7 @@ window.ConnectFourAICore = {
     getFreeRow: getConnectFourFreeRow,
     applyMove: applyConnectFourMove,
     hasWinner: connectFourHasWinner,
+    findWinner: findConnectFourWinner,
     isBoardFull: isConnectFourBoardFull,
     evaluateBoard: evaluateConnectFourBoard,
     minimax: connectFourMinimax,

@@ -41,12 +41,6 @@ let keyboardCol = 3;
 
 window.othelloPlayerProfile = createOthelloPlayerProfile();
 
-const dirs = [
-    [-1, -1], [-1, 0], [-1, 1],
-    [0, -1], [0, 1],
-    [1, -1], [1, 0], [1, 1]
-];
-
 function initGame() {
     cancelPendingTurnTimers();
     const token = gameToken;
@@ -207,53 +201,18 @@ function animateMove(move, flips, player) {
 }
 
 function getAllValidMoves(player) {
-    const moves = [];
-    for(let r = 0; r < 8; r++) {
-        for(let c = 0; c < 8; c++) {
-            if(isValidMove(r, c, player)) moves.push({r, c});
-        }
-    }
-    return moves;
+    return OthelloAICore.getAllValidMoves(player, board);
 }
 
 function isValidMove(r, c, player) {
-    if(board[r][c]) return false;
-    const opponent = player === "black"? "white" : "black";
-    for(const [dr, dc] of dirs) {
-        let nr = r + dr, nc = c + dc;
-        let foundOpponent = false;
-        while(nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && board[nr][nc] === opponent) {
-            foundOpponent = true;
-            nr += dr;
-            nc += dc;
-        }
-        if(foundOpponent && nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && board[nr][nc] === player) {
-            return true;
-        }
-    }
-    return false;
+    return OthelloAICore.isValidMove(r, c, player, board);
 }
 
 function makeMove(r, c, player) {
-    if(!isValidMove(r, c, player)) return false;
-    const opponent = player === "black"? "white" : "black";
-    const flipped = [];
-    board[r][c] = player;
-
-    for(const [dr, dc] of dirs) {
-        let nr = r + dr, nc = c + dc;
-        const toFlip = [];
-        while(nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && board[nr][nc] === opponent) {
-            toFlip.push([nr, nc]);
-            nr += dr;
-            nc += dc;
-        }
-        if(toFlip.length && nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && board[nr][nc] === player) {
-            toFlip.forEach(([fr, fc]) => board[fr][fc] = player);
-            flipped.push(...toFlip);
-        }
-    }
-    return { move: {r, c}, flips: flipped };
+    const result = OthelloAICore.applyMove(board, { r, c }, player);
+    if (!result) return false;
+    board = result.board;
+    return { move: result.move, flips: result.flips };
 }
 
 function getPressureState(player) {
