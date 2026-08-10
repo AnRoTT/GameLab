@@ -125,7 +125,7 @@ function attachColumnHoverZones() {
             if (gameOver) return;
             if (chipDropActive) return;
             hoverInputMode = event.pointerType || "mouse";
-            if (hoverInputMode === "touch") return;
+            if (hoverInputMode !== "mouse" || !window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
             hoveredCol = c;
             if (modeIndex === 1 && currentPlayer === PLAYER_YELLOW) return; // Bot: kein Ghost
             updateGhost(c);

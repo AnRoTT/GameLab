@@ -31,6 +31,7 @@ let board = [];
 let currentPlayer = "black";
 let gameOver = false;
 let gameStarted = false;
+let turnTransitionActive = false;
 let lastMoveWasPressure = false;
 let botMoveTimer = null;
 let nextTurnTimer = null;
@@ -61,6 +62,7 @@ function initGame() {
     keyboardCol = 3;
     gameOver = false;
     gameStarted = true;
+    turnTransitionActive = false;
     boardEl.classList.remove("disabled");
     boardEl.tabIndex = 0;
     // settingsPanel.classList.add("disabled"); // NICHT sperren wegen Abbrechen
@@ -94,9 +96,11 @@ function cancelPendingTurnTimers() {
 
 function scheduleNextTurn(delay, token = gameToken) {
     if (nextTurnTimer !== null) clearTimeout(nextTurnTimer);
+    turnTransitionActive = true;
     nextTurnTimer = setTimeout(() => {
         nextTurnTimer = null;
         if (token !== gameToken || !gameStarted || gameOver) return;
+        turnTransitionActive = false;
         nextTurn();
     }, delay);
 }
@@ -109,6 +113,7 @@ function resetGame() {
     keyboardCol = 3;
     gameStarted = false;
     gameOver = false;
+    turnTransitionActive = false;
     boardEl.classList.add("disabled");
     boardEl.tabIndex = -1;
 modeBtn.classList.remove("disabled"); // nur Modus wieder frei
@@ -125,7 +130,7 @@ function renderBoard() {
     boardEl.innerHTML = "";
     // Gültige Züge sind in beiden Regelmodi identisch. Der Turniermodus
     // verändert nur die Wertung der verbliebenen leeren Felder.
-    const humanMayMove = !vsComputer || currentPlayer === "black";
+    const humanMayMove = isHumanTurn() && !turnTransitionActive;
     const validMoves = (gameStarted && !gameOver && ruleMode !== "tournament" && humanMayMove)
         ? getAllValidMoves(currentPlayer)
         : [];
@@ -151,6 +156,10 @@ function renderBoard() {
             boardEl.appendChild(cell);
         }
     }
+}
+
+function isHumanTurn() {
+    return !vsComputer || currentPlayer === "black";
 }
 
 boardEl.tabIndex = -1;
@@ -313,6 +322,7 @@ function botMove(token = gameToken) { // Bot zieht und ruft dann nextTurn
     }
     playSound(soundMove, 0.28);
     updateScore();
+    turnTransitionActive = true;
     renderBoard();
     animateMove(result.move, result.flips, "white");
     lastMoveWasPressure = getPressureState("white");
@@ -401,6 +411,7 @@ boardEl.addEventListener("click", (e) => {
             }
         }
         updateScore();
+        turnTransitionActive = true;
         renderBoard();
         animateMove(result.move, result.flips, currentPlayer);
         lastMoveWasPressure = getPressureState(currentPlayer);
