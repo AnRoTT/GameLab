@@ -158,6 +158,10 @@ function renderBoard() {
     }
 }
 
+function hideValidMoveHints() {
+    boardEl.querySelectorAll(".cell.valid").forEach(cell => cell.classList.remove("valid"));
+}
+
 function isHumanTurn() {
     return !vsComputer || currentPlayer === "black";
 }
@@ -188,6 +192,7 @@ boardEl.addEventListener("keydown", event => {
 });
 
 function animateMove(move, flips, player) {
+    hideValidMoveHints();
     const opponent = player === "black" ? "white" : "black";
     const placedCell = boardEl.querySelector(`.cell[data-r="${move.r}"][data-c="${move.c}"]`);
     const placedPiece = placedCell?.querySelector(".piece");
