@@ -218,6 +218,29 @@ button {
     font-weight: 600;
 }
 
+.menu-item-copy {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    text-align: center;
+}
+
+.menu-item-description {
+    color: var(--text-muted);
+    font-size: .8rem;
+    line-height: 1.3;
+}
+
+.menu-item.coming-soon {
+    border-color: #3d4356;
+}
+
+.menu-item.coming-soon .icon,
+.menu-item.coming-soon .label {
+    color: var(--text-muted);
+}
+
 .menu-item.disabled {
     opacity: 0.4;
     pointer-events: none;
@@ -402,6 +425,9 @@ button {
     .menu-item .label {
         font-size: 1.2rem;
     }
+
+    .menu-item-copy { align-items: center; }
+    .menu-item-description { font-size: .72rem; }
 
     .footer {
         margin-top: 16px;

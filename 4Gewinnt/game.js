@@ -30,6 +30,10 @@ let roundStartInProgress = false;
 let hoveredCol = null;
 let hoverInputMode = "mouse";
 let keyboardColumn = 0;
+let chipDropActive = false;
+let chipDropTimer = null;
+let chipDropFrame = null;
+const CHIP_DROP_DURATION = 180;
 
 // === SOUNDS ===
 const soundChip = new Audio('../assets/sounds/Chip_Drop.mp3');
@@ -119,6 +123,7 @@ function attachColumnHoverZones() {
         // --- HOVER / TOUCH: Ghost nur für echte Spieler ---
         zone.addEventListener("pointerenter", (event) => {
             if (gameOver) return;
+            if (chipDropActive) return;
             hoverInputMode = event.pointerType || "mouse";
             if (hoverInputMode === "touch") return;
             hoveredCol = c;
@@ -257,6 +262,7 @@ function startNewRound() {
 }
 
 function clearBoardVisual() {
+    clearDropAnimation();
     const cells = boardEl.querySelectorAll(".cell");
     cells.forEach(cell => {
         cell.classList.remove("win");
@@ -277,6 +283,7 @@ function resetBoardArray() {
 
 function handleColumnClick(col) {
     if (gameOver) return;
+    if (chipDropActive) return;
     if (!matchActive && resetButtonIndex === 0) return;
     if (modeIndex === 1 && isBotTurn()) return;
 
@@ -335,6 +342,12 @@ function maybeBotMove() {
     if (modeIndex !== 1) return;
     if (currentPlayer !== PLAYER_YELLOW) return;
     if (gameOver) return;
+    if (chipDropActive) {
+        window.setTimeout(() => {
+            if (!chipDropActive) maybeBotMove();
+        }, CHIP_DROP_DURATION);
+        return;
+    }
     const token = roundToken;
 
     const level = BOT_LEVEL_KEYS[botLevelIndex];
@@ -417,17 +430,153 @@ function placeChip(row, col, player) {
     const chip = cell.querySelector(".chip");
     chip.classList.remove("ghost", "ghost-red", "ghost-yellow");
 
-    // 1. Farbe setzen, aber noch nicht sichtbar machen
-    chip.classList.add(player === PLAYER_RED? "red" : "yellow");
+    chip.classList.add(player === PLAYER_RED ? "red" : "yellow", "drop-pending");
+    animateChipDrop(row, col, player);
 
-    // 2. Im nächsten Frame sichtbar machen = startet die Fall-Animation
-    requestAnimationFrame(() => {
-        chip.classList.add("visible");
+}
+
+function animateChipDropLegacy(row, col, player) {
+    const cell = getCell(row, col);
+    if (!cell) return;
+
+    clearDropAnimation();
+    const boardRect = boardEl.getBoundingClientRect();
+    const cellRect = cell.getBoundingClientRect();
+    const targetChip = cell.querySelector(".chip");
+    const targetChipRect = targetChip.getBoundingClientRect();
+    const svgNamespace = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(svgNamespace, "svg");
+    const defs = document.createElementNS(svgNamespace, "defs");
+    const clipPath = document.createElementNS(svgNamespace, "clipPath");
+    const dropCircle = document.createElementNS(svgNamespace, "circle");
+    const clipId = `connect-four-drop-${Date.now()}`;
+    const gradientId = `${clipId}-gradient`;
+    const radius = Math.min(targetChipRect.width, targetChipRect.height) / 2;
+
+    svg.classList.add("drop-svg");
+    svg.setAttribute("width", boardRect.width.toString());
+    svg.setAttribute("height", boardRect.height.toString());
+    svg.setAttribute("viewBox", `0 0 ${boardRect.width} ${boardRect.height}`);
+    svg.setAttribute("aria-hidden", "true");
+    clipPath.setAttribute("id", clipId);
+    clipPath.setAttribute("clipPathUnits", "userSpaceOnUse");
+
+    const gradient = document.createElementNS(svgNamespace, "radialGradient");
+    gradient.setAttribute("id", gradientId);
+    gradient.setAttribute("cx", "30%");
+    gradient.setAttribute("cy", "22%");
+    gradient.setAttribute("r", "78%");
+    const gradientStops = player === PLAYER_RED
+        ? [["0%", "#ff9a9a"], ["40%", "#ee3038"], ["100%", "#8d0c16"]]
+        : [["0%", "#fff8bd"], ["42%", "#f5c928"], ["100%", "#a97900"]];
+    gradientStops.forEach(([offset, color]) => {
+        const stop = document.createElementNS(svgNamespace, "stop");
+        stop.setAttribute("offset", offset);
+        stop.setAttribute("stop-color", color);
+        gradient.appendChild(stop);
     });
+    defs.appendChild(gradient);
 
-    // 3. Sound abspielen
-    soundChip.currentTime = 0;
-    soundChip.play().catch(()=>{});
+    for (let clipRow = 0; clipRow < ROWS; clipRow++) {
+        const clipCell = getCell(clipRow, col);
+        const clipRect = clipCell.getBoundingClientRect();
+        const opening = document.createElementNS(svgNamespace, "circle");
+        opening.setAttribute("cx", (clipRect.left - boardRect.left + clipRect.width / 2).toString());
+        opening.setAttribute("cy", (clipRect.top - boardRect.top + clipRect.height / 2).toString());
+        opening.setAttribute("r", radius.toString());
+        clipPath.appendChild(opening);
+    }
+
+    dropCircle.classList.add("drop-svg-chip", player === PLAYER_RED ? "red" : "yellow");
+    dropCircle.setAttribute("cx", (targetChipRect.left - boardRect.left + targetChipRect.width / 2).toString());
+    dropCircle.setAttribute("cy", (-radius - 8).toString());
+    dropCircle.setAttribute("r", radius.toString());
+    dropCircle.setAttribute("fill", `url(#${gradientId})`);
+    dropCircle.setAttribute("clip-path", `url(#${clipId})`);
+    svg.appendChild(defs);
+    svg.appendChild(clipPath);
+    svg.appendChild(dropCircle);
+    boardEl.appendChild(svg);
+
+    chipDropActive = true;
+    const finishDrop = () => {
+        if (chipDropFrame !== null) {
+            window.cancelAnimationFrame(chipDropFrame);
+            chipDropFrame = null;
+        }
+        svg.remove();
+        const finalChip = cell.querySelector(".chip");
+        if (finalChip) {
+            finalChip.classList.remove("drop-pending");
+            finalChip.classList.add("visible", "landed");
+        }
+        chipDropActive = false;
+        chipDropTimer = null;
+    };
+
+    const startTime = performance.now();
+    const startY = -radius - 8;
+    const targetY = targetChipRect.top - boardRect.top + targetChipRect.height / 2;
+    const duration = Math.max(CHIP_DROP_DURATION, 260 + row * 95);
+    prepareChipSound();
+    let landingSoundScheduled = scheduleChipSound(duration);
+    const animate = (now) => {
+        if (!chipDropActive) return;
+        const progress = Math.min(1, (now - startTime) / duration);
+        let y;
+        if (progress < 0.84) {
+            const eased = 1 - Math.pow(1 - progress / 0.84, 3);
+            y = startY + (targetY - startY) * eased;
+        } else {
+            const settleProgress = (progress - 0.84) / 0.16;
+            y = targetY + Math.sin(settleProgress * Math.PI) * radius * 0.06 * (1 - settleProgress);
+        }
+        dropCircle.setAttribute("cy", y.toString());
+        if (!landingSoundScheduled && progress >= 0.96) {
+            landingSoundScheduled = true;
+            playChipSoundFallback();
+        }
+        if (progress < 1) {
+            chipDropFrame = window.requestAnimationFrame(animate);
+        } else {
+            finishDrop();
+        }
+    };
+
+    chipDropFrame = window.requestAnimationFrame(animate);
+}
+
+function clearDropAnimation() {
+    if (chipDropTimer !== null) {
+        window.clearTimeout(chipDropTimer);
+        chipDropTimer = null;
+    }
+    if (chipDropFrame !== null) {
+        window.cancelAnimationFrame(chipDropFrame);
+        chipDropFrame = null;
+    }
+    boardEl.querySelectorAll(".drop-svg, .drop-sequence-chip, .drop-chip").forEach(dropChip => dropChip.remove());
+    chipDropActive = false;
+}
+
+function animateChipDrop(row, col, player) {
+    const cell = getCell(row, col);
+    if (!cell) return;
+
+    clearDropAnimation();
+    const chip = cell.querySelector(".chip");
+    chipDropActive = true;
+    chip.classList.add("landing");
+    requestAnimationFrame(() => chip.classList.add("visible"));
+
+    chipDropTimer = window.setTimeout(() => {
+        chip.classList.remove("drop-pending", "landing");
+        chip.classList.add("visible", "landed");
+        soundChip.currentTime = 0;
+        soundChip.play().catch(() => {});
+        chipDropActive = false;
+        chipDropTimer = null;
+    }, CHIP_DROP_DURATION);
 }
 
 function getCell(row, col) {

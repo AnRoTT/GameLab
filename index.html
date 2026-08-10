@@ -7,35 +7,41 @@
     <link rel="stylesheet" href="theme.css">
 </head>
 <body>
-
-    <div class="container">
+    <main class="container">
         <h1 class="title">GameLab</h1>
-        <p class="subtitle">Interaktive Spiele mit anpassungsfähigen Gegnern</p>
+        <p class="subtitle">Interaktive Spiele mit anpassungsf&auml;higen Gegnern</p>
 
-        <div class="menu">
+        <nav class="menu" aria-label="Spieleauswahl">
             <a href="TicTacToe/TicTacToe.html?menu=1" class="menu-item">
-                <div class="icon">⭕</div>
-                <div class="label">TicTacToe</div>
+                <div class="menu-item-copy">
+                    <div class="label">TicTacToe</div>
+                    <div class="menu-item-description">Schnelles Strategiespiel</div>
+                </div>
             </a>
-			
+
             <a href="4Gewinnt/4Gewinnt.html?menu=1" class="menu-item">
-                 <div class="icon">🔴</div>
-                 <div class="label">4 Gewinnt</div>
+                <div class="menu-item-copy">
+                    <div class="label">4 Gewinnt</div>
+                    <div class="menu-item-description">Verbinde vier Steine</div>
+                </div>
             </a>
 
             <a href="Othello/Othello.html?menu=1" class="menu-item">
-                <div class="icon">⚫</div>
-                <div class="label">Othello</div>
+                <div class="menu-item-copy">
+                    <div class="label">Othello</div>
+                    <div class="menu-item-description">Mehrheit durch geschicktes Wenden</div>
+                </div>
             </a>
-	
-            <div class="menu-item disabled">
-                <div class="icon">🎮</div>
-                <div class="label">Coming Soon</div>
+
+            <div class="menu-item disabled coming-soon" aria-label="Nächstes Spiel kommt bald">
+                <div class="menu-item-copy">
+                    <div class="label">N&auml;chstes Spiel</div>
+                    <div class="menu-item-description">Coming Soon</div>
+                </div>
             </div>
-        </div>
+        </nav>
 
-        <footer class="footer">by Andreas Rollinger | 2026.08.08</footer>
-    </div>
-
+        <footer class="footer">GameLab | by Andreas Rollinger | 2026.08.10</footer>
+    </main>
 </body>
 </html>

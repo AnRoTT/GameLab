@@ -116,28 +116,11 @@ board.addEventListener("keydown", event => {
     render();
 });
 
-/* Particles */
-function spawnParticles(x, y) {
-    for (let i = 0; i < 10; i++) {
-        const p = document.createElement("div");
-        p.className = "particle";
-        const angle = Math.random() * Math.PI * 2;
-        const dist = 20 + Math.random() * 20;
-        p.style.left = x + "px";
-        p.style.top = y + "px";
-        p.style.setProperty("--px", Math.cos(angle) * dist + "px");
-        p.style.setProperty("--py", Math.sin(angle) * dist + "px");
-        document.body.appendChild(p);
-        setTimeout(() => p.remove(), 400);
-    }
-}
-
 function cancelPendingBotMove() {
     if (botMoveTimer !== null) {
         clearTimeout(botMoveTimer);
         botMoveTimer = null;
     }
-    board.classList.remove("bot-thinking");
 }
 
 function cancelNextRoundCountdown() {
@@ -210,7 +193,6 @@ function scheduleBotMove(delay, showPreview = true) {
 
     if (showPreview && board.children[plannedMove]) {
         board.children[plannedMove].dataset.ghost = "O";
-        board.classList.add("bot-thinking");
     }
 
     botMoveTimer = setTimeout(() => {
@@ -218,8 +200,6 @@ function scheduleBotMove(delay, showPreview = true) {
         if (showPreview && board.children[plannedMove]) {
             board.children[plannedMove].dataset.ghost = "";
         }
-        board.classList.remove("bot-thinking");
-
         if (!canBotMove()) return;
         botMove(plannedMove);
     }, delay);
@@ -249,8 +229,6 @@ function playMove(index, player) {
     cells[index] = player;
     playBoardClick();
     board.children[index].classList.add("pop");
-    const rect = board.children[index].getBoundingClientRect();
-    spawnParticles(rect.left + rect.width / 2, rect.top + rect.height / 2);
 
     const winRow = TicTacToeAICore.checkWin(player, cells);
     if (winRow) return endRound(player, winRow);
