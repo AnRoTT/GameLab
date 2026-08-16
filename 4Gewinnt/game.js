@@ -83,7 +83,7 @@ window.currentAdaptSpeedFactor = ADAPT_SPEED_FACTORS[adaptSpeedIndex];
 let modeIndex = 1;
 let startRuleIndex = 1;
 let matchModeIndex = 0;
-const RESET_BUTTON_STATES = ["Spiel starten", "Neues Spiel"];
+const RESET_BUTTON_STATES = ["Jetzt spielen", "Jetzt spielen"];
 let resetButtonIndex = 0;
 const ACTIVE_RESET_BUTTON_TEXT = "Match beenden";
 const FINISHED_RESET_BUTTON_TEXT = "Neues Match beginnen";
@@ -133,22 +133,19 @@ function setMatchInProgressLocked(isLocked) {
 }
 
 function setNextRoundButtonState(isVisible, isEnabled) {
-    // Keep the action in the layout permanently so the board never jumps.
-    roundActionButton.hidden = false;
-    roundActionButton.disabled = !isEnabled;
-    roundActionButton.setAttribute("aria-disabled", isEnabled ? "false" : "true");
-    roundActionButton.classList.toggle("button-disabled", !isEnabled);
-    roundActionButton.style.pointerEvents = isEnabled ? "auto" : "none";
-    roundActionButton.style.opacity = isEnabled ? "1" : "0.45";
-    roundActionButton.style.filter = isEnabled ? "none" : "grayscale(40%)";
-    roundActionButton.textContent = "Neue Runde";
+    // Die Rundenaktion läuft wie bei Othello über den Hauptbutton.
+    roundActionButton.hidden = true;
 }
 
 function setResetButtonForRound(isRoundActive, isRoundFinished = false) {
     resetButtonIndex = isRoundActive ? 1 : 0;
-    settingsResetGameButton.textContent = isRoundActive
-        ? ACTIVE_RESET_BUTTON_TEXT
-        : isRoundFinished ? FINISHED_RESET_BUTTON_TEXT : RESET_BUTTON_STATES[resetButtonIndex];
+    if (isRoundActive && matchModeIndex > 0) {
+        settingsResetGameButton.textContent = isRoundFinished ? "Nächste Runde" : ACTIVE_RESET_BUTTON_TEXT;
+    } else {
+        settingsResetGameButton.textContent = isRoundActive
+            ? "Spiel abbrechen"
+            : isRoundFinished ? "Jetzt spielen" : RESET_BUTTON_STATES[resetButtonIndex];
+    }
 }
 
 function updateAdaptiveStrengthUI() {
@@ -214,7 +211,12 @@ settingsNewGameButton.addEventListener("click", () => {
 settingsResetGameButton.addEventListener("click", () => {
     soundButton.currentTime = 0;
     soundButton.play().catch(() => {});
-    if (resetButtonIndex === 0) {
+    if (gameOver) {
+        hideWinner();
+        startNewRound();
+        setResetButtonForRound(true);
+        setMatchInProgressLocked(true);
+    } else if (resetButtonIndex === 0) {
         settingsBoard.classList.remove("disabled");
         settingsBoard.style.pointerEvents = "auto";
         startNewRound();
@@ -224,7 +226,6 @@ settingsResetGameButton.addEventListener("click", () => {
         resetMatchOnly();
         setResetButtonForRound(false);
         setMatchInProgressLocked(false);
-        roundActionButton.classList.add("button-disabled");
         updateBotButtonState();
     }
 });
@@ -445,6 +446,7 @@ function startNewRound() {
 
     updateUIStatus("Runde gestartet.");
     setMatchInProgressLocked(true);
+    setResetButtonForRound(true);
     setNextRoundButtonState(matchModeIndex > 0, false);
     maybeBotMove();
     } finally {
@@ -875,6 +877,7 @@ function onWin(player) {
     } else {
         startingPlayer = startingPlayer === PLAYER_RED ? PLAYER_YELLOW : PLAYER_RED;
     }
+    if (matchModeIndex > 0 && matchActive) setResetButtonForRound(true, true);
 
     // Apply the completed-round UI only after every game-state update. This
     // prevents an adaptive/profile refresh from re-enabling the live status.
@@ -942,6 +945,7 @@ function onDraw() {
     } else {
         startingPlayer = startingPlayer === PLAYER_RED ? PLAYER_YELLOW : PLAYER_RED;
     }
+    if (matchModeIndex > 0 && matchActive) setResetButtonForRound(true, true);
 
     updateUIStatus();
     showWinner("Unentschieden!");

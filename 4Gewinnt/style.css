@@ -596,19 +596,19 @@ main {
     align-items: center;
     justify-content: center;
     gap: 10px;
-    width: min(100%, 320px);
+    width: auto;
     margin: 0 auto;
 }
 
 .round-actions .primary-button {
-    flex: 1 1 0;
-    min-width: 0;
+    flex: 0 0 auto;
+    min-width: 140px;
 }
 
 @media (max-width: 520px) {
     .round-actions {
         gap: 8px;
-        width: min(100%, 320px);
+        width: auto;
     }
 
     .round-actions .primary-button {

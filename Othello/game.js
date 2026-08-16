@@ -208,7 +208,7 @@ rulesBtn.classList.add("disabled"); // nur Regeln sperren
     renderBoard();
     updateScore();
     statusEl.textContent = "Schwarz am Zug";
-    startBtn.textContent = getMatchMode() > 0 ? "Match beenden" : "Abbrechen";
+    startBtn.textContent = getMatchMode() > 0 ? "Match beenden" : "Spiel abbrechen";
     lastMoveWasPressure = false;
 
     updateBotLevelUI();

@@ -16,7 +16,6 @@
     const adaptiveStrengthFill = document.getElementById("adaptiveStrengthFill");
     const adaptiveStrengthValue = document.getElementById("adaptiveStrengthValue");
     const startButton = document.getElementById("startButton");
-    const endMatchButton = document.getElementById("endMatchButton");
     const QUARTO_BOT_PLAYER = 1;
     const BOT_LEVELS = ["Anfänger", "Hobbyspieler", "Vereinsspieler", "Meister", "Adaptiv"];
     const ADAPT_SPEEDS = [
@@ -206,12 +205,11 @@
         botLevelButton.classList.toggle("button-disabled", botLevelButton.disabled);
         modeButton.disabled = gameStarted && (matchModeIndex > 0 || !gameOver);
         matchButton.disabled = gameStarted && (matchModeIndex > 0 || !gameOver);
-        startButton.disabled = matchModeIndex > 0 && gameStarted && !gameOver;
+        startButton.disabled = false;
         startButton.classList.toggle("button-disabled", startButton.disabled);
         matchLineElement.textContent = matchModeIndex === 0
             ? "Einzelrunde - Offizielle Regeln"
             : `Mehrfachrunde - ${matchModeIndex === 1 ? "Abwechselnd" : "Verlierer beginnt"} - Match ${scores[0]}:${scores[1]}`;
-        endMatchButton.hidden = !(matchModeIndex > 0 && matchInProgress && gameStarted);
         updateAdaptiveUI();
     }
 
@@ -306,7 +304,7 @@
         clearWinnerScore();
         if (winner === 0) scorePlayer1Element.parentElement.classList.add("winner");
         if (winner === 1) scorePlayer2Element.parentElement.classList.add("winner");
-        startButton.textContent = matchModeIndex === 0 ? "Neues Spiel" : "Neue Runde";
+        startButton.textContent = matchModeIndex === 0 ? "Jetzt spielen" : "Nächste Runde";
         if (matchModeIndex === 0) {
             matchInProgress = false;
         } else {
@@ -333,8 +331,8 @@
         gameStarted = false;
         gameOver = true;
         renderScores();
-        startButton.textContent = "Spiel starten";
-        setStatus("Einstellungen ändern und 'Spiel starten' klicken.");
+        startButton.textContent = "Jetzt spielen";
+        setStatus("Einstellungen ändern und 'Jetzt spielen' klicken.");
         render();
         if (keyboardMode) startButton.focus();
     }
@@ -356,7 +354,7 @@
         gameStarted = true;
         gameOver = false;
         QuartoAdaptiveBot.beginRound({ enabled: isAdaptiveBot(), adaptSpeed: adaptiveSpeed() });
-        startButton.textContent = matchModeIndex > 0 ? "Neue Runde" : "Spiel abbrechen";
+        startButton.textContent = matchModeIndex > 0 ? "Match beenden" : "Spiel abbrechen";
         setStatus(`${playerName(chooser)} wählt einen Spielstein für ${playerName(1 - chooser)}.`);
         render();
         focusFirstAvailable(poolElement);
@@ -395,8 +393,7 @@
         else if (gameOver) startGame();
         else abortMatch();
     });
-    endMatchButton.addEventListener("click", abortMatch);
-    [modeButton, botLevelButton, adaptiveButton, matchButton, startButton, endMatchButton, document.getElementById("helpIcon"), document.getElementById("backIcon")]
+    [modeButton, botLevelButton, adaptiveButton, matchButton, startButton, document.getElementById("helpIcon"), document.getElementById("backIcon")]
         .filter(Boolean)
         .forEach((element) => element.addEventListener("click", () => playSound(soundButton, 0.22)));
     document.addEventListener("keydown", (event) => {
