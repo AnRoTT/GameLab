@@ -38,7 +38,7 @@
     const MATCH_OPTIONS = ["Einzelrunde", "Mehrfachrunde - Abwechselnd", "Mehrfachrunde - Verlierer beginnt"];
     let onePlayer = true;
     let board = Array(16).fill(null);
-    let remainingPieces = [];
+    let remainingPieces = Array.from({ length: 16 }, (_, index) => index);
     let selectedPiece = null;
     let chooser = 0;
     let startingChooser = 0;
@@ -171,12 +171,13 @@
         });
 
         poolElement.innerHTML = "";
-        for (let piece = 0; piece < 16; piece++) {
+        const visiblePieces = selectedPiece === null ? remainingPieces : [selectedPiece];
+        visiblePieces.forEach((piece, visibleIndex) => {
             const button = document.createElement("button");
             button.type = "button";
             button.className = `piece-button selection-player-${chooser + 1}${piece === selectedPiece ? " selected" : ""}`;
             button.innerHTML = pieceMarkup(piece);
-            button.disabled = gameOver || selectedPiece !== null || !remainingPieces.includes(piece) || isBot(chooser);
+            button.disabled = !gameStarted || gameOver || selectedPiece !== null || !remainingPieces.includes(piece) || isBot(chooser);
             button.setAttribute("aria-label", pieceDescription(piece));
             button.setAttribute("aria-pressed", String(piece === selectedPiece));
             button.title = pieceDescription(piece);
@@ -184,12 +185,12 @@
             button.addEventListener("keydown", (event) => handleGridKeydown(
                 event,
                 poolElement,
-                piece,
+                visibleIndex,
                 gridColumnCount(poolElement, 8),
                 () => choosePiece(piece)
             ));
             poolElement.appendChild(button);
-        }
+        });
         botLevelButton.textContent = onePlayer ? BOT_LEVELS[botLevelIndex] : "2 Spieler Modus";
         botLevelButton.disabled = !onePlayer || (gameStarted && (matchModeIndex > 0 || !gameOver));
         botLevelButton.classList.toggle("button-disabled", botLevelButton.disabled);
@@ -314,7 +315,7 @@
         window.clearTimeout(botTimer);
         QuartoAdaptiveBot.cancelRound();
         board = Array(16).fill(null);
-        remainingPieces = [];
+        remainingPieces = Array.from({ length: 16 }, (_, index) => index);
         selectedPiece = null;
         chooser = 0;
         startingChooser = 0;
