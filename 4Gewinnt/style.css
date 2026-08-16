@@ -395,6 +395,10 @@ main {
     touch-action: manipulation;
 }
 
+.board {
+    -webkit-tap-highlight-color: transparent;
+}
+
 .board:focus-visible .board-column-hover.keyboard-focus {
     background: rgba(120, 165, 255, 0.14);
     outline: 2px solid rgba(255, 255, 255, 0.75);
