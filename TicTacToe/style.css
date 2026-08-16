@@ -345,11 +345,11 @@ h1 {
     display: inline-block;
     vertical-align: middle;
     width: min(48vw, 220px);
-    height: 12px;
+    height: 8px;
     margin-left: 10px;
     border: 1px solid rgba(61, 125, 255, 0.45);
     border-radius: 999px;
-    background: rgba(61, 125, 255, 0.14);
+    background: #10131e;
     overflow: hidden;
     position: relative;
 }
@@ -364,7 +364,7 @@ h1 {
 .adaptive-strength-fill {
     display: block;
     height: 100%;
-    background: #3d7dff;
+    background: linear-gradient(90deg, #4f8cff, #8b5cf6);
     border-radius: inherit;
     width: var(--skill, 0%);
     transition: width 0.25s ease;
@@ -497,4 +497,14 @@ h1 {
 @keyframes tttWinnerGlow {
     0%, 100% { filter: brightness(1); }
     50% { filter: brightness(1.28); text-shadow: 0 0 13px rgba(255,255,255,.92), 0 0 28px rgba(120,165,255,.7); }
+}
+
+h1.game-title {
+    width: 100%;
+    margin: 0 0 8px;
+    font-size: 2rem;
+    line-height: 1.2;
+    font-weight: 400;
+    letter-spacing: normal;
+    text-shadow: 0 0 15px var(--accent);
 }

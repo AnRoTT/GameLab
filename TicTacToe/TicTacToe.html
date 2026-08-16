@@ -11,7 +11,7 @@
     <div id="backIcon">&#8592; Men&uuml;</div>
     <a id="helpIcon" class="help-button" href="Anleitung.html" aria-label="Kurzanleitung zu TicTacToe">Anleitung</a>
 
-    <h1>TicTacToe</h1>
+    <h1 class="game-title">TicTacToe</h1>
 
     <div class="settings">
         <div class="cycle-group setting-row setting-row-wide" id="rowPlayers">
@@ -45,23 +45,22 @@
         <div id="status"></div>
         <div id="roundCountdown" class="round-countdown" hidden></div>
         <div id="adaptiveStrengthPanel" class="adaptive-strength hidden" hidden>
-            <span class="adaptive-strength-label">Botstärke</span>
-            <span id="adaptiveStrengthTrack" class="adaptive-strength-track" aria-label="Botstärke 50 von 100">
+            <span class="adaptive-strength-label">Adaptive Stärke</span>
+            <span id="adaptiveStrengthTrack" class="adaptive-strength-track" aria-label="Adaptive Stärke 35 von 100">
                 <span id="adaptiveStrengthFill" class="adaptive-strength-fill"></span>
-                <span class="adaptive-strength-knob"></span>
             </span>
-            <span id="adaptiveStrengthValue" class="adaptive-strength-value">50%</span>
+            <span id="adaptiveStrengthValue" class="adaptive-strength-value">35%</span>
         </div>
     </div>
 
     <div id="board" class="board"></div>
 
-    <footer class="footer">TicTacToe | by Andreas Rollinger | 2026.08.08</footer>
+    <footer class="footer">Andis Game Foundry | TicTacToe | by Andreas Rollinger | 2026.08.16</footer>
 
+    <script src="../Shared/difficultyCore.js"></script>
     <script src="aiCore.js"></script>
     <script src="manuellBot.js"></script>
     <script src="adaptiveBot.js"></script>
-    <script src="settings.js"></script>
     <script src="game.js"></script>
     <script>
         document.getElementById("backIcon").style.display =

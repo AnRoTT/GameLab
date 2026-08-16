@@ -81,18 +81,119 @@ function getTicTacToeBestMoves(board, player) {
     return bestMoves;
 }
 
-function getTicTacToeDifficultyProfile(skill) {
-    const normalized = Math.max(0, Math.min(100, Number(skill) || 0)) / 100;
-    const challenge = normalized <= 0.75
-        ? 0.75 * ((normalized / 0.75) ** 2 * (3 - 2 * (normalized / 0.75)))
-        : 0.75 + ((normalized - 0.75) / 0.25) ** 1.8 * 0.25;
+// Labor-only deterministic Level-4 reference variant. It uses the same
+// search path as Level 4, but without its intentional errors or randomness.
+function getTicTacToeReferenceMove(board, player) {
+    return getTicTacToeBestMoves(board, player)[0] ?? null;
+}
+
+const TICTACTOE_MANUAL_STRENGTHS = {
+    // Level 1 bis 3 wurden nach der Referenzmessung etwas angehoben,
+    // damit sie näher an die Zielkorridore herankommen.
+    1: 0.36,
+    2: 0.52,
+    3: 0.61,
+    // Level 4 bleibt am Referenzanker ausgerichtet.
+    4: 0.71
+};
+const ticTacToeManualOverrides = Object.create(null);
+try {
+    const storedProfiles = JSON.parse(localStorage.getItem("gamelab-tictactoe-manual-profiles") || "{}");
+    if (storedProfiles && typeof storedProfiles === "object") Object.entries(storedProfiles).forEach(([level, value]) => {
+        if (["1", "2", "3", "4"].includes(level) && Number.isFinite(Number(value))) ticTacToeManualOverrides[level] = Math.max(0, Math.min(0.999, Number(value)));
+    });
+} catch {}
+
+function getTicTacToeManualProfile(levelOrStrength = 1) {
+    const numericValue = Number(levelOrStrength);
+    const isReferenceProfile = levelOrStrength === "reference" || levelOrStrength === "referenz";
+    const level = Number.isInteger(numericValue) && TICTACTOE_MANUAL_STRENGTHS[numericValue]
+        ? numericValue
+        : null;
+    const strength = isReferenceProfile
+        ? 1
+        : level
+        ? (ticTacToeManualOverrides[level] ?? TICTACTOE_MANUAL_STRENGTHS[level])
+        : Math.max(0, Math.min(1, numericValue || 0));
+    const difficulty = window.SharedDifficulty.createProfile({
+        mode: "manual",
+        strength,
+        minSearchChance: 0.08,
+        maxSearchChance: 1.0,
+        minRandomness: 0,
+        maxRandomness: 0.92,
+        minErrorRate: 0,
+        maxErrorRate: 0.36,
+        habitInfluence: 0.60,
+        searchConfig: {
+            supportsMinimax: true,
+            minDepth: 0,
+            maxDepth: 9,
+            fixedDepth: null
+        }
+    });
 
     return {
-        challenge,
-        randomness: Math.max(0.02, 0.42 - challenge * 0.38),
-        errorRate: Math.max(0.02, 0.34 - challenge * 0.30),
-        tacticalAccuracy: Math.min(0.98, 0.35 + challenge * 0.60),
-        thinkTime: 160 + challenge * 1500
+        ...difficulty,
+        level: isReferenceProfile ? "reference" : level,
+        strength,
+        tacticalChance: difficulty.tacticalAccuracy,
+        minimaxChance: difficulty.searchChance,
+        profileUsage: difficulty.habitInfluence,
+        thinkTimeMin: Math.round(180 + difficulty.curve * 470),
+        thinkTimeMax: Math.round(320 + difficulty.curve * 630)
+    };
+}
+
+function setTicTacToeManualProfileStrength(level, value) {
+    const key = Number(level);
+    ticTacToeManualOverrides[key] = Math.max(0, Math.min(0.999, Number(value) || 0));
+    try { localStorage.setItem("gamelab-tictactoe-manual-profiles", JSON.stringify(ticTacToeManualOverrides)); } catch {}
+    return ticTacToeManualOverrides[key];
+}
+
+function getTicTacToeProfilePreferredMove(board, profile) {
+    if (!profile || profile.totalMoves < 10) return -1;
+    const freeCells = getTicTacToeFreeCells(board);
+    if (!freeCells.length) return -1;
+
+    const total = Math.max(1, profile.totalMoves);
+    const score = (index) => {
+        const favorite = (profile.favoriteCells?.[index] || 0) / total;
+        const opening = (profile.openingCells?.[index] || 0) / Math.max(1, Math.min(2, total));
+        const row = (profile.rowPreference?.[Math.floor(index / 3)] || 0) / total;
+        const col = (profile.colPreference?.[index % 3] || 0) / total;
+        return favorite * 0.55 + opening * 0.25 + row * 0.10 + col * 0.10;
+    };
+
+    return freeCells.reduce((best, index) => score(index) > score(best) ? index : best, freeCells[0]);
+}
+
+function getTicTacToeDifficultyProfile(skill) {
+    const difficulty = window.SharedDifficulty.createProfile({
+        mode: "adaptive",
+        skill,
+        minSearchChance: 0.08,
+        maxSearchChance: 1.0,
+        minRandomness: 0.02,
+        maxRandomness: 0.44,
+        minErrorRate: 0.02,
+        maxErrorRate: 0.36,
+        habitInfluence: 0.60,
+        searchConfig: {
+            supportsMinimax: true,
+            minDepth: 0,
+            maxDepth: 9,
+            fixedDepth: null
+        }
+    });
+
+    return {
+        ...difficulty,
+        challenge: difficulty.curve,
+        randomness: difficulty.randomChance,
+        tacticalAccuracy: difficulty.tacticalAccuracy,
+        thinkTime: 150 + difficulty.curve * 1450
     };
 }
 
@@ -154,7 +255,11 @@ window.TicTacToeAICore = {
     wouldFork: wouldTicTacToeFork,
     minimax: ticTacToeMinimax,
     getBestMoves: getTicTacToeBestMoves,
+    getReferenceMove: getTicTacToeReferenceMove,
+    getManualProfile: getTicTacToeManualProfile,
+    getProfilePreferredMove: getTicTacToeProfilePreferredMove,
     getDifficultyProfile: getTicTacToeDifficultyProfile,
+    setManualProfileStrength: setTicTacToeManualProfileStrength,
     createPlayerProfile: createTicTacToePlayerProfile,
     getPositionType: getTicTacToePositionType,
     trackPlayerMove: trackTicTacToePlayerMove,

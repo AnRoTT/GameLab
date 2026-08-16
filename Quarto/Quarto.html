@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quarto</title>
+    <link rel="stylesheet" href="../theme.css" />
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <div id="backIcon" hidden>&larr; Menü</div>
+    <a id="helpIcon" class="help-button" href="Anleitung.html" aria-label="Kurzanleitung zu Quarto">Anleitung</a>
+
+    <div class="app">
+        <header class="top-bar">
+            <h1 class="title-center game-title">Quarto</h1>
+
+            <div class="controls-vertical">
+                <div class="cycle-group">
+                    <span class="label">Spieler:</span>
+                    <button id="modeButton" class="cycle-button" type="button">1 Spieler</button>
+                </div>
+
+                <div class="cycle-group">
+                    <span class="label">Match:</span>
+                    <button id="matchButton" class="cycle-button" type="button">Einzelrunde</button>
+                </div>
+
+                <div class="cycle-group cycle-group-double">
+                    <span class="label">Gegner:</span>
+                    <button id="botLevelButton" class="cycle-button" type="button">Anfänger</button>
+                    <button id="adaptiveButton" class="cycle-button adaptive-speed-control" type="button" disabled aria-label="Anpassungsgeschwindigkeit">—</button>
+                </div>
+
+                <div class="round-actions">
+                    <button id="startButton" class="primary-button" type="button">Spiel starten</button>
+                    <button id="endMatchButton" class="secondary-button" type="button" hidden>Match beenden</button>
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <section class="status-panel" aria-live="polite">
+                <div id="statusText" class="status-text">Spiel starten</div>
+                <div id="matchLine" class="match-line">Einzelrunde - Offizielle Regeln</div>
+                <div class="scoreboard" aria-label="Punktestand">
+                    <div class="score">
+                        <span class="score-label">Spieler 1</span>
+                        <span id="scorePlayer1" class="score-value">0</span>
+                    </div>
+                    <div class="score">
+                        <span class="score-label">Spieler 2</span>
+                        <span id="scorePlayer2" class="score-value">0</span>
+                    </div>
+                </div>
+                <div id="adaptivePanel" class="adaptive-panel" aria-live="polite">
+                    <div class="adaptive-strength-row">
+                        <span>Adaptive Stärke</span>
+                        <div id="adaptiveStrengthTrack" class="adaptive-strength-track" role="progressbar" aria-label="Adaptive Stärke" aria-valuemin="0" aria-valuemax="100" aria-valuenow="35">
+                            <span id="adaptiveStrengthFill" class="adaptive-strength-fill"></span>
+                        </div>
+                        <strong id="adaptiveStrengthValue">35%</strong>
+                    </div>
+                </div>
+            </section>
+
+            <section class="game-area">
+                <div class="piece-panel">
+                    <h2>Verfügbare Spielsteine</h2>
+                    <div class="piece-legend" aria-label="Bedeutung der vier Steineigenschaften">
+                        <span class="legend-item"><span class="legend-pair"><i class="legend-swatch dark"></i><i class="legend-swatch light"></i></span>Farbe</span>
+                        <span class="legend-item"><span class="legend-pair"><i class="legend-swatch round"></i><i class="legend-swatch square"></i></span>Form</span>
+                        <span class="legend-item"><span class="legend-pair"><i class="legend-swatch short"></i><i class="legend-swatch tall"></i></span>Höhe</span>
+                        <span class="legend-item"><span class="legend-pair"><i class="legend-swatch solid"></i><i class="legend-swatch hollow"></i></span>Füllung</span>
+                    </div>
+                    <div id="piecePool" class="piece-pool" aria-label="Verfügbare Quarto-Spielsteine"></div>
+                </div>
+
+                <div class="board-wrapper">
+                    <div id="board" class="board" role="grid" aria-label="Quarto-Spielbrett"></div>
+                </div>
+            </section>
+
+        </main>
+
+        <footer class="footer">Andis Game Foundry | Quarto | by Andreas Rollinger | 2026.08.16</footer>
+    </div>
+
+    <script src="../Shared/difficultyCore.js"></script>
+    <script src="aiCore.js"></script>
+    <script src="manuellBot.js"></script>
+    <script src="adaptiveBot.js"></script>
+    <script src="game.js"></script>
+    <script>
+        const backIcon = document.getElementById("backIcon");
+        if (new URLSearchParams(location.search).get("menu") === "1") {
+            backIcon.hidden = false;
+            backIcon.addEventListener("click", () => {
+                window.location.href = "../index.html?menu=1";
+            });
+        }
+    </script>
+</body>
+</html>

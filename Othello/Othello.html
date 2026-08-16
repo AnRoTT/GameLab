@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Othello / Reversi</title>
+    <link rel="stylesheet" href="../theme.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a id="helpIcon" class="help-button" href="Anleitung.html" aria-label="Kurzanleitung zu Othello">Anleitung</a>
+
+<div id="backIcon">⟵ Menü</div>
+
+<div class="container">
+    <div class="title game-title">Othello</div>
+
+    <!-- Einstellungen -->
+    <div id="settingsPanel" class="menu">
+        <div class="cycle-group setting-row">
+            <div class="label">Spielmodus</div>
+            <button id="modeBtn" class="cycle-button">1 Spieler</button>
+        </div>
+        <div class="cycle-group setting-row">
+            <div class="label">Regelmodus</div>
+            <button id="rulesBtn" class="cycle-button">Standard</button>
+        </div>
+        <div class="cycle-group setting-row">
+            <div class="label">Match</div>
+            <button id="matchBtn" class="cycle-button">Einzelrunde</button>
+        </div>
+        <div id="botOpponentRow" class="cycle-group cycle-group-double setting-row">
+            <div class="label">Gegner:</div>
+            <button id="botLevelBtn" class="cycle-button">Anfänger</button>
+            <button id="adaptSpeedBtn" class="cycle-button">Normal</button>
+        </div>
+        <button id="startBtn" class="primary-button">Jetzt spielen</button>
+    </div>
+
+<!-- NEU: Infoleiste - die einzige mit status/score -->
+<div id="gameInfo" class="game-info">
+    <div id="status" class="status">Wähle den Modus und starte</div> <!-- DIESE ZEILE NEU -->
+    <div id="matchLine" class="match-line">Einzelrunde - Offizielle Regeln</div>
+    <div class="score-bar">
+        <span>Schwarz: <span id="scoreBlack">2</span></span>
+        <span>Weiß: <span id="scoreWhite">2</span></span>
+    </div>
+    <div id="adaptiveStrengthPanel" class="adaptive-strength" hidden>
+        <span class="adaptive-strength-label">Adaptive Stärke</span>
+        <span class="adaptive-strength-track" aria-label="Adaptive Stärke 35 von 100">
+            <span id="adaptiveStrengthBar"></span>
+        </span>
+        <span id="adaptiveStrengthValue" class="adaptive-strength-value">35%</span>
+    </div>
+</div>
+
+    <!-- Spielfeld -->
+    <div id="boardWrapper" style="margin-top:10px;">
+        <div id="board" class="board disabled"></div>
+    </div>
+
+    <footer class="footer">Andis Game Foundry | Othello | by Andreas Rollinger | 2026.08.16</footer>
+</div>
+
+<script src="../Shared/difficultyCore.js"></script>
+<script src="aiCore.js"></script>
+<script src="manuellBot.js"></script>
+<script src="adaptiveBot.js"></script>
+<script src="game.js"></script>
+<script>
+    const backIcon = document.getElementById("backIcon");
+    backIcon.style.display =
+        new URLSearchParams(location.search).get("menu") === "1" ? "block" : "none";
+    backIcon.onclick = () => {
+        const sound = new Audio("../assets/sounds/Button_Click.mp3");
+        sound.volume = 0.22;
+        sound.play().catch(()=>{});
+        setTimeout(() => {
+            window.location.href = "../index.html?menu=1";
+        }, 100);
+    };
+</script>
+</body>
+</html>
