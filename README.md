@@ -1,7 +1,6 @@
 # Andis Game Foundry
 
-Eine persönliche Sammlung browserbasierter Brett- und Strategiespiele mit anpassungsfähigen Bots.
-
+Andis Game Foundry ist eine selbst entwickelte Sammlung browserbasierter Spiele mit individuell programmierten Bots und adaptiver Schwierigkeitssteuerung.
 ## Spiele
 
 Aktuell enthalten:
