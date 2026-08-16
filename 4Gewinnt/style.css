@@ -382,12 +382,17 @@ main {
 /* Column hover zones (for click on mobile & desktop) */
 
 .board-column-hover {
-	z-index: 300;
+    z-index: 300;
     position: absolute;
     top: 10px;
     bottom: 10px;
     width: calc((100% - 20px) / 7);
     cursor: pointer;
+
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
 }
 
 .board:focus-visible .board-column-hover.keyboard-focus {
