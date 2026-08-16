@@ -1,6 +1,7 @@
 # Andis Game Foundry
 
-Andis Game Foundry ist eine selbst entwickelte Sammlung browserbasierter Spiele mit individuell programmierten Bots und adaptiver Schwierigkeitssteuerung.
+... ist eine selbst entwickelte Sammlung browserbasierter Spiele mit individuell programmierten Bots und adaptiver Schwierigkeitssteuerung.
+
 ## Spiele
 
 Aktuell enthalten:
