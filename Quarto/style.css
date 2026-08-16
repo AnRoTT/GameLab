@@ -81,7 +81,12 @@ main { padding: 12px 18px 18px; }
 .legend-swatch.tall { width: 17px; height: 23px; background: #242b3b; }
 .legend-swatch.solid { background: linear-gradient(145deg, #52647f, #182033); }
 .legend-swatch.hollow { background: transparent; box-shadow: inset 0 0 0 2px rgba(139,149,170,.7), 0 2px 4px rgba(0,0,0,.35); }
-.piece-pool { display: grid; grid-template-columns: repeat(8, minmax(30px, 1fr)); gap: 7px; }
+.piece-pool {
+    display: grid;
+    grid-template-columns: repeat(8, minmax(30px, 1fr));
+    gap: 7px;
+    min-height: 130px;
+}
 
 .piece-button, .piece {
     position: relative;
@@ -179,8 +184,28 @@ main { padding: 12px 18px 18px; }
 
 @media (max-width: 520px) {
     .title-center { font-size: 1.9rem; }
-    .piece-pool { grid-template-columns: repeat(4, minmax(44px, 1fr)); gap: 8px; width: min(100%, 320px); margin: 0 auto; }
-    .piece-button { min-height: 44px; padding: 5px; border-radius: 9px; }
+    .piece-pool {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        width: 100%;
+        height: 50px;
+        flex: 0 0 50px;
+        min-height: 0;
+        padding: 3px 4px 8px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        overscroll-behavior-x: contain;
+        scrollbar-width: thin;
+        scrollbar-gutter: stable;
+    }
+    .piece-button {
+        flex: 0 0 40px;
+        width: 40px;
+        min-height: 40px;
+        padding: 4px;
+        border-radius: 8px;
+    }
     .piece-legend { gap: 3px; }
     .legend-item { font-size: .62rem; }
     .board { gap: 5px; padding: 7px; border-width: 3px; border-radius: 14px; }
