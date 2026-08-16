@@ -1,37 +1,51 @@
 # Andis Game Foundry
 
-... ist eine selbst entwickelte Sammlung browserbasierter Spiele mit individuell programmierten Bots und adaptiver Schwierigkeitssteuerung.
+Eine selbst entwickelte Sammlung browserbasierter Spiele mit eigenen Bots und adaptiver Schwierigkeitssteuerung.
 
-## Spiele
+## Live-Version
 
-Aktuell enthalten:
+Die Spiele können direkt über GitHub Pages gespielt werden:
+
+**[Andis Game Foundry öffnen](https://anrott.github.io/GameLab/)**
+
+## Enthaltene Spiele
 
 - Tic-Tac-Toe
 - 4 Gewinnt
 - Othello
 - Quarto
 
-Jedes Spiel kann alleine gegen unterschiedlich starke Bots oder im Mehrspielermodus gespielt werden.
+Weitere Spiele können später ergänzt werden.
 
-## Botsystem
+## Adaptive Bots
 
-Die Spiele verwenden eine gemeinsame Difficulty-Core-Architektur. Dadurch lassen sich manuelle, adaptive und Referenz-Bots einheitlich steuern und vergleichen.
+Die Spiele enthalten unterschiedlich starke Bots sowie adaptive Bots.
 
-Der adaptive Bot passt seine Spielstärke während des Spiels an das Verhalten und Spielniveau des Spielers an.
+Ein adaptiver Bot passt seine Spielstärke während des Spiels an das Spielniveau des Spielers an. Nach Siegen und Niederlagen wird die Stärke schrittweise angepasst, damit der Bot weder dauerhaft zu leicht noch zu schwer ist.
 
-Die einzelnen Spiele behalten dabei ihre eigenen Regeln, Bewertungsfunktionen, Taktiken und Suchverfahren.
+Die adaptiven Bots beobachten außerdem das Spielverhalten des Spielers und bauen daraus ein individuelles Spielerprofil auf. Sie erkennen unter anderem bevorzugte Spielzüge, taktische Muster sowie sichere und riskante Entscheidungen.
 
-## Ziel des Projekts
+Auf dieser Grundlage passen sie ihre eigene Spielweise an, lernen den Spieler kennen und entwickeln im Verlauf eine individuellere Gegenstrategie.
 
-Andis Game Foundry verbindet klassische Spiele mit individuell entwickelten Bots und einer flexiblen Schwierigkeitssteuerung. Das Projekt wird laufend erweitert und verbessert – sowohl spielerisch als auch technisch.
+Die Spiele verwenden eine gemeinsame Difficulty-Core-Architektur. Die jeweiligen Spielregeln, Taktiken und Bewertungsfunktionen bleiben dabei spielabhängig.
 
-## Technologie
+## Technik
 
 - HTML
 - CSS
 - JavaScript
 - Minimax-Suche
-- adaptive Spielstärken
+- eigene Bewertungs- und Botlogik
 - responsive Darstellung für Desktop und mobile Geräte
 
-Das Projekt befindet sich in aktiver Entwicklung.
+## Entwicklung
+
+Andis Game Foundry befindet sich aktiv in Entwicklung. Die Spiele, Bots und Benutzeroberflächen werden laufend getestet und verbessert.
+
+## Nutzung des Quellcodes
+
+Das Projekt wird öffentlich auf GitHub bereitgestellt, damit die Spiele angesehen und ausprobiert werden können.
+
+Der Quellcode ist nicht zur freien Nutzung, Vervielfältigung, Veränderung oder Weitergabe freigegeben. Eine entsprechende Nutzung ist nur mit ausdrücklicher Zustimmung des Urhebers gestattet.
+
+© 2026 Andreas Rollinger
