@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-    <div id="backIcon" hidden>&larr; Menü</div>
+    <div id="backIcon">⟵ Menü</div>
     <a id="helpIcon" class="help-button" href="Anleitung.html" aria-label="Kurzanleitung zu Quarto">Anleitung</a>
 
     <div class="app">
@@ -93,12 +93,11 @@
     <script src="game.js"></script>
     <script>
         const backIcon = document.getElementById("backIcon");
-        if (new URLSearchParams(location.search).get("menu") === "1") {
-            backIcon.hidden = false;
-            backIcon.addEventListener("click", () => {
-                window.location.href = "../index.html?menu=1";
-            });
-        }
+        backIcon.style.display =
+            new URLSearchParams(location.search).get("menu") === "1" ? "block" : "none";
+        backIcon.addEventListener("click", () => {
+            window.location.href = "../index.html?menu=1";
+        });
     </script>
 </body>
 </html>
