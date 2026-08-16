@@ -171,11 +171,14 @@
         });
 
         poolElement.innerHTML = "";
-        const visiblePieces = selectedPiece === null ? remainingPieces : [selectedPiece];
+        const visiblePieces = selectedPiece === null
+            ? remainingPieces
+            : [...remainingPieces, selectedPiece].sort((a, b) => a - b);
         visiblePieces.forEach((piece, visibleIndex) => {
             const button = document.createElement("button");
             button.type = "button";
             button.className = `piece-button selection-player-${chooser + 1}${piece === selectedPiece ? " selected" : ""}`;
+            button.dataset.piece = String(piece);
             button.innerHTML = pieceMarkup(piece);
             button.disabled = !gameStarted || gameOver || selectedPiece !== null || !remainingPieces.includes(piece) || isBot(chooser);
             button.setAttribute("aria-label", pieceDescription(piece));
@@ -191,6 +194,13 @@
             ));
             poolElement.appendChild(button);
         });
+        if (selectedPiece !== null) {
+            poolElement.querySelector(`[data-piece="${selectedPiece}"]`)?.scrollIntoView({
+                behavior: "smooth",
+                block: "nearest",
+                inline: "center"
+            });
+        }
         botLevelButton.textContent = onePlayer ? BOT_LEVELS[botLevelIndex] : "2 Spieler Modus";
         botLevelButton.disabled = !onePlayer || (gameStarted && (matchModeIndex > 0 || !gameOver));
         botLevelButton.classList.toggle("button-disabled", botLevelButton.disabled);
