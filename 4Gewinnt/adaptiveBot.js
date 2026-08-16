@@ -1,14 +1,19 @@
-var adaptiveSkill = 48;
+(function () {
+"use strict";
+
+var adaptiveSkill = 35;
 var adaptiveMomentum = 0;
 var adaptiveMoveCounter = 0;
 var adaptiveRoundDelta = 0;
 var adaptiveLearn = {
-    skill: 48,
+    skill: 35,
     roundForm: 0,
     resultBias: 0,
     matchTrend: 0,
     winStreak: 0,
     lossStreak: 0,
+    drawStreak: 0,
+    resultHistory: [],
     lastBotCol: -1,
     lastUiMove: 0,
     uiText: "Bot beobachtet erst einmal ruhig",
@@ -32,30 +37,41 @@ var adaptiveAI = {
     creativity: 0.42
 };
 
+// Fallbacks for the isolated BotLab context. The normal game still provides
+// these constants through game.js.
+const ADAPTIVE_PLAYER_RED = typeof PLAYER_RED !== "undefined" ? PLAYER_RED : 1;
+const ADAPTIVE_PLAYER_YELLOW = typeof PLAYER_YELLOW !== "undefined" ? PLAYER_YELLOW : 2;
+const ADAPTIVE_COLS = typeof COLS !== "undefined" ? COLS : 7;
+
 // Das Spielerprofil wird zentral in aiCore.js angelegt. Die alten deutschen
 // Feldnamen sind dort nur noch kompatible Verweise auf dieselben Werte.
 const playerProfile = window.connectFourPlayerProfile;
+let adaptiveLabBoard = null;
+
+function getAdaptiveBoard() {
+    return adaptiveLabBoard || (typeof board !== "undefined" ? board : null);
+}
 
 function adaptiveRandomMove() {
-    const columns = window.ConnectFourAICore.getAvailableColumns(board);
+    const columns = window.ConnectFourAICore.getAvailableColumns(getAdaptiveBoard());
     return columns.length ? columns[Math.floor(Math.random() * columns.length)] : -1;
 }
 
 function adaptiveFreeRow(col) {
-    return window.ConnectFourAICore.getFreeRow(board, col);
+    return window.ConnectFourAICore.getFreeRow(getAdaptiveBoard(), col);
 }
 
 function adaptiveHasWinner(player) {
-    return window.ConnectFourAICore.hasWinner(board, player);
+    return window.ConnectFourAICore.hasWinner(getAdaptiveBoard(), player);
 }
 
 function adaptiveMinimaxMove(depth) {
     const result = window.ConnectFourAICore.minimax(
-        board,
+        getAdaptiveBoard(),
         depth,
         true,
-        PLAYER_YELLOW,
-        PLAYER_RED
+        ADAPTIVE_PLAYER_YELLOW,
+        ADAPTIVE_PLAYER_RED
     );
     return result.col ?? -1;
 }
@@ -120,17 +136,19 @@ function getAdaptiveBotSkillBand() {
 }
 
 function resetAdaptiveState() {
-    adaptiveSkill = 48;
+    adaptiveSkill = 35;
     adaptiveMomentum = 0;
     adaptiveMoveCounter = 0;
     adaptiveRoundDelta = 0;
     adaptiveLearn = {
-        skill: 48,
+        skill: 35,
         roundForm: 0,
         resultBias: 0,
         matchTrend: 0,
         winStreak: 0,
         lossStreak: 0,
+        drawStreak: 0,
+        resultHistory: [],
         lastBotCol: -1,
         lastUiMove: 0,
         uiText: "Bot beobachtet erst einmal ruhig",
@@ -195,23 +213,23 @@ function getAdaptiveThinkTime() {
 }
 
 function getAdaptiveSearchDepth() {
-    const stage = getAdaptiveLearningStage();
     const skillValue = getAdaptiveBotSkillValue();
     const curve = adaptiveCurve(skillValue);
-    let searchIntensity = curve.searchIntensity;
-    if (stage === "observe") searchIntensity *= 0.86;
-    else if (stage === "apply") searchIntensity = Math.min(1, searchIntensity + 0.04);
-    return Math.max(1, Math.min(curve.maxDepth,
-        Math.floor(1 + Math.pow(searchIntensity, 2.4) * (curve.maxDepth - 1))));
+    return curve.depth;
+}
+
+// Liefert fuer jede Skillzahl einen stetigen Faktor zwischen 0 und 1.
+// Die vorhandene nichtlineare Kurve wird nur unterschiedlich stark gewichtet;
+// feste Umschaltpunkte gibt es fuer adaptive Entscheidungsanteile nicht.
+function getContinuousStrengthFactor(skillValue, exponent = 1) {
+    const smooth = adaptiveClamp(adaptiveCurve(skillValue).smooth);
+    return Math.pow(smooth, exponent);
 }
 
 function getAdaptiveStochasticity(skillBand, stage) {
     const skillValue = getAdaptiveBotSkillValue();
     const curve = adaptiveCurve(skillValue);
-    let stochasticity = adaptiveLerp(0.48, 0.03, curve.smooth);
-    if (stage === "observe") stochasticity += 0.08;
-    else if (stage === "learn") stochasticity += 0.03;
-    return Math.max(0.02, Math.min(0.58, stochasticity));
+    return curve.randomChance;
 }
 
 function pickAdaptiveSentence(options) {
@@ -503,6 +521,7 @@ function getAdaptiveTargetSkill() {
 }
 
 function getAdaptiveBotMove() {
+    const board = getAdaptiveBoard();
     const stage = getAdaptiveLearningStage();
     const skillBand = getAdaptiveBotSkillBand();
     const skillValue = getAdaptiveBotSkillValue();
@@ -513,7 +532,7 @@ function getAdaptiveBotMove() {
     const applyFactor = stage === "observe" ? 0.10 : stage === "learn" ? 0.26 : 0.58;
     const stochasticity = getAdaptiveStochasticity(skillBand, stage);
     const weakPhase = skillValue < 60;
-    const learningGate = getAdaptiveStrengthGate(skillValue);
+    const learningGate = getContinuousStrengthFactor(skillValue, 1.0);
     const earlyMistakeChance = Math.max(0.02, Math.min(0.58,
         curve.errorRate * (stage === "observe" ? 1.25 : stage === "learn" ? 1.05 : 0.9)
     ));
@@ -549,11 +568,11 @@ function getAdaptiveBotMove() {
         return randomCol;
     }
 
-    for (let c = 0; c < COLS; c++) {
+    for (let c = 0; c < ADAPTIVE_COLS; c++) {
         const r = adaptiveFreeRow(c);
         if (r === -1) continue;
-        board[r][c] = PLAYER_YELLOW;
-        if (adaptiveHasWinner(PLAYER_YELLOW)) {
+        board[r][c] = ADAPTIVE_PLAYER_YELLOW;
+        if (adaptiveHasWinner(ADAPTIVE_PLAYER_YELLOW)) {
             board[r][c] = 0;
             adaptiveMoveCounter++;
             adaptiveRoundDelta += stage === "observe" ? 2 : 4;
@@ -563,11 +582,11 @@ function getAdaptiveBotMove() {
         board[r][c] = 0;
     }
 
-    for (let c = 0; c < COLS; c++) {
+    for (let c = 0; c < ADAPTIVE_COLS; c++) {
         const r = adaptiveFreeRow(c);
         if (r === -1) continue;
-        board[r][c] = PLAYER_RED;
-        if (adaptiveHasWinner(PLAYER_RED)) {
+        board[r][c] = ADAPTIVE_PLAYER_RED;
+        if (adaptiveHasWinner(ADAPTIVE_PLAYER_RED)) {
             board[r][c] = 0;
             adaptiveMoveCounter++;
             adaptiveRoundDelta -= skillBand === "low" ? 1 : 3;
@@ -577,21 +596,30 @@ function getAdaptiveBotMove() {
         board[r][c] = 0;
     }
 
-    let tacticalBest = -1;
-    if (learningGate > 0) {
-        tacticalBest = adaptiveMinimaxMove(depth);
-    }
-    if (tacticalBest === -1 && learningGate > 0.45) tacticalBest = adaptiveRandomMove();
+    let tacticalBest = adaptiveMinimaxMove(depth);
+    if (tacticalBest === -1) tacticalBest = adaptiveRandomMove();
     if (tacticalBest === -1) return -1;
 
+    // Im oberen Bereich muss die Staerke auch spielerisch sichtbar werden:
+    // Der Suchzug wird zunehmend verbindlich, damit die Heuristik nicht bei
+    // Skill 100 trotzdem einen schwachen Alternativzug auswaehlt.
+    if (tacticalBest !== -1) {
+        if (Math.random() < curve.searchChance) {
+            adaptiveMoveCounter++;
+            adaptiveRoundDelta += adaptiveLerp(1, 2, curve.smooth);
+            adaptiveLearn.lastBotCol = tacticalBest;
+            return tacticalBest;
+        }
+    }
+
     const candidates = [];
-    for (let c = 0; c < COLS; c++) {
+    for (let c = 0; c < ADAPTIVE_COLS; c++) {
         const r = adaptiveFreeRow(c);
         if (r === -1) continue;
 
-        board[r][c] = PLAYER_YELLOW;
+        board[r][c] = ADAPTIVE_PLAYER_YELLOW;
         let score = 0;
-        const redWins = window.ConnectFourAICore.countWinningMoves(board, PLAYER_RED);
+        const redWins = window.ConnectFourAICore.countWinningMoves(board, ADAPTIVE_PLAYER_RED);
 
         if (stage === "apply") {
             if (c === 3) score += weakPhase ? 0.12 : 0.8;
@@ -641,14 +669,14 @@ function getAdaptiveBotMove() {
         score += adaptiveAI.creativity * creativityFactor * applyFactor * learningGate;
         score -= adaptiveAI.mistakeChance * mistakeFactor * applyFactor;
 
-        if (!weakPhase && learningGate > 0.2) {
+        if (!weakPhase) {
             if (redWins >= 2) score += skillBand === "ruthless" ? 55 : adaptiveLerp(12, 24, curve.smooth);
             else if (redWins >= 1) score += skillBand === "ruthless" ? 22 : adaptiveLerp(6, 12, curve.smooth);
         }
 
         if (adaptiveLearn.lastBotCol === c) score -= weakPhase ? 6 : 4;
         if (adaptiveLearn.lastBotCol !== -1 && Math.abs(adaptiveLearn.lastBotCol - c) === 1) score += 0.5;
-        if (learningGate > 0.35 && c === tacticalBest) score += skillBand === "ruthless" ? 7 : skillBand === "strong" ? 3 : adaptiveLerp(0.8, 1.8, curve.smooth);
+        if (c === tacticalBest) score += adaptiveLerp(0.8, 7, learningGate) * learningGate;
 
         board[r][c] = 0;
         candidates.push({ col: c, score });
@@ -666,11 +694,11 @@ function getAdaptiveBotMove() {
     const pool = candidates.filter(k => topScore - k.score <= threshold);
     let choice = pool[Math.floor(Math.random() * pool.length)] || candidates[0];
 
-    if (learningGate > 0.65 || skillBand === "ruthless") {
+    if (Math.random() < learningGate) {
         choice = candidates[0];
-    } else if (learningGate > 0.25 && stage === "apply" && choice.col !== tacticalBest && Math.random() > stochasticity) {
+    } else if (stage === "apply" && choice.col !== tacticalBest && Math.random() < learningGate * (1 - stochasticity)) {
         choice = candidates.find(k => k.col === tacticalBest) || choice;
-    } else if (learningGate > 0.25 && choice.col !== tacticalBest && Math.random() > 0.65) {
+    } else if (choice.col !== tacticalBest && Math.random() < learningGate * 0.35) {
         choice = candidates.find(k => k.col === tacticalBest) || choice;
     }
 
@@ -686,8 +714,23 @@ function getAdaptiveBotMove() {
 
 function finalizeAdaptiveRound(resultSign) {
     updateAdaptiveAfterMatch(resultSign);
+    adaptiveLearn.resultHistory.push(resultSign);
+    if (adaptiveLearn.resultHistory.length > 5) adaptiveLearn.resultHistory.shift();
+    adaptiveLearn.drawStreak = resultSign === 0 ? adaptiveLearn.drawStreak + 1 : 0;
+    // Use a short result window so one unusually short or lucky game does not
+    // move the adaptive strength by the full amount.
+    const smoothedResult = adaptiveLearn.resultHistory.reduce((sum, value) => sum + value, 0)
+        / adaptiveLearn.resultHistory.length;
     const targetSkill = getAdaptiveTargetSkill();
-    const resultDelta = resultSign > 0 ? 3 : resultSign < 0 ? -3 : 0;
+    // Evaluate each completed round directly. The continuous learning rate
+    // below keeps the reaction soft without delaying a visible response for
+    // five rounds.
+    // Use a stronger but symmetric round signal. Player and bot results must
+    // move the skill by the same base amount; profile data only fine-tunes it.
+    const drawBonus = resultSign === 0
+        ? adaptiveLearn.drawStreak === 2 ? 1 : adaptiveLearn.drawStreak >= 3 ? 2 : 0
+        : 0;
+    const resultDelta = resultSign * 5 + drawBonus;
     const playerSkill = getAdaptivePlayerSkillEstimate();
     const qualityDelta = resultSign === 0
         ? 0
@@ -699,10 +742,37 @@ function finalizeAdaptiveRound(resultSign) {
     const profileDelta = Math.max(-0.75, Math.min(0.75, (targetSkill - adaptiveSkill) * 0.06));
     const styleDelta = Math.max(-0.5, Math.min(0.5, adaptiveRoundDelta * 0.12));
     const learningStage = getAdaptiveLearningStage();
-    const learningRate = learningStage === "observe" ? 0.45 : learningStage === "learn" ? 0.75 : 1;
-    const totalDelta = Math.max(-4, Math.min(4,
-        (resultDelta + qualityDelta + streakDelta + profileDelta + styleDelta) * learningRate
+    // Gegen starke Gegner soll der Bot die hohe Suchlogik frueher erreichen.
+    // Die Anpassung bleibt ergebnisbasiert und wird nicht ueber die Grenzen
+    // hinaus verstaerkt.
+    const stageRate = learningStage === "observe" ? 0.65 : learningStage === "learn" ? 0.9 : 1;
+    const speedRate = Number(window.currentAdaptSpeedFactor) || 1;
+    // Three continuously blended learning zones: fast below 50 %, balanced
+    // in the middle, and deliberately slower near reference strength.
+    const lowerProgress = adaptiveClamp(adaptiveSkill / 50);
+    const middleProgress = adaptiveClamp((adaptiveSkill - 35) / 45);
+    const upperProgress = adaptiveClamp((adaptiveSkill - 65) / 35);
+    const lowerResponse = adaptiveLerp(1.55, 1.12, lowerProgress);
+    const middleResponse = adaptiveLerp(1.12, 0.92, middleProgress);
+    const upperResponse = adaptiveLerp(0.92, 0.42, upperProgress);
+    const zoneBlend = adaptiveClamp((adaptiveSkill - 50) / 30);
+    const blendedResponse = adaptiveLerp(
+        lowerProgress < 0.7 ? lowerResponse : middleResponse,
+        upperResponse,
+        zoneBlend
+    );
+    const learningRate = stageRate * speedRate * blendedResponse;
+    // Das Spielergebnis gibt immer die Richtung der Anpassung vor:
+    // Spielergewinn staerkt den Bot, Botgewinn schwaecht ihn. Profil-,
+    // Qualitaets- und Trendwerte duerfen diese Richtung nur feinjustieren.
+    const secondaryDelta = Math.max(-1.25, Math.min(1.25,
+        qualityDelta + streakDelta + profileDelta + styleDelta
     ));
+    let totalDelta = Math.max(-4, Math.min(4,
+        (resultDelta + secondaryDelta) * learningRate
+    ));
+    if (resultSign > 0) totalDelta = Math.max(0, totalDelta);
+    if (resultSign < 0) totalDelta = Math.min(0, totalDelta);
 
     adaptiveSkill = Math.max(1, Math.min(100, adaptiveSkill + totalDelta));
     adaptiveLearn.skill = adaptiveSkill;
@@ -710,4 +780,39 @@ function finalizeAdaptiveRound(resultSign) {
     adaptiveMoveCounter = 0;
     adaptiveRoundDelta = 0;
 }
+
+function resetAdaptiveForLab(initialSkill = 35) {
+    resetAdaptiveState();
+    adaptiveSkill = Math.max(1, Math.min(100, Number(initialSkill) || 35));
+    adaptiveLearn.skill = adaptiveSkill;
+}
+
+function getAdaptiveMoveForLab(testBoard) {
+    adaptiveLabBoard = testBoard;
+    try {
+        return getAdaptiveBotMove();
+    } finally {
+        adaptiveLabBoard = null;
+    }
+}
+
+function recordAdaptiveLabResult(result) {
+    finalizeAdaptiveRound(result === "playerWin" ? 1 : result === "botWin" ? -1 : 0);
+    return Math.round(adaptiveSkill);
+}
+
+window.ConnectFourAdaptiveBot = {
+    getMove: getAdaptiveMoveForLab,
+    getSkill: () => Math.round(adaptiveSkill),
+    resetForLab: resetAdaptiveForLab,
+    recordLabResult: recordAdaptiveLabResult
+};
+
+// Keep the normal 4-Gewinnt game API explicit while isolating internal names
+// from the adaptive bots of the other games in BotLab.
+window.getAdaptiveThinkTime = getAdaptiveThinkTime;
+window.getAdaptiveBotMove = getAdaptiveBotMove;
+window.resetAdaptiveState = resetAdaptiveState;
+window.finalizeAdaptiveRound = finalizeAdaptiveRound;
+})();
 

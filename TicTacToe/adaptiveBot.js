@@ -3,7 +3,8 @@
     const state = {
         adaptiveRoundStatus: "",
         adaptiveRoundSnapshot: null,
-        adaptiveSkill: 0.5,
+        drawStreak: 0,
+        adaptiveSkill: 0.35,
         adaptiveAI: {
             accuracy: 0.60,
             tactics: 0.55,
@@ -16,19 +17,52 @@
     };
 
     function getLearningRate() {
-        switch (activeMatch?.adaptSpeed) {
-            case "slow": return 0.45;
-            case "fast": return 1.4;
-            default: return 1.0;
-        }
+        const baseRate = (() => {
+            const speed = typeof activeMatch !== "undefined" ? activeMatch?.adaptSpeed : "normal";
+            switch (speed) {
+                case "slow": return 0.5;
+                case "fast": return 1.5;
+                default: return 1.0;
+            }
+        })();
+        const lowerSkillBoost = 1.35 - adaptiveCurve() * 0.20;
+        return baseRate * lowerSkillBoost;
     }
 
     function adaptiveClamp(v) {
-        return Math.max(0, Math.min(1, v));
+        // A small floor prevents the adaptive bot from collapsing to zero
+        // against a weak opponent while keeping the beginner range gentle.
+        return Math.max(0.10, Math.min(1, v));
     }
 
     function adaptiveCurve() {
         return TicTacToeAdaptiveCore.getDifficultyProfile(getAdaptiveSkillValue()).challenge;
+    }
+
+    function getReferenceBlendWeight(skillValue) {
+        const value = Math.max(0, Math.min(100, Number(skillValue) || 0));
+        if (value <= 87) return 0;
+        if (value >= 93) return 1;
+        const t = (value - 87) / 6;
+        return t * t * (3 - 2 * t);
+    }
+
+    function getLowerSlopeWeight(skillValue) {
+        const value = Math.max(0, Math.min(100, Number(skillValue) || 0));
+        if (value >= 40) return 1;
+        const t = value / 40;
+        return t * t * (3 - 2 * t);
+    }
+
+    function pickReferenceMove(board) {
+        const referenceMoves = TicTacToeAdaptiveCore.getBestMoves(board, "O");
+        if (!referenceMoves.length) return null;
+        const blend = getReferenceBlendWeight(getAdaptiveSkillValue());
+        if (blend <= 0) return null;
+        if (Math.random() < blend) {
+            return referenceMoves[0];
+        }
+        return null;
     }
 
     function getAdaptiveSkillBand() {
@@ -59,6 +93,10 @@
 
     function getAdaptiveSkillValue() {
         return Math.round(state.adaptiveSkill * 100);
+    }
+
+    function getAdaptiveCells() {
+        return state.labCells || (typeof cells !== "undefined" ? cells : Array(9).fill(null));
     }
 
     function decayAdaptiveMemory() {
@@ -139,6 +177,7 @@
     }
 
     function getAdaptiveBestMove() {
+        const cells = getAdaptiveCells();
         const free = TicTacToeAdaptiveCore.getFreeCells(cells);
         const curve = adaptiveCurve();
         const win = TicTacToeAdaptiveCore.findCritical("O", cells);
@@ -193,23 +232,22 @@
 
     function botAdaptive() {
         const bestMove = getAdaptiveBestMove();
-        const free = TicTacToeAdaptiveCore.getFreeCells(cells);
+        const free = TicTacToeAdaptiveCore.getFreeCells(getAdaptiveCells());
         if (bestMove === null || !Number.isInteger(bestMove) || !free.includes(bestMove)) {
             return free[0] ?? null;
         }
 
-        if (state.adaptiveSkill >= 0.98) {
-            return bestMove;
-        }
-
         const curve = adaptiveCurve();
         const difficultyProfile = TicTacToeAdaptiveCore.getDifficultyProfile(getAdaptiveSkillValue());
-        const skillFactor = 1 - curve;
         const styleFactor = (1 - state.adaptiveAI.accuracy) * 0.18 + (1 - state.adaptiveAI.tactics) * 0.08 + (1 - state.adaptiveAI.creativity) * 0.06;
         const errorChance = Math.max(
             0.02,
             Math.min(0.38, difficultyProfile.errorRate + state.adaptiveAI.mistakeChance * 0.12 + styleFactor * 0.35)
         );
+        const referenceMove = pickReferenceMove(getAdaptiveCells());
+        if (referenceMove !== null) {
+            return referenceMove;
+        }
         if (Math.random() < errorChance) {
             const imperfectPool = free.filter(i => i !== bestMove);
             if (imperfectPool.length) return imperfectPool[Math.floor(Math.random() * imperfectPool.length)];
@@ -243,12 +281,26 @@
         );
 
         let delta = 0;
-        if (winner === "X") delta += 0.022;
-        else if (winner === "O") delta -= 0.03;
-        else delta += 0.003;
+        const lowerSlopeWeight = getLowerSlopeWeight(getAdaptiveSkillValue());
+        // X = Spieler gewinnt -> der Bot soll stärker werden.
+        if (winner === "X") {
+            state.drawStreak = 0;
+            delta += 0.035;
+        // O = Bot gewinnt -> der Bot soll schwächer werden.
+        } else if (winner === "O") {
+            state.drawStreak = 0;
+            delta -= 0.03 * (0.7 + lowerSlopeWeight * 0.3);
+        } else {
+            state.drawStreak += 1;
+            // Remis bleiben fast neutral. Nur eine lange Serie darf
+            // vorsichtig nach oben korrigieren: beim 5. und danach jedem 3. Remis.
+            if (state.drawStreak >= 5 && (state.drawStreak === 5 || (state.drawStreak - 5) % 3 === 0)) {
+                delta += 0.008 * (0.75 + lowerSlopeWeight * 0.25);
+            }
+        }
 
-        delta += Math.max(-0.012, Math.min(0.012, (roundGood - roundBad) * 0.002));
-        delta += Math.max(-0.01, Math.min(0.01, -roundRisk * 0.001));
+        delta += Math.max(-0.012, Math.min(0.012, (roundGood - roundBad) * 0.002)) * (0.75 + lowerSlopeWeight * 0.25);
+        delta += Math.max(-0.01, Math.min(0.01, -roundRisk * 0.001)) * (0.75 + lowerSlopeWeight * 0.25);
         delta *= rate;
 
         state.adaptiveSkill = adaptiveClamp(state.adaptiveSkill + delta);
@@ -258,7 +310,7 @@
             state.adaptiveAI.habitUsage = adaptiveClamp(state.adaptiveAI.habitUsage + (state.playerProfile.favoriteCells.reduce((a, b) => a + b, 0) > 0 ? 0.0008 * rate : 0));
         }
         state.adaptiveAI.mistakeChance = adaptiveClamp(state.adaptiveAI.mistakeChance + (winner === "X" ? -0.0015 : 0.0008) * rate);
-        state.adaptiveAI.creativity = adaptiveClamp(state.adaptiveAI.creativity + (winner === "draw" ? 0.0015 : 0.0005) * rate);
+        state.adaptiveAI.creativity = adaptiveClamp(state.adaptiveAI.creativity + (winner === "draw" ? 0 : 0.0005) * rate);
 
         if (winner === "X") {
             state.playerProfile.style.aggressive += 0.6;
@@ -270,6 +322,35 @@
         }
 
         decayAdaptiveMemory();
+    }
+
+    function resetForLab(initialSkill = 35) {
+        state.adaptiveSkill = adaptiveClamp(initialSkill / 100);
+        state.adaptiveAI = {
+            accuracy: 0.60,
+            tactics: 0.55,
+            habitUsage: 0.40,
+            mistakeChance: 0.12,
+            creativity: 0.50
+        };
+        state.playerProfile = TicTacToeAdaptiveCore.createPlayerProfile();
+        state.adaptiveRoundSnapshot = null;
+        state.labCells = null;
+        state.drawStreak = 0;
+    }
+
+    function getBotMoveForLab(board) {
+        state.labCells = board;
+        const referenceMove = pickReferenceMove(board);
+        if (referenceMove !== null) {
+            return referenceMove;
+        }
+        return getBotMove();
+    }
+
+    function recordLabResult(result) {
+        updateAdaptiveAfterMatch(result === "playerWin" ? "X" : result === "botWin" ? "O" : "draw");
+        return getAdaptiveSkillValue();
     }
 
     function observePlayerMove(move, stateBeforeMove, player) {
@@ -308,6 +389,9 @@
         getRoundStatus,
         getSkillValue: getAdaptiveSkillValue,
         getBotMove,
+        getBotMoveForLab,
+        resetForLab,
+        recordLabResult,
         getBotDelay,
         observePlayerMove,
         updateAfterMatch: updateAdaptiveAfterMatch,

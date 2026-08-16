@@ -4,45 +4,27 @@ const ConnectFourManualCore = window.ConnectFourAICore;
  * Manuelle Bots fuer 4 Gewinnt
  * ----------------------------
  *
- * Diese Bots lernen nicht und veraendern ihre Staerke nicht waehrend des
- * Spiels. Jede Stufe hat feste Regeln. Dadurch bleiben die manuellen Bots
- * vorhersehbar und eignen sich als klare Schwierigkeitsstufen.
- *
- * Ablauf eines Zuges:
- * 1. Mit tacticalChance wird geprueft, ob der Bot sofort gewinnen oder blocken
- *    soll.
- * 2. Mit randomChance wird geprueft, ob ein bewusst einfacher Zufallszug folgt.
- * 3. Sonst wird Minimax mit der Tiefe der jeweiligen Stufe verwendet.
- *
- * Auch Meister bleibt durch randomChance bewusst schlagbar.
+ * Die manuellen Bots bleiben fest, aber ihre Stufen werden ueber eine
+ * gemeinsame, kontinuierliche Kurve abgeleitet. So entstehen keine harten
+ * Spruenge zwischen den Stufen und die Staffelung bleibt besser vergleichbar.
  */
 
-// depth: Minimax-Tiefe; je hoeher, desto weiter schaut der Bot voraus.
-// tacticalChance: Wahrscheinlichkeit fuer sofortigen Gewinn oder Block.
-// randomChance: Wahrscheinlichkeit fuer einen bewusst zufaelligen Zug.
-const CONNECT_FOUR_MANUAL_LEVELS = {
-    "anfänger": { randomChance: 0.80, tacticalChance: 0.20, depth: 0 }, // fast zufaellig
-    hobby: { randomChance: 0.30, tacticalChance: 0.70, depth: 1 }, // erste Vorausplanung
-    verein: { randomChance: 0.12, tacticalChance: 0.90, depth: 2 }, // solide Taktik
-    meister: { randomChance: 0.05, tacticalChance: 1.00, depth: 4 } // stark, aber nicht perfekt
-};
-
-// Die Denkzeit ist nur eine Spielillusion und veraendert nicht die Spielstaerke.
-const CONNECT_FOUR_MANUAL_THINK_TIMES = {
-    "anfänger": [250, 450],
-    hobby: [450, 700],
-    verein: [650, 950],
-    meister: [900, 1300]
-};
+function normalizeLevel(level) {
+    const key = String(level || "anfanger")
+        .toLowerCase()
+        .replace(/ä/g, "ae")
+        .replace(/ö/g, "oe")
+        .replace(/ü/g, "ue")
+        .replace(/ß/g, "ss");
+    if (key === "anfanger" || key === "anfaenger" || key === "anfÃ¤nger") return "anfanger";
+    return key;
+}
 
 function getManualConnectFourRandomMove(board) {
     const columns = ConnectFourManualCore.getAvailableColumns(board);
-    return columns.length
-        ? columns[Math.floor(Math.random() * columns.length)]
-        : -1;
+    return columns.length ? columns[Math.floor(Math.random() * columns.length)] : -1;
 }
 
-// Findet einen Zug, mit dem der angegebene Spieler sofort vier gewinnt.
 function findImmediateConnectFourMove(board, player) {
     for (const col of ConnectFourManualCore.getAvailableColumns(board)) {
         const result = ConnectFourManualCore.applyMove(board, col, player);
@@ -53,31 +35,31 @@ function findImmediateConnectFourMove(board, player) {
     return -1;
 }
 
-// Eigener Gewinnzug hat Vorrang. Gibt es keinen, wird ein Gewinnzug des
-// Gegners blockiert.
 function getTacticalConnectFourMove(board, player, opponent) {
     const winningMove = findImmediateConnectFourMove(board, player);
     if (winningMove !== -1) return winningMove;
     return findImmediateConnectFourMove(board, opponent);
 }
 
-// Fragt den gemeinsamen KI-Kern nach dem besten Zug innerhalb der erlaubten
-// Suchtiefe. Der Kern enthaelt Minimax und Alpha-Beta-Pruning.
-function getManualConnectFourMinimaxMove(board, config, player, opponent) {
-    if (config.depth <= 0) return -1;
-    const result = ConnectFourManualCore.minimax(
-        board,
-        config.depth,
-        true,
-        player,
-        opponent
-    );
-    return result && Number.isInteger(result.col) ? result.col : -1;
+function getManualConnectFourLevelProfile(levelOrStrength) {
+    const normalizedLevel = normalizeLevel(levelOrStrength);
+    return ConnectFourManualCore.getManualProfile(normalizedLevel);
 }
 
-// Zentrale Entscheidungsroutine fuer alle vier manuellen Schwierigkeitsstufen.
+function getManualConnectFourMinimaxMove(board, config, player, opponent) {
+    if (config.depth <= 0) return -1;
+    const ranked = ConnectFourManualCore.getRankedMoves(board, config.depth, player, opponent);
+    if (!ranked.length) return -1;
+
+    // Die Kandidatenbreite kommt ausschließlich aus dem Difficulty-Core.
+    const poolSize = Math.min(ranked.length, config.candidatePoolSize ?? ranked.length);
+    const pool = ranked.slice(0, poolSize);
+    const index = Math.floor(Math.random() * pool.length);
+    return pool[index]?.col ?? -1;
+}
+
 function getManualConnectFourMoveForLevel(board, level, player, opponent) {
-    const config = CONNECT_FOUR_MANUAL_LEVELS[level] || CONNECT_FOUR_MANUAL_LEVELS["anfänger"];
+    const config = getManualConnectFourLevelProfile(level);
 
     if (Math.random() < config.tacticalChance) {
         const tacticalMove = getTacticalConnectFourMove(board, player, opponent);
@@ -88,14 +70,16 @@ function getManualConnectFourMoveForLevel(board, level, player, opponent) {
         return getManualConnectFourRandomMove(board);
     }
 
-    const minimaxMove = getManualConnectFourMinimaxMove(board, config, player, opponent);
+    // Minimax bleibt in jedem Level Teil des Profils; die Chance steigt mit
+    // der Staerke und wird nicht mehr durch einen ungenutzten Profilwert ersetzt.
+    const minimaxMove = Math.random() < config.minimaxChance
+        ? getManualConnectFourMinimaxMove(board, config, player, opponent)
+        : -1;
     return minimaxMove !== -1 ? minimaxMove : getManualConnectFourRandomMove(board);
 }
 
-// Die vier benannten Funktionen machen die Stufen bewusst sichtbar und
-// erleichtern spaetere Anpassungen einzelner Bots.
 function getManualConnectFourBeginnerMove(board, player, opponent) {
-    return getManualConnectFourMoveForLevel(board, "anfänger", player, opponent);
+    return getManualConnectFourMoveForLevel(board, "anfanger", player, opponent);
 }
 
 function getManualConnectFourHobbyMove(board, player, opponent) {
@@ -110,22 +94,28 @@ function getManualConnectFourMasterMove(board, player, opponent) {
     return getManualConnectFourMoveForLevel(board, "meister", player, opponent);
 }
 
-// Oeffentliche Schnittstelle fuer game.js. game.js muss nur Level und Brett
-// uebergeben und kennt die interne Entscheidungslogik nicht.
-function getManualConnectFourMove({ board, level = "anfänger", player = 2, opponent = 1 }) {
+function getManualConnectFourMove({ board, level = "anfanger", player = 2, opponent = 1 }) {
     const movesByLevel = {
-        "anfänger": getManualConnectFourBeginnerMove,
+        anfanger: getManualConnectFourBeginnerMove,
         hobby: getManualConnectFourHobbyMove,
         verein: getManualConnectFourClubMove,
-        meister: getManualConnectFourMasterMove
+        meister: getManualConnectFourMasterMove,
+        referenz: (board, player, opponent) => getManualConnectFourMoveForLevel(board, "referenz", player, opponent)
     };
-    const moveFunction = movesByLevel[level] || movesByLevel["anfänger"];
+    const moveFunction = movesByLevel[normalizeLevel(level)] || movesByLevel.anfanger;
     return moveFunction(board, player, opponent);
 }
 
-// Liefert eine zufaellige Denkzeit fuer die Anzeige im Spiel.
 function getManualConnectFourThinkTime(level) {
-    const [min, max] = CONNECT_FOUR_MANUAL_THINK_TIMES[level]
-        || CONNECT_FOUR_MANUAL_THINK_TIMES["anfänger"];
-    return Math.round(min + Math.random() * (max - min));
+    const profile = getManualConnectFourLevelProfile(level);
+    const base = profile.thinkTime ?? 300;
+    return Math.round(base - 60 + Math.random() * 120);
 }
+
+window.getManualConnectFourMove = getManualConnectFourMove;
+window.getManualConnectFourBeginnerMove = getManualConnectFourBeginnerMove;
+window.getManualConnectFourHobbyMove = getManualConnectFourHobbyMove;
+window.getManualConnectFourClubMove = getManualConnectFourClubMove;
+window.getManualConnectFourMasterMove = getManualConnectFourMasterMove;
+window.getManualConnectFourLevelProfile = getManualConnectFourLevelProfile;
+window.getManualConnectFourThinkTime = getManualConnectFourThinkTime;

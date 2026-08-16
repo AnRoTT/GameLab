@@ -54,12 +54,12 @@ function findConnectFourWinner(board) {
                 [0, 1], [1, 0], [1, 1], [1, -1]
             ];
             for (const [dr, dc] of lines) {
-                const count = 1
-                    + connectFourCountDirection(board, row, col, dr, dc, player)
-                    + connectFourCountDirection(board, row, col, -dr, -dc, player);
+                const forward = connectFourCountDirection(board, row, col, dr, dc, player);
+                const backward = connectFourCountDirection(board, row, col, -dr, -dc, player);
+                const count = 1 + forward + backward;
                 if (count >= 4) {
                     const coordinates = [];
-                    for (let step = -3; step <= 3; step += 1) {
+                    for (let step = -backward; step <= forward; step += 1) {
                         const nextRow = row + dr * step;
                         const nextCol = col + dc * step;
                         if (nextRow >= 0 && nextRow < CONNECT_FOUR_ROWS && nextCol >= 0 && nextCol < CONNECT_FOUR_COLS && board[nextRow][nextCol] === player) {
@@ -163,6 +163,21 @@ function connectFourMinimax(board, depth, maximizing, player, opponent, alpha = 
         if (beta <= alpha) break;
     }
     return best;
+}
+
+function getConnectFourRankedMoves(board, depth, player, opponent) {
+    const columns = getConnectFourAvailableColumns(board);
+    return columns.map(col => {
+        const result = applyConnectFourMove(board, col, player);
+        const evaluated = connectFourMinimax(
+            result.board,
+            Math.max(0, depth - 1),
+            false,
+            player,
+            opponent
+        );
+        return { col, score: evaluated.score };
+    }).sort((a, b) => b.score - a.score);
 }
 
 function createConnectFourPlayerProfile() {
@@ -273,25 +288,111 @@ function hasMissedConnectFourWin(board, chosenCol, player) {
 }
 
 function getConnectFourDifficultyProfile(skill) {
-    const normalized = Math.max(0, Math.min(100, Number(skill) || 0)) / 100;
-    const early = normalized <= 0.75
-        ? 0.75 * ((normalized / 0.75) ** 2 * (3 - 2 * (normalized / 0.75)))
-        : 0.75 + ((normalized - 0.75) / 0.25) ** 1.8 * 0.25;
+    const difficulty = window.SharedDifficulty.createProfile({
+        mode: "adaptive",
+        skill,
+        minSearchChance: 0.06,
+        maxSearchChance: 1.0,
+        minRandomness: 0.03,
+        maxRandomness: 0.42,
+        minErrorRate: 0.02,
+        maxErrorRate: 0.34,
+        habitInfluence: 0.60,
+        searchConfig: {
+            supportsMinimax: true,
+            minDepth: 0,
+            maxDepth: 3,
+            fixedDepth: 3
+        }
+    });
 
     return {
-        challenge: early,
-        smooth: early,
-        learningWeight: 0.03 + early * 0.55,
-        minimaxWeight: 0.06 + early * 0.79,
-        tacticWeight: 0.06 + early * 0.74,
-        randomness: Math.max(0.03, 0.42 - early * 0.39),
-        errorRate: Math.max(0.02, 0.34 - early * 0.30),
-        tacticalAccuracy: Math.min(0.98, 0.34 + early * 0.62),
-        thinkTimeWeight: early,
-        searchIntensity: early,
-        maxDepth: 5,
-        thinkTime: 260 + early * 1050
+        ...difficulty,
+        challenge: difficulty.curve,
+        smooth: difficulty.curve,
+        learningWeight: 0.03 + difficulty.curve * 0.55,
+        minimaxWeight: difficulty.searchChance,
+        tacticWeight: difficulty.tacticalAccuracy,
+        randomness: difficulty.randomChance,
+        thinkTimeWeight: difficulty.curve,
+        searchIntensity: difficulty.curve,
+        maxDepth: difficulty.maxDepth,
+        thinkTime: 260 + difficulty.curve * 1050
     };
+}
+//Anpassung der manuellen Bots//
+const CONNECT_FOUR_MANUAL_STRENGTHS = Object.freeze({ 
+      anfanger: 0.26, 
+	  hobby: 0.48, 
+	  verein: 0.63, 
+	  meister: 0.67, 
+	  referenz: 1.0 
+});
+const connectFourManualOverrides = Object.create(null);
+try {
+    const stored = JSON.parse(localStorage.getItem("gamelab-4gewinnt-manual-profiles") || "{}");
+    ["1", "2", "3", "4"].forEach((key) => delete stored[key]);
+    Object.assign(connectFourManualOverrides, stored);
+    localStorage.setItem("gamelab-4gewinnt-manual-profiles", JSON.stringify(connectFourManualOverrides));
+} catch {}
+
+function clearConnectFourManualProfileOverrides() {
+    Object.keys(connectFourManualOverrides).forEach((key) => delete connectFourManualOverrides[key]);
+    try { localStorage.removeItem("gamelab-4gewinnt-manual-profiles"); } catch {}
+}
+//Anpassung der manuellen Bots//
+
+function normalizeConnectFourProfileKey(level) {
+    const value = String(level).toLowerCase();
+    return ({
+        "1": "anfanger",
+        "2": "hobby",
+        "3": "verein",
+        "4": "meister",
+        referenz: "referenz",
+        reference: "referenz"
+    })[value] || value;
+}
+
+function getConnectFourManualProfile(level = "anfanger") {
+    const key = normalizeConnectFourProfileKey(level);
+    const strength = connectFourManualOverrides[key] ?? CONNECT_FOUR_MANUAL_STRENGTHS[key] ?? Math.max(0, Math.min(1, Number(level) || 0.31));
+    const difficulty = window.SharedDifficulty.createProfile({
+        mode: "manual",
+        strength,
+        minSearchChance: 0.06,
+        maxSearchChance: 1.0,
+        minRandomness: 0.03,
+        maxRandomness: 0.42,
+        minErrorRate: 0.02,
+        maxErrorRate: 0.34,
+        habitInfluence: 0.60,
+        searchConfig: {
+            supportsMinimax: true,
+            minDepth: 0,
+            maxDepth: 3,
+            fixedDepth: 3
+        }
+    });
+    return {
+        level: key,
+        strength,
+        curve: difficulty.curve,
+        randomChance: difficulty.randomChance,
+        tacticalChance: difficulty.tacticalAccuracy,
+        minimaxChance: difficulty.searchChance,
+        candidatePoolSize: Math.max(1, Math.ceil(7 * (1 - difficulty.searchChance))),
+        depth: difficulty.depth,
+        thinkTime: 260 + difficulty.curve * 1020
+    };
+}
+
+function setConnectFourManualProfileStrength(level, value) {
+    const key = normalizeConnectFourProfileKey(level);
+    if (key === "referenz") return 1;
+    connectFourManualOverrides[key] = Math.max(0, Math.min(0.999, Number(value) || 0));
+    try { localStorage.setItem("gamelab-4gewinnt-manual-profiles", JSON.stringify(connectFourManualOverrides)); } catch {}
+    return connectFourManualOverrides[key];
 }
 
 window.ConnectFourAICore = {
@@ -307,6 +408,7 @@ window.ConnectFourAICore = {
     isBoardFull: isConnectFourBoardFull,
     evaluateBoard: evaluateConnectFourBoard,
     minimax: connectFourMinimax,
+    getRankedMoves: getConnectFourRankedMoves,
     createPlayerProfile: createConnectFourPlayerProfile,
     resetPlayerProfile: resetConnectFourPlayerProfile,
     trackPlayerMove: trackConnectFourPlayerMove,
@@ -314,7 +416,11 @@ window.ConnectFourAICore = {
     evaluatePlayerMove: evaluateConnectFourPlayerMove,
     countWinningMoves: countConnectFourWinningMoves,
     hasMissedWin: hasMissedConnectFourWin,
-    getDifficultyProfile: getConnectFourDifficultyProfile
+    getDifficultyProfile: getConnectFourDifficultyProfile,
+    getManualProfile: getConnectFourManualProfile,
+    getManualReferenceProfile: () => getConnectFourManualProfile("referenz"),
+    setManualProfileStrength: setConnectFourManualProfileStrength,
+    clearManualProfileOverrides: clearConnectFourManualProfileOverrides
 };
 
 // Das Profil muss vor adaptiveBot.js und game.js existieren, weil beide

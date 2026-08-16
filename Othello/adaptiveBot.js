@@ -1,6 +1,6 @@
 const OthelloAdaptiveCore = window.OthelloAICore;
 
-let adaptiveStrength = 50;
+let adaptiveStrength = 35;
 
 function calculatePlayerPerformance(profile) {
     if (!profile) return 50;
@@ -50,15 +50,16 @@ function startAdaptiveRound(profile, speed = "normal") {
     } else if (profile?.lastResult === "botWin") {
         // Spielt der Spieler gut und verliert trotzdem, war der Bot zu stark.
         // Bei schwacher Spielweise wird er deutlicher zurückgenommen.
-        adjustment = -4 + (performance - 50) * 0.08;
+        adjustment = -4 - (performance - 50) * 0.08;
     } else {
         // Bei einem Remis zählt nur die beobachtete Spielqualität.
         adjustment = (performance - 50) * 0.04;
     }
 
     const speedFactor = speed === "slow" ? 0.5 : speed === "fast" ? 1.5 : 1;
-    adjustment = Math.max(-6, Math.min(6, adjustment * speedFactor));
-    adaptiveStrength = Math.max(1, Math.min(100, adaptiveStrength + adjustment));
+    const lowerSkillBoost = 1.25 - getAdaptiveCurve(adaptiveStrength).challenge * 0.25;
+    const scaledAdjustment = Math.max(-6, Math.min(6, adjustment * speedFactor * lowerSkillBoost));
+    adaptiveStrength = Math.max(1, Math.min(100, adaptiveStrength + scaledAdjustment));
     return adaptiveStrength;
 }
 
@@ -67,28 +68,51 @@ function getAdaptiveStrength() {
 }
 
 function getAdaptiveCurve(skill) {
-    return OthelloAdaptiveCore.getDifficultyProfile(skill);
+    const difficulty = window.SharedDifficulty.createProfile({
+        mode: "adaptive",
+        skill,
+        searchConfig: {
+            supportsMinimax: true,
+            minDepth: 0,
+            maxDepth: 4,
+            fixedDepth: null
+        },
+        habitInfluence: 1
+    });
+
+    // Kompatibilitätsfeld für die adaptive Lernanpassung.
+    return { ...difficulty, challenge: difficulty.curve };
+}
+
+function getAdaptiveSearchPlan(skill) {
+    const difficulty = getAdaptiveCurve(skill);
+    return {
+        depth: difficulty.depth,
+        nextDepth: Math.min(difficulty.maxDepth, difficulty.depth + 1),
+        upgradeChance: 0,
+        difficulty
+    };
 }
 
 function getAdaptiveSearchDepth(skill) {
-    if (skill < 20) return 0;
-    const challenge = getAdaptiveCurve(skill).challenge;
-    return Math.max(1, Math.min(4, Math.floor(1 + Math.pow(challenge, 2.0) * 3)));
+    const plan = getAdaptiveSearchPlan(skill);
+    return Math.random() < plan.upgradeChance ? plan.nextDepth : plan.depth;
 }
 
 function getAdaptiveBotMove(state, player = "white", profile = null) {
     const core = OthelloAdaptiveCore;
     const moves = core.getAllValidMovesForState(player, state);
     if (!moves.length) return null;
-    const curve = getAdaptiveCurve(adaptiveStrength);
+    const difficulty = getAdaptiveCurve(adaptiveStrength);
+    const curve = difficulty.curve;
     const weights = {
-        position: curve.position,
-        mobility: curve.mobility,
-        pieces: curve.pieces
+        position: 0.8 + curve * 1.0,
+        mobility: 5 + curve * 14,
+        pieces: 0.5 + curve * 1.5
     };
-    const depth = getAdaptiveSearchDepth(adaptiveStrength);
+    const depth = difficulty.depth;
 
-    if (depth === 0 && adaptiveStrength < 20) {
+    if (depth === 0 && difficulty.randomChance > 0.70) {
         return moves[Math.floor(Math.random() * moves.length)];
     }
 
@@ -97,11 +121,11 @@ function getAdaptiveBotMove(state, player = "white", profile = null) {
             move,
             score: core.othelloScoreMove(state, move, player, null, weights)
         })).sort((a, b) => b.score - a.score);
-        const count = Math.max(1, Math.ceil(scored.length * (0.16 + curve.randomness)));
+        const count = Math.max(1, Math.ceil(scored.length * (0.16 + difficulty.randomChance)));
         return scored[Math.floor(Math.random() * count)].move;
     }
 
-    const randomness = Math.max(0, curve.randomness * 35);
+    const randomness = Math.max(0, difficulty.randomChance * 35);
     return core.othelloChooseMinimaxMove(state, player, depth, randomness, weights) || moves[0];
 }
 
@@ -111,3 +135,25 @@ function getAdaptiveBotThinkTime() {
     const variation = 180 + (1 - challenge) * 220;
     return Math.round(minimum + Math.random() * variation);
 }
+
+function resetAdaptiveForLab(initialSkill = 35) {
+    adaptiveStrength = Math.max(1, Math.min(100, Number(initialSkill) || 35));
+}
+
+function recordAdaptiveLabResult(result, opponentPerformance = 50) {
+    const performance = Math.max(0, Math.min(100, Number(opponentPerformance) || 50));
+    let adjustment = 0;
+    if (result === "playerWin") adjustment = 4 + (performance - 50) * 0.04;
+    if (result === "botWin") adjustment = -4 + (performance - 50) * 0.04;
+    if (result === "draw") adjustment = (performance - 50) * 0.02;
+    const lowerSkillBoost = 1.25 - getAdaptiveCurve(adaptiveStrength).challenge * 0.25;
+    adaptiveStrength = Math.max(1, Math.min(100, adaptiveStrength + adjustment * lowerSkillBoost));
+    return Math.round(adaptiveStrength);
+}
+
+window.OthelloAdaptiveBot = {
+    getBotMove: getAdaptiveBotMove,
+    getSkill: getAdaptiveStrength,
+    resetForLab: resetAdaptiveForLab,
+    recordLabResult: recordAdaptiveLabResult
+};

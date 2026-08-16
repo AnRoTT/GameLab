@@ -1,4 +1,110 @@
 ﻿const boardEl = document.getElementById("board");
+const ADAPT_SPEEDS = [
+    { key: "slow", label: "Langsam" },
+    { key: "normal", label: "Normal" },
+    { key: "fast", label: "Schnell" }
+];
+const BOT_LEVELS = ["Anfänger", "Hobbyspieler", "Vereinsspieler", "Meister", "Adaptiv"];
+const MATCH_OPTIONS = ["Einzelrunde", "Mehrfachrunde - Abwechselnd", "Mehrfachrunde - Verlierer beginnt"];
+
+let vsComputer = true;
+let botType = "adaptive";
+let botLevelIndex = 0;
+let adaptSpeedIndex = 1;
+let ruleMode = "standard";
+let matchModeIndex = 0;
+
+const settingsStartButton = document.getElementById("startBtn");
+const settingsModeButton = document.getElementById("modeBtn");
+const settingsRulesButton = document.getElementById("rulesBtn");
+const settingsMatchButton = document.getElementById("matchBtn");
+const settingsOpponentRow = document.getElementById("botOpponentRow");
+const settingsBotLevelButton = document.getElementById("botLevelBtn");
+const settingsAdaptSpeedButton = document.getElementById("adaptSpeedBtn");
+const settingsStrengthPanel = document.getElementById("adaptiveStrengthPanel");
+const settingsStrengthValue = document.getElementById("adaptiveStrengthValue");
+const settingsStrengthBar = document.getElementById("adaptiveStrengthBar");
+
+function updateAdaptiveStrengthUI(strength = getAdaptiveStrength()) {
+    const visible = vsComputer && botType === "adaptive";
+    settingsStrengthPanel.hidden = !visible;
+    if (!visible) return;
+    settingsStrengthValue.textContent = `${Math.round(strength)}%`;
+    settingsStrengthBar.style.width = `${Math.max(1, Math.min(100, strength))}%`;
+}
+
+function updateBotLevelUI() {
+    settingsOpponentRow.classList.remove("disabled");
+    settingsBotLevelButton.disabled = !vsComputer;
+    settingsBotLevelButton.classList.toggle("button-disabled", settingsBotLevelButton.disabled);
+    settingsBotLevelButton.textContent = vsComputer ? BOT_LEVELS[botLevelIndex] : "2 Spieler Modus";
+    botType = botLevelIndex === 4 ? "adaptive" : "manual";
+    const adaptiveEnabled = vsComputer && botType === "adaptive";
+    settingsAdaptSpeedButton.disabled = !adaptiveEnabled;
+    settingsAdaptSpeedButton.classList.toggle("button-disabled", !adaptiveEnabled);
+    settingsAdaptSpeedButton.textContent = adaptiveEnabled ? ADAPT_SPEEDS[adaptSpeedIndex].label : "—";
+    updateAdaptiveStrengthUI();
+}
+
+function updateMatchModeUI() {
+    settingsMatchButton.textContent = MATCH_OPTIONS[matchModeIndex];
+    window.othelloMatchModeIndex = matchModeIndex;
+}
+
+window.setOthelloMatchSettingsLocked = function (locked) {
+    settingsModeButton.disabled = locked;
+    settingsRulesButton.disabled = locked;
+    settingsMatchButton.disabled = locked;
+    settingsBotLevelButton.disabled = locked || !vsComputer;
+    settingsAdaptSpeedButton.disabled = locked || !vsComputer || botType !== "adaptive";
+    [settingsModeButton, settingsRulesButton, settingsMatchButton, settingsBotLevelButton, settingsAdaptSpeedButton]
+        .forEach(button => button.classList.toggle("button-disabled", button.disabled));
+};
+
+settingsStartButton.addEventListener("click", () => {
+    playSound(soundButton, 0.22);
+    if (gameStarted && !gameOver) {
+        resetGame();
+        return;
+    }
+    initGame();
+});
+settingsModeButton.addEventListener("click", () => {
+    if (gameStarted && !gameOver) return;
+    playSound(soundButton, 0.22);
+    vsComputer = !vsComputer;
+    settingsModeButton.textContent = vsComputer ? "1 Spieler" : "2 Spieler";
+    updateBotLevelUI();
+});
+settingsRulesButton.addEventListener("click", () => {
+    if (gameStarted && !gameOver) return;
+    playSound(soundButton, 0.22);
+    ruleMode = ruleMode === "standard" ? "tournament" : "standard";
+    settingsRulesButton.textContent = ruleMode === "standard" ? "Standard" : "Turnier";
+});
+settingsMatchButton.addEventListener("click", () => {
+    if (gameStarted && !gameOver) return;
+    playSound(soundButton, 0.22);
+    matchModeIndex = (matchModeIndex + 1) % MATCH_OPTIONS.length;
+    updateMatchModeUI();
+    if (typeof updateMatchInfo === "function") updateMatchInfo();
+});
+settingsBotLevelButton.addEventListener("click", () => {
+    if (gameStarted && !gameOver) return;
+    playSound(soundButton, 0.22);
+    botLevelIndex = (botLevelIndex + 1) % BOT_LEVELS.length;
+    updateBotLevelUI();
+});
+settingsAdaptSpeedButton.addEventListener("click", () => {
+    if (settingsAdaptSpeedButton.disabled || (gameStarted && !gameOver)) return;
+    playSound(soundButton, 0.22);
+    adaptSpeedIndex = (adaptSpeedIndex + 1) % ADAPT_SPEEDS.length;
+    updateBotLevelUI();
+});
+
+updateBotLevelUI();
+updateMatchModeUI();
+
 const startBtn = document.getElementById("startBtn");
 const modeBtn = document.getElementById("modeBtn");
 const rulesBtn = document.getElementById("rulesBtn");
@@ -8,6 +114,7 @@ const settingsPanel = document.getElementById("settingsPanel");
 const scoreBlackEl = document.getElementById("scoreBlack");
 const scoreWhiteEl = document.getElementById("scoreWhite");
 const statusEl = document.getElementById("status");
+const matchLineEl = document.getElementById("matchLine");
 const adaptiveStrengthPanel = document.getElementById("adaptiveStrengthPanel");
 const adaptiveStrengthValue = document.getElementById("adaptiveStrengthValue");
 const adaptiveStrengthBar = document.getElementById("adaptiveStrengthBar");
@@ -27,11 +134,35 @@ function playSound(sound, volume = 0.25) {
     sound.play().catch(() => {});
 }
 
+function getMatchMode() {
+    return Number(window.othelloMatchModeIndex) || 0;
+}
+
+function otherColor(color) {
+    return color === "black" ? "white" : "black";
+}
+
+function getBotColor() {
+    return otherColor(playerOneColor);
+}
+
+function updateMatchInfo() {
+    if (getMatchMode() === 0) {
+        matchLineEl.textContent = "Einzelrunde - Offizielle Regeln";
+        return;
+    }
+    matchLineEl.textContent = `Mehrfachrunde - Runde ${matchRound} - Match ${matchWins.playerOne}:${matchWins.playerTwo}`;
+}
+
 let board = [];
 let currentPlayer = "black";
 let gameOver = false;
 let gameStarted = false;
 let turnTransitionActive = false;
+let playerOneColor = "black";
+let matchRound = 1;
+let matchWins = { playerOne: 0, playerTwo: 0 };
+let matchInProgress = false;
 let lastMoveWasPressure = false;
 let botMoveTimer = null;
 let nextTurnTimer = null;
@@ -45,6 +176,12 @@ window.othelloPlayerProfile = createOthelloPlayerProfile();
 function initGame() {
     cancelPendingTurnTimers();
     const token = gameToken;
+    if (!matchInProgress || getMatchMode() === 0) {
+        matchInProgress = getMatchMode() > 0;
+        matchRound = 1;
+        matchWins = { playerOne: 0, playerTwo: 0 };
+        playerOneColor = "black";
+    }
     if (vsComputer && botType === "adaptive" && typeof startAdaptiveRound === "function") {
         updateAdaptiveStrengthUI(startAdaptiveRound(
             window.othelloPlayerProfile,
@@ -71,11 +208,15 @@ rulesBtn.classList.add("disabled"); // nur Regeln sperren
     renderBoard();
     updateScore();
     statusEl.textContent = "Schwarz am Zug";
-    startBtn.textContent = "Abbrechen";
+    startBtn.textContent = getMatchMode() > 0 ? "Match beenden" : "Abbrechen";
     lastMoveWasPressure = false;
 
     updateBotLevelUI();
-    if(vsComputer && currentPlayer === "white") botMove(token); // Sofort Bot wenn er anfängt
+    updateMatchInfo();
+    if (typeof window.setOthelloMatchSettingsLocked === "function") {
+        window.setOthelloMatchSettingsLocked(true);
+    }
+    if(vsComputer && currentPlayer === getBotColor()) botMove(token); // Sofort Bot wenn er anfängt
 }
 
 function cancelPendingTurnTimers() {
@@ -123,7 +264,15 @@ rulesBtn.classList.remove("disabled"); // nur Regeln wieder frei
     statusEl.textContent = "Klick 'Jetzt spielen' um zu starten";
     startBtn.textContent = "Jetzt spielen";
     lastMoveWasPressure = false;
+    matchInProgress = false;
+    matchRound = 1;
+    matchWins = { playerOne: 0, playerTwo: 0 };
+    playerOneColor = "black";
+    updateMatchInfo();
     updateBotLevelUI();
+    if (typeof window.setOthelloMatchSettingsLocked === "function") {
+        window.setOthelloMatchSettingsLocked(false);
+    }
 }
 
 function renderBoard() {
@@ -163,13 +312,13 @@ function hideValidMoveHints() {
 }
 
 function isHumanTurn() {
-    return !vsComputer || currentPlayer === "black";
+    return !vsComputer || currentPlayer === playerOneColor;
 }
 
 boardEl.tabIndex = -1;
 boardEl.addEventListener("keydown", event => {
     if (gameOver || !gameStarted || boardEl.classList.contains("disabled")) return;
-    if (vsComputer && currentPlayer === "white") return;
+    if (vsComputer && currentPlayer !== playerOneColor) return;
 
     let nextRow = keyboardRow;
     let nextCol = keyboardCol;
@@ -274,13 +423,14 @@ function nextTurn() { // NEU: Zentrale Funktion für Spielerwechsel + Bot
         renderBoard();
 
         // Wenn Bot dran ist und Spiel läuft: nach seiner Denkzeit ziehen.
-        if(vsComputer && currentPlayer === "white") {
-            const moves = getAllValidMoves("white");
+        if(vsComputer && currentPlayer === getBotColor()) {
+            const botColor = getBotColor();
+            const moves = getAllValidMoves(botColor);
             if(moves.length > 0) {
                 const thinkTime = botType === "adaptive" && typeof getAdaptiveBotThinkTime === "function"
                     ? getAdaptiveBotThinkTime()
                     : typeof getOthelloBotThinkTime === "function"
-                    ? getOthelloBotThinkTime(botLevelIndex + 1, "white")
+                    ? getOthelloBotThinkTime(botLevelIndex + 1, botColor)
                     : 300;
                 const token = gameToken;
                 botMoveTimer = setTimeout(() => {
@@ -308,18 +458,19 @@ function nextTurn() { // NEU: Zentrale Funktion für Spielerwechsel + Bot
 
 function botMove(token = gameToken) { // Bot zieht und ruft dann nextTurn
     if (token !== gameToken || !gameStarted || gameOver) return;
-    const moves = getAllValidMoves("white");
+    const botColor = getBotColor();
+    const moves = getAllValidMoves(botColor);
     if(moves.length === 0) {
         nextTurn(); // Falls doch kein Zug da ist
         return;
     }
     const m = botType === "adaptive"
-        ? getAdaptiveBotMove(board, "white", window.othelloPlayerProfile)
-        : getOthelloBotMove(botLevelIndex + 1, "white");
+        ? getAdaptiveBotMove(board, botColor, window.othelloPlayerProfile)
+        : getOthelloBotMove(botLevelIndex + 1, botColor);
     const selectedMove = m && moves.some(move => move.r === m.r && move.c === m.c)
         ? m
         : moves[Math.floor(Math.random() * moves.length)];
-    const result = makeMove(selectedMove.r, selectedMove.c, "white");
+    const result = makeMove(selectedMove.r, selectedMove.c, botColor);
     if (!result) {
         playSound(soundError, 0.22);
         scheduleNextTurn(0, token);
@@ -329,8 +480,8 @@ function botMove(token = gameToken) { // Bot zieht und ruft dann nextTurn
     updateScore();
     turnTransitionActive = true;
     renderBoard();
-    animateMove(result.move, result.flips, "white");
-    lastMoveWasPressure = getPressureState("white");
+    animateMove(result.move, result.flips, botColor);
+    lastMoveWasPressure = getPressureState(botColor);
     scheduleNextTurn(430 + result.flips.length * 65, token); // Nach der Animation ist Schwarz dran
 }
 
@@ -374,15 +525,40 @@ function endGame() {
     let winner = black > white? "Schwarz gewinnt!" : white > black? "Weiß gewinnt!" : "Unentschieden!";
     scoreBlackEl.parentElement.classList.toggle("winner", black > white);
     scoreWhiteEl.parentElement.classList.toggle("winner", white > black);
+    const roundWinnerColor = black > white ? "black" : white > black ? "white" : null;
     if (window.othelloPlayerProfile && vsComputer && botType === "adaptive") {
-        window.othelloPlayerProfile.lastResult = black > white ? "playerWin" : white > black ? "botWin" : "draw";
+        window.othelloPlayerProfile.lastResult = roundWinnerColor === null
+            ? "draw"
+            : roundWinnerColor === playerOneColor ? "playerWin" : "botWin";
+    }
+
+    if (getMatchMode() > 0 && matchInProgress) {
+        const winnerKey = roundWinnerColor === playerOneColor ? "playerOne" : "playerTwo";
+        if (roundWinnerColor) matchWins[winnerKey] += 1;
+
+        if (getMatchMode() === 1 || roundWinnerColor === null) {
+            playerOneColor = otherColor(playerOneColor);
+        } else {
+            playerOneColor = otherColor(roundWinnerColor);
+        }
+        matchRound += 1;
+        updateMatchInfo();
+        statusEl.textContent = `Runde beendet: ${winner} - Nächste Runde starten`;
+        startBtn.textContent = "Nächste Runde";
+        if (typeof window.setOthelloMatchSettingsLocked === "function") {
+            window.setOthelloMatchSettingsLocked(true);
+        }
+        return;
     }
     statusEl.textContent = `Spiel vorbei! ${winner} ${black}:${white}`;
+    if (typeof window.setOthelloMatchSettingsLocked === "function") {
+        window.setOthelloMatchSettingsLocked(false);
+    }
 }
 
 boardEl.addEventListener("click", (e) => {
     if(gameOver ||!gameStarted) return;
-    if(vsComputer && currentPlayer === "white") return; // Klick blocken wenn Bot dran
+    if(vsComputer && currentPlayer !== playerOneColor) return; // Klick blocken wenn Bot dran
 
     const cell = e.target.closest(".cell");
     if(!cell) return;
@@ -397,7 +573,7 @@ boardEl.addEventListener("click", (e) => {
     const result = makeMove(r, c, currentPlayer);
     if(result) {
         playSound(soundMove, 0.28);
-        if (vsComputer && window.othelloPlayerProfile && currentPlayer === "black") {
+        if (vsComputer && window.othelloPlayerProfile && currentPlayer === playerOneColor) {
             const learningState = { board, playerProfile: window.othelloPlayerProfile };
             const pressureForMove = learningOpponentMoves.length <= 4;
             othelloTrackPlayerMove(learningState, { r, c }, currentPlayer, pressureForMove);

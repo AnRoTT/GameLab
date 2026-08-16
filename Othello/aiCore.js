@@ -307,22 +307,75 @@ function othelloChooseMinimaxMove(state, player, depth = 3, randomness = 0, weig
     return candidates[Math.floor(Math.random() * candidates.length)].move;
 }
 
-function getOthelloDifficultyProfile(skill) {
-    const normalized = Math.max(0, Math.min(100, Number(skill) || 0)) / 100;
-    const challenge = normalized <= 0.75
-        ? 0.75 * ((normalized / 0.75) ** 2 * (3 - 2 * (normalized / 0.75)))
-        : 0.75 + ((normalized - 0.75) / 0.25) ** 1.8 * 0.25;
+const OTHELLO_MANUAL_PROFILES = Object.freeze({
+    1: { strength: 0.51 },
+    2: { strength: 0.65 },
+    3: { strength: 0.70 },
+    4: { strength: 0.88 },
+    reference: { strength: 1.0 }
+});
+const othelloManualOverrides = Object.create(null);
+try {
+    const storedOthelloProfiles = JSON.parse(localStorage.getItem("gamelab-othello-manual-profiles") || "{}");
+    if (storedOthelloProfiles && typeof storedOthelloProfiles === "object") {
+        Object.entries(storedOthelloProfiles).forEach(([level, value]) => {
+            if (["1", "2", "3", "4"].includes(level) && Number.isFinite(Number(value))) {
+                othelloManualOverrides[level] = Math.max(0, Math.min(0.999, Number(value)));
+            }
+        });
+    }
+} catch {}
 
-    return {
-        challenge,
-        randomness: Math.max(0.03, 0.38 - challenge * 0.34),
-        tacticalAccuracy: Math.min(0.98, 0.32 + challenge * 0.64),
-        position: 0.8 + challenge * 1.0,
-        mobility: 5 + challenge * 14,
-        pieces: 0.5 + challenge * 1.5,
-        maxDepth: 4,
-        thinkTime: 300 + challenge * 900
+function getOthelloManualProfile(level = 1) {
+    const numericLevel = Number(level);
+    const profileKey = level === "reference" || level === "referenz"
+        ? "reference"
+        : (Number.isInteger(numericLevel) && OTHELLO_MANUAL_PROFILES[numericLevel] ? numericLevel : 1);
+    const base = OTHELLO_MANUAL_PROFILES[profileKey];
+    const strength = profileKey === "reference" ? base.strength : othelloManualOverrides[profileKey] ?? base.strength;
+    const scale = Math.max(0, Math.min(1, Number(strength) || 0));
+    const difficulty = window.SharedDifficulty.createProfile({
+        mode: "manual",
+        strength: scale,
+        minSearchChance: 0.08,
+        maxSearchChance: 1.0,
+        minRandomness: 0,
+        maxRandomness: 0.88,
+        minErrorRate: 0,
+        maxErrorRate: 0.34,
+        searchConfig: {
+            supportsMinimax: true,
+            minDepth: 0,
+            maxDepth: 4,
+            fixedDepth: null
+        },
+        habitInfluence: 0.5
+    });
+    const curve = difficulty.curve;
+    const weights = {
+        position: curve,
+        mobility: curve * 12,
+        pieces: curve * 2
     };
+    return {
+        ...base,
+        level: profileKey,
+        ...difficulty,
+        strength: scale,
+        curve,
+        learnedUsage: difficulty.habitInfluence,
+        cornerChance: difficulty.tacticalAccuracy * curve,
+        edgeChance: 0.25 + difficulty.tacticalAccuracy * curve * 0.45,
+        weights
+    };
+}
+
+function setOthelloManualProfileStrength(level, value) {
+    const key = String(level);
+    if (key === "reference") return 1;
+    othelloManualOverrides[key] = Math.max(0, Math.min(0.999, Number(value) || 0));
+    try { localStorage.setItem("gamelab-othello-manual-profiles", JSON.stringify(othelloManualOverrides)); } catch {}
+    return othelloManualOverrides[key];
 }
 
 window.OthelloAICore = {
@@ -341,7 +394,8 @@ window.OthelloAICore = {
     OTHELLO_POSITION_MATRIX,
     othelloEvaluateState,
     othelloChooseMinimaxMove,
-    getDifficultyProfile: getOthelloDifficultyProfile,
+    getManualProfile: getOthelloManualProfile,
+    setManualProfileStrength: setOthelloManualProfileStrength,
     getAllValidMovesForState,
     isValidMoveState,
     getAllValidMoves: getAllValidMovesForState,

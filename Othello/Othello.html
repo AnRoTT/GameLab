@@ -13,7 +13,7 @@
 <div id="backIcon">⟵ Menü</div>
 
 <div class="container">
-    <div class="title">Othello</div>
+    <div class="title game-title">Othello</div>
 
     <!-- Einstellungen -->
     <div id="settingsPanel" class="menu">
@@ -24,6 +24,10 @@
         <div class="cycle-group setting-row">
             <div class="label">Regelmodus</div>
             <button id="rulesBtn" class="cycle-button">Standard</button>
+        </div>
+        <div class="cycle-group setting-row">
+            <div class="label">Match</div>
+            <button id="matchBtn" class="cycle-button">Einzelrunde</button>
         </div>
         <div id="botOpponentRow" class="cycle-group cycle-group-double setting-row">
             <div class="label">Gegner:</div>
@@ -36,16 +40,17 @@
 <!-- NEU: Infoleiste - die einzige mit status/score -->
 <div id="gameInfo" class="game-info">
     <div id="status" class="status">Wähle den Modus und starte</div> <!-- DIESE ZEILE NEU -->
+    <div id="matchLine" class="match-line">Einzelrunde - Offizielle Regeln</div>
     <div class="score-bar">
         <span>Schwarz: <span id="scoreBlack">2</span></span>
         <span>Weiß: <span id="scoreWhite">2</span></span>
     </div>
     <div id="adaptiveStrengthPanel" class="adaptive-strength" hidden>
-        <span class="adaptive-strength-label">Botstärke</span>
-        <span class="adaptive-strength-track" aria-label="Botstärke 50 von 100">
+        <span class="adaptive-strength-label">Adaptive Stärke</span>
+        <span class="adaptive-strength-track" aria-label="Adaptive Stärke 35 von 100">
             <span id="adaptiveStrengthBar"></span>
         </span>
-        <span id="adaptiveStrengthValue" class="adaptive-strength-value">50%</span>
+        <span id="adaptiveStrengthValue" class="adaptive-strength-value">35%</span>
     </div>
 </div>
 
@@ -54,13 +59,13 @@
         <div id="board" class="board disabled"></div>
     </div>
 
-    <footer class="footer">Othello | by Andreas Rollinger | 2026.08.08</footer>
+    <footer class="footer">Andis Game Foundry | Othello | by Andreas Rollinger | 2026.08.16</footer>
 </div>
 
+<script src="../Shared/difficultyCore.js"></script>
 <script src="aiCore.js"></script>
 <script src="manuellBot.js"></script>
 <script src="adaptiveBot.js"></script>
-<script src="settings.js"></script>
 <script src="game.js"></script>
 <script>
     const backIcon = document.getElementById("backIcon");

@@ -1,23 +1,25 @@
 const OthelloBotCore = window.OthelloAICore;
 
-const MANUAL_BOT_WEIGHTS = {
-    1: { position: 0, mobility: 0, pieces: 0 },
-    2: { position: 1, mobility: 0, pieces: 0 },
-    3: { position: 1, mobility: 6, pieces: 1 },
-    4: { position: 1, mobility: 12, pieces: 2 }
-};
+const othelloBotDiagnostics = Object.create(null);
+function resetOthelloBotDiagnostics() {
+    Object.keys(othelloBotDiagnostics).forEach(key => delete othelloBotDiagnostics[key]);
+}
+function recordOthelloBotDiagnostic(level, config, branch) {
+    const key = String(level);
+    const entry = othelloBotDiagnostics[key] || (othelloBotDiagnostics[key] = {
+        calls: 0, minimax: 0, random: 0, learned: 0, edge: 0, corner: 0,
+        strength: config.strength, curve: config.curve, depth: config.depth,
+        searchChance: config.searchChance, randomChance: config.randomChance,
+        errorRate: config.errorRate
+    });
+    entry.calls += 1;
+    entry[branch] = (entry[branch] || 0) + 1;
+}
 
 // Die Abstufung folgt bewusst der manuellen Bot-Reihe.
 // Das Premium-Profil bleibt davon getrennt und wird später adaptiv gesteuert.
-const MANUAL_BOT_CONFIG = {
-    1: { minimaxDepth: 0, learnedUsage: 0.10, errorChance: 0.35, randomChance: 0.75 },
-    2: { minimaxDepth: 1, learnedUsage: 0.20, errorChance: 0.25, randomChance: 0.40 },
-    3: { minimaxDepth: 2, learnedUsage: 0.25, errorChance: 0.12, randomChance: 0.10 },
-    4: { minimaxDepth: 3, learnedUsage: 0.10, errorChance: 0.08, randomChance: 0.05 }
-};
-
-function getLearnedProfileScore(move) {
-    const profile = window.othelloPlayerProfile;
+function getLearnedProfileScore(move, playerProfile = window.othelloPlayerProfile) {
+    const profile = playerProfile;
     if (!profile) return 0;
 
     const index = move.r * 8 + move.c;
@@ -29,22 +31,27 @@ function getLearnedProfileScore(move) {
         + (position.zones[zone] || 0) * 0.25;
 }
 
-function chooseLearnedMove(moves, influence = 1) {
+function chooseLearnedMove(moves, influence = 1, playerProfile = window.othelloPlayerProfile) {
     if (!moves.length) return null;
 
     // Kleine Zufallsstreuung verhindert, dass der Bot immer exakt gleich spielt.
     const scored = moves.map(move => ({
         move,
-        score: getLearnedProfileScore(move) * influence + Math.random() * 0.8
+        score: getLearnedProfileScore(move, playerProfile) * influence + Math.random() * 0.8
     })).sort((a, b) => b.score - a.score);
 
-    const candidateCount = Math.max(1, Math.min(4, Math.ceil(moves.length * (1 - influence * 0.7))));
+    const candidateCount = influence >= 0.95
+        ? 1
+        : Math.max(1, Math.min(4, Math.ceil(moves.length * (1 - influence * 0.7))));
     return scored[Math.floor(Math.random() * candidateCount)].move;
 }
 
-function getOthelloBotMove(level, player = "white") {
+function getOthelloBotMove(level, player = "white", stateBoard = null, playerProfile = null) {
     const core = OthelloBotCore;
-    const moves = getAllValidMoves(player);
+    const activeBoard = stateBoard || (typeof board !== "undefined" ? board : null);
+    if (!activeBoard) return null;
+    const effectiveProfile = stateBoard ? playerProfile : window.othelloPlayerProfile;
+    const moves = core.getAllValidMovesForState(player, activeBoard);
     if (!moves.length) return null;
 
     const isCorner = core.othelloIsCornerMove;
@@ -52,69 +59,62 @@ function getOthelloBotMove(level, player = "white") {
     const applyMove = (state, move, p) => core.othelloApplyMoveToState(state, move, p);
     const validMovesForState = (p, state) => core.getAllValidMovesForState(p, state);
 
-    const config = MANUAL_BOT_CONFIG[Math.max(1, Math.min(4, level))];
-
-    // Level 1: lernt bereits, setzt das Profil aber nur sehr schwach ein.
-    if (level <= 1) {
-        return Math.random() < config.learnedUsage
-            ? chooseLearnedMove(moves, 0.2)
-            : moves[Math.floor(Math.random() * moves.length)];
-    }
+    const config = OthelloBotCore.getManualProfile(level);
+    const strategicMove = depth => core.othelloChooseMinimaxMove(
+        activeBoard,
+        player,
+        depth,
+        config.randomChance * 35,
+        config.weights
+    );
 
     const randomMove = () => moves[Math.floor(Math.random() * moves.length)];
     const corners = moves.filter(isCorner);
-    // Eine Ecke ist auf allen höheren Stufen grundsätzlich der beste Zug.
-    if (corners.length) {
-        return corners[Math.floor(Math.random() * corners.length)];
+
+    // Minimax ist immer der erste Entscheidungszweig. Die Difficulty-Kurve
+    // steuert nur, ob die Suche erfolgreich verwendet wird; taktische,
+    // zufällige und gelernte Fallbacks kommen erst danach.
+    if (
+        config.depth > 0 &&
+        Math.random() >= config.errorRate &&
+        Math.random() < config.searchChance
+    ) {
+        const minimaxMove = strategicMove(config.depth);
+        if (minimaxMove) {
+            recordOthelloBotDiagnostic(level, config, "minimax");
+            return minimaxMove;
+        }
     }
 
-    const strategicMove = depth => core.othelloChooseMinimaxMove(
-        board,
-        player,
-        depth,
-        depth === 1 ? 18 : depth === 2 ? 12 : 10,
-        MANUAL_BOT_WEIGHTS[level] || MANUAL_BOT_WEIGHTS[4]
-    );
-
-    // Level 2: Minimax-Tiefe 1 plus einfache Positionsregeln.
-    if (level === 2) {
-        if (Math.random() < config.learnedUsage) return chooseLearnedMove(moves, 0.45);
-        if (Math.random() > config.errorChance) {
-            const move = strategicMove(config.minimaxDepth);
-            if (move) return move;
-        }
-        const edges = moves.filter(isEdge);
-        if (edges.length && Math.random() < 0.65) {
-            return edges[Math.floor(Math.random() * edges.length)];
-        }
+    if (Math.random() < config.randomChance) {
+        recordOthelloBotDiagnostic(level, config, "random");
         return randomMove();
     }
 
-    // Level 3: Minimax-Tiefe 2; das Profil wird bei einem Teil der Züge
-    // als menschliche Präferenz zugemischt.
-    if (level === 3) {
-        if (Math.random() < config.learnedUsage) {
-            return chooseLearnedMove(moves, 0.65);
-        }
-        if (Math.random() < config.errorChance) {
-            return chooseLearnedMove(moves, 0.35) || randomMove();
-        }
-        const move = strategicMove(config.minimaxDepth);
-        if (move) return move;
-        return randomMove();
+    if (effectiveProfile && Math.random() < config.learnedUsage) {
+        const learnedInfluence = 0.2 + config.curve * 0.6;
+        recordOthelloBotDiagnostic(level, config, "learned");
+        return chooseLearnedMove(moves, learnedInfluence, effectiveProfile);
     }
 
-    // Level 4: Minimax bleibt führend; das Spielerprofil beeinflusst die
-    // gelegentlichen unperfekten Züge und macht sie persönlicher.
-    if (Math.random() < config.errorChance) {
-        return Math.random() < config.learnedUsage / Math.max(config.errorChance, 0.01)
-            ? chooseLearnedMove(moves, 0.8) || randomMove()
-            : randomMove();
+    const edges = moves.filter(isEdge);
+    if (edges.length && Math.random() < config.edgeChance) {
+        recordOthelloBotDiagnostic(level, config, "edge");
+        return edges[Math.floor(Math.random() * edges.length)];
     }
-
-    const minimaxMove = strategicMove(config.minimaxDepth);
-    if (minimaxMove) return minimaxMove;
+    if (corners.length && Math.random() < config.cornerChance) {
+        const cornerIndex = config.randomChance === 0
+            ? 0
+            : Math.floor(Math.random() * corners.length);
+        recordOthelloBotDiagnostic(level, config, "corner");
+        return corners[cornerIndex];
+    }
+    recordOthelloBotDiagnostic(level, config, "random");
     return randomMove();
+}
+
+function getOthelloBotMoveForState({ board, level = 1, player = "white", playerProfile = null }) {
+    return getOthelloBotMove(level, player, board, playerProfile);
 }
 
 function getOthelloBotThinkTime(level, player = "white") {
@@ -141,3 +141,9 @@ function getOthelloBotThinkTime(level, player = "white") {
         Math.min(max + 180, min + Math.random() * (max - min) + positionComplexity + naturalVariation + occasionalHesitation)
     ));
 }
+
+// Public adapter API for the game and the Bot-Labor.
+window.getOthelloBotMoveForState = getOthelloBotMoveForState;
+window.resetOthelloBotDiagnostics = resetOthelloBotDiagnostics;
+window.getOthelloBotDiagnostics = () => JSON.parse(JSON.stringify(othelloBotDiagnostics));
+window.getOthelloBotThinkTime = getOthelloBotThinkTime;

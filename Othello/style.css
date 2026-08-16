@@ -101,6 +101,15 @@
     }
 }
 
+.title.game-title {
+    margin: 0 0 8px;
+    font-size: 2rem;
+    line-height: 1.2;
+    font-weight: 400;
+    letter-spacing: normal;
+    text-shadow: 0 0 15px var(--accent);
+}
+
 .piece.black {
     background: radial-gradient(circle at 30% 30%, #555, #000);
 }
@@ -126,7 +135,7 @@
 .game-info {
     width: min(100%, 360px);
     max-width: 100%;
-    min-height: 120px;
+    min-height: 166px;
     box-sizing: border-box;
     margin: 0 auto 10px auto;
     padding: 10px 16px;
@@ -146,6 +155,16 @@
     margin-bottom: 6px;
     color: var(--text-main);
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.match-line {
+    min-height: 20px;
+    margin: 0 0 7px;
+    color: var(--text-muted);
+    font-size: .78rem;
+    font-weight: 600;
+    line-height: 20px;
+    white-space: nowrap;
 }
 
 .score-bar {
@@ -312,7 +331,8 @@
 }
 
 .adaptive-strength[hidden] {
-    display: none;
+    display: flex;
+    visibility: hidden;
 }
 
 .adaptive-strength-label {
@@ -337,7 +357,7 @@
     height: 8px;
     overflow: hidden;
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.16);
+    background: #10131e;
 }
 
 .adaptive-strength-track > span {
@@ -345,7 +365,7 @@
     width: 50%;
     height: 100%;
     border-radius: inherit;
-    background: linear-gradient(90deg, #3d7cff, #78a5ff);
+    background: linear-gradient(90deg, #4f8cff, #8b5cf6);
     transition: width 350ms ease;
 }
 

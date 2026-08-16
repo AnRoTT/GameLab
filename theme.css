@@ -125,6 +125,18 @@ button {
     text-align: center;
 }
 
+/* Einheitliche Spieltitel; einzelne Spiele koennen nur das Layout, nicht die Typografie, erweitern. */
+.game-title {
+    margin: 0 0 8px;
+    font-size: 2rem;
+    line-height: 1.2;
+    font-weight: 400;
+    letter-spacing: normal;
+    color: var(--text-main);
+    text-align: center;
+    text-shadow: 0 0 15px var(--accent);
+}
+
 .subtitle {
     margin: 0 0 28px;
     color: var(--text-muted);
