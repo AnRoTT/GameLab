@@ -393,7 +393,7 @@
         else if (gameOver) startGame();
         else abortMatch();
     });
-    [modeButton, botLevelButton, adaptiveButton, matchButton, startButton, document.getElementById("helpIcon"), document.getElementById("backIcon")]
+    [modeButton, botLevelButton, adaptiveButton, matchButton, startButton]
         .filter(Boolean)
         .forEach((element) => element.addEventListener("click", () => playSound(soundButton, 0.22)));
     document.addEventListener("keydown", (event) => {

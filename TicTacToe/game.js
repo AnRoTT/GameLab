@@ -549,6 +549,7 @@ reset.addEventListener('click', () => {
 const backBtn = document.getElementById("backIcon");
 if(backBtn) {
     backBtn.addEventListener('click', () => {
+        playUiClick(0.22);
         setTimeout(() => {
             window.location.href = "../index.html?menu=1";
         }, 100);
