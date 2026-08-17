@@ -34,7 +34,7 @@
         sound.preload = "auto";
     });
 
-    const MATCH_OPTIONS = ["Einzelrunde", "Mehrfachrunde - Abwechselnd", "Mehrfachrunde - Verlierer beginnt"];
+    const MATCH_OPTIONS = ["Einzelrunde", "Abwechselnd", "Verlierer beginnt"];
     let onePlayer = true;
     let board = Array(16).fill(null);
     let remainingPieces = Array.from({ length: 16 }, (_, index) => index);
@@ -209,7 +209,7 @@
         startButton.classList.toggle("button-disabled", startButton.disabled);
         matchLineElement.textContent = matchModeIndex === 0
             ? "Einzelrunde - Offizielle Regeln"
-            : `Mehrfachrunde - ${matchModeIndex === 1 ? "Abwechselnd" : "Verlierer beginnt"} - Match ${scores[0]}:${scores[1]}`;
+            : `${matchModeIndex === 1 ? "Abwechselnd" : "Verlierer beginnt"} - Match ${scores[0]}:${scores[1]}`;
         updateAdaptiveUI();
     }
 

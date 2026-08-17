@@ -71,7 +71,7 @@ const nextRoundBtnEl = document.getElementById("next-round-btn");
 const endMatchButton = document.getElementById("endMatchButton");
 
 const MODE_OPTIONS = ["2 Spieler", "1 Spieler"];
-const MATCH_OPTIONS = ["Einzelrunde", "Mehrfachrunde - Abwechselnd", "Mehrfachrunde - Verlierer beginnt"];
+const MATCH_OPTIONS = ["Einzelrunde", "Abwechselnd", "Verlierer beginnt"];
 const BOT_LEVELS = ["Anfänger", "Hobbyspieler", "Vereinsspieler", "Meister", "Adaptiv"];
 const BOT_LEVEL_KEYS = ["anfänger", "hobby", "verein", "meister", "adaptiv"];
 const ADAPT_SPEED_OPTIONS = ["Langsam", "Normal", "Schnell"];
@@ -392,7 +392,7 @@ function playerName(player) {
 function updateUIStatus(message, keepLine2 = false) {
     matchLineEl.textContent = matchModeIndex === 0
         ? "Einzelrunde - Offizielle Regeln"
-        : `Mehrfachrunde - ${matchModeIndex === 1 ? "Abwechselnd" : "Verlierer beginnt"} - Match ${scores[PLAYER_RED]}:${scores[PLAYER_YELLOW]}`;
+        : `${matchModeIndex === 1 ? "Abwechselnd" : "Verlierer beginnt"} - Match ${scores[PLAYER_RED]}:${scores[PLAYER_YELLOW]}`;
     // A completed round owns the status line. No later refresh may make it
     // look like the next turn has already started.
     if (gameOver || roundResultProcessed) {

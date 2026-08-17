@@ -5,7 +5,7 @@ const ADAPT_SPEEDS = [
     { key: "fast", label: "Schnell" }
 ];
 const BOT_LEVELS = ["Anfänger", "Hobbyspieler", "Vereinsspieler", "Meister", "Adaptiv"];
-const MATCH_OPTIONS = ["Einzelrunde", "Mehrfachrunde - Abwechselnd", "Mehrfachrunde - Verlierer beginnt"];
+const MATCH_OPTIONS = ["Einzelrunde", "Abwechselnd", "Verlierer beginnt"];
 
 let vsComputer = true;
 let botType = "adaptive";
@@ -151,7 +151,8 @@ function updateMatchInfo() {
         matchLineEl.textContent = "Einzelrunde - Offizielle Regeln";
         return;
     }
-    matchLineEl.textContent = `Mehrfachrunde - Runde ${matchRound} - Match ${matchWins.playerOne}:${matchWins.playerTwo}`;
+    const matchStartMode = getMatchMode() === 1 ? "Abwechselnd" : "Verlierer beginnt";
+    matchLineEl.textContent = `${matchStartMode} - Runde ${matchRound} - Match ${matchWins.playerOne}:${matchWins.playerTwo}`;
 }
 
 let board = [];
