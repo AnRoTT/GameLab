@@ -45,7 +45,15 @@
         const botName = document.body.dataset.adaptiveBot;
         window[botName]?.resetForLab?.(35);
         window[botName]?.clearPersistentState?.(35);
+        const profileCore = botName === "ConnectFourAdaptiveBot" ? window.ConnectFourAICore
+            : botName === "OthelloAdaptiveBot" ? window.OthelloAICore
+            : botName === "QuartoAdaptiveBot" ? window.QuartoAICore
+            : null;
+        profileCore?.clearPlayerProfile?.();
         window.updateTicTacToeAdaptiveStrengthUI?.(35);
+        window.updateAdaptiveStrengthUI?.();
+        window.updateQuartoAdaptiveStrengthUI?.();
+        window.updateOthelloAdaptiveStrengthUI?.(35);
         document.getElementById("resetConfirm")?.setAttribute("hidden", "");
     });
 })();

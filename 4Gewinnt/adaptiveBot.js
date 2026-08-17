@@ -36,6 +36,30 @@ var adaptiveAI = {
     mistakeChance: 0.12,
     creativity: 0.42
 };
+const ADAPTIVE_STORAGE_KEY = "andis-game-foundry-4gewinnt-adaptive";
+
+function saveAdaptivePersistentState() {
+    try {
+        localStorage.setItem(ADAPTIVE_STORAGE_KEY, JSON.stringify({
+            adaptiveSkill, adaptiveMomentum, adaptiveMoveCounter, adaptiveRoundDelta,
+            adaptiveLearn, adaptiveAI
+        }));
+    } catch (_) {}
+}
+
+function loadAdaptivePersistentState() {
+    try {
+        const stored = JSON.parse(localStorage.getItem(ADAPTIVE_STORAGE_KEY) || "null");
+        if (!stored) return;
+        if (Number.isFinite(stored.adaptiveSkill)) adaptiveSkill = Math.max(1, Math.min(100, stored.adaptiveSkill));
+        if (Number.isFinite(stored.adaptiveMomentum)) adaptiveMomentum = stored.adaptiveMomentum;
+        if (Number.isFinite(stored.adaptiveMoveCounter)) adaptiveMoveCounter = stored.adaptiveMoveCounter;
+        if (Number.isFinite(stored.adaptiveRoundDelta)) adaptiveRoundDelta = stored.adaptiveRoundDelta;
+        if (stored.adaptiveLearn && typeof stored.adaptiveLearn === "object") adaptiveLearn = stored.adaptiveLearn;
+        if (stored.adaptiveAI && typeof stored.adaptiveAI === "object") adaptiveAI = stored.adaptiveAI;
+    } catch (_) {}
+}
+loadAdaptivePersistentState();
 
 // Fallbacks for the isolated BotLab context. The normal game still provides
 // these constants through game.js.
@@ -136,7 +160,6 @@ function getAdaptiveBotSkillBand() {
 }
 
 function resetAdaptiveState() {
-    adaptiveSkill = 35;
     adaptiveMomentum = 0;
     adaptiveMoveCounter = 0;
     adaptiveRoundDelta = 0;
@@ -164,6 +187,7 @@ function resetAdaptiveState() {
             tempo: 0
         }
     };
+    adaptiveLearn.skill = adaptiveSkill;
     adaptiveAI = {
         accuracy: 0.60,
         tactics: 0.52,
@@ -779,12 +803,19 @@ function finalizeAdaptiveRound(resultSign) {
     if (typeof updateAdaptiveStrengthUI === "function") updateAdaptiveStrengthUI();
     adaptiveMoveCounter = 0;
     adaptiveRoundDelta = 0;
+    saveAdaptivePersistentState();
 }
 
 function resetAdaptiveForLab(initialSkill = 35) {
     resetAdaptiveState();
     adaptiveSkill = Math.max(1, Math.min(100, Number(initialSkill) || 35));
     adaptiveLearn.skill = adaptiveSkill;
+    saveAdaptivePersistentState();
+}
+
+function clearAdaptivePersistentState(initialSkill = 35) {
+    try { localStorage.removeItem(ADAPTIVE_STORAGE_KEY); } catch (_) {}
+    resetAdaptiveForLab(initialSkill);
 }
 
 function getAdaptiveMoveForLab(testBoard) {
@@ -798,6 +829,7 @@ function getAdaptiveMoveForLab(testBoard) {
 
 function recordAdaptiveLabResult(result) {
     finalizeAdaptiveRound(result === "playerWin" ? 1 : result === "botWin" ? -1 : 0);
+    saveAdaptivePersistentState();
     return Math.round(adaptiveSkill);
 }
 
@@ -805,6 +837,7 @@ window.ConnectFourAdaptiveBot = {
     getMove: getAdaptiveMoveForLab,
     getSkill: () => Math.round(adaptiveSkill),
     resetForLab: resetAdaptiveForLab,
+    clearPersistentState: clearAdaptivePersistentState,
     recordLabResult: recordAdaptiveLabResult
 };
 

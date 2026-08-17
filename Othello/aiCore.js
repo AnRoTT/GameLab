@@ -15,8 +15,19 @@ const OTHELLO_POSITION_MATRIX = [
     [120, -35, 20, 8, 8, 20, -35, 120]
 ];
 
+const OTHELLO_PLAYER_PROFILE_KEY = "andis-game-foundry-othello-player-profile";
+function saveOthelloPlayerProfile(profile) { try { localStorage.setItem(OTHELLO_PLAYER_PROFILE_KEY, JSON.stringify(profile)); } catch (_) {} }
+function clearOthelloPlayerProfile(profile) { try { localStorage.removeItem(OTHELLO_PLAYER_PROFILE_KEY); } catch (_) {} const fresh = createOthelloPlayerProfile(); Object.keys(profile).forEach((key) => { profile[key] = fresh[key]; }); }
+function loadOthelloPlayerProfile(profile) {
+    try {
+        const stored = JSON.parse(localStorage.getItem(OTHELLO_PLAYER_PROFILE_KEY) || "null");
+        if (stored && typeof stored === "object") Object.keys(profile).forEach((key) => { if (key in stored) profile[key] = stored[key]; });
+    } catch (_) {}
+    return profile;
+}
+
 function createOthelloPlayerProfile() {
-    return {
+    return loadOthelloPlayerProfile({
         gamesPlayed: 0,
         movesPlayed: 0,
         opening: { center: 0, corner: 0, edge: 0 },
@@ -56,7 +67,7 @@ function createOthelloPlayerProfile() {
             midgame: 0,
             endgame: 0
         }
-    };
+    });
 }
 
 function getOthelloZone(r, c) {
@@ -89,6 +100,7 @@ function othelloTrackPlayerMove(state, move, player, isPressureMove = false) {
     }
 
     if (isPressureMove) profile.pressure.underPressureMoves += 1;
+    saveOthelloPlayerProfile(profile);
 }
 
 function othelloRecordMistake(state, kind) {
@@ -96,6 +108,7 @@ function othelloRecordMistake(state, kind) {
     if (kind === "win") state.playerProfile.mistakes.missedWins += 1;
     if (kind === "block") state.playerProfile.mistakes.missedBlocks += 1;
     if (kind === "pressure") state.playerProfile.pressure.pressureMistakes += 1;
+    saveOthelloPlayerProfile(state.playerProfile);
 }
 
 function othelloTrackMoveQuality(state, move, player, beforeBoard, beforePlayerMoves, beforeOpponentMoves) {
@@ -112,6 +125,7 @@ function othelloTrackMoveQuality(state, move, player, beforeBoard, beforePlayerM
     profile.mobility.movesAfter += afterOpponentMoves.length;
     if (afterOpponentMoves.length < beforeOpponentMoves.length) profile.mobility.restrictedOpponentMoves += 1;
     if (afterOpponentMoves.length > beforeOpponentMoves.length) profile.mobility.openedOpponentMoves += 1;
+    saveOthelloPlayerProfile(profile);
 
     const flippedCount = state.board.flat().filter(cell => cell === player).length
         - beforeBoard.flat().filter(cell => cell === player).length;
@@ -396,6 +410,7 @@ window.OthelloAICore = {
     othelloChooseMinimaxMove,
     getManualProfile: getOthelloManualProfile,
     setManualProfileStrength: setOthelloManualProfileStrength,
+    clearPlayerProfile: () => clearOthelloPlayerProfile(window.othelloPlayerProfile),
     getAllValidMovesForState,
     isValidMoveState,
     getAllValidMoves: getAllValidMovesForState,

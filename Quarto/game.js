@@ -69,6 +69,7 @@
         adaptiveStrengthFill.style.width = `${skill}%`;
         adaptiveStrengthValue.textContent = `${skill}%`;
     }
+    window.updateQuartoAdaptiveStrengthUI = updateAdaptiveUI;
 
     function pieceClasses(piece) {
         return [

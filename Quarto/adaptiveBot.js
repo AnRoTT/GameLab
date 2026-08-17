@@ -11,10 +11,24 @@
     let speed = "normal";
     let pendingResult = null;
     let roundSnapshot = null;
+    const STORAGE_KEY = "andis-game-foundry-quarto-adaptive";
 
     function clamp(value, min, max) {
         return Math.max(min, Math.min(max, value));
     }
+
+    function savePersistentState() {
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ skill, speed })); } catch (_) {}
+    }
+
+    function loadPersistentState() {
+        try {
+            const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+            if (stored && Number.isFinite(stored.skill)) skill = clamp(stored.skill, 1, 100);
+            if (stored && SPEED_FACTORS[stored.speed]) speed = stored.speed;
+        } catch (_) {}
+    }
+    loadPersistentState();
 
     function smoothstep(value) {
         const t = clamp(value, 0, 1);
@@ -90,6 +104,7 @@
 
     function setAdaptSpeed(nextSpeed = "normal") {
         speed = SPEED_FACTORS[nextSpeed] ? nextSpeed : "normal";
+        savePersistentState();
     }
 
     function getAdaptSpeed() {
@@ -163,6 +178,7 @@
         const lowerSkillBoost = 1.25 - getAdaptiveCurve(skill).challenge * 0.25;
         const limitedAdjustment = limitAdaptiveAdjustment(adjustment * factor * lowerSkillBoost);
         skill = clamp(skill + limitedAdjustment, 1, 100);
+        savePersistentState();
         fadeProfile(profile);
         pendingResult = null;
     }
@@ -198,6 +214,12 @@
         speed = "normal";
         pendingResult = null;
         roundSnapshot = null;
+        savePersistentState();
+    }
+
+    function clearPersistentState(initialSkill = 35) {
+        try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
+        resetForLab(initialSkill);
     }
 
     function recordLabResult(result, opponentPerformance = 50) {
@@ -211,6 +233,7 @@
         const lowerSkillBoost = 1.25 - getAdaptiveCurve(skill).challenge * 0.25;
         const limitedAdjustment = limitAdaptiveAdjustment(adjustment * factor * lowerSkillBoost);
         skill = clamp(skill + limitedAdjustment, 1, 100);
+        savePersistentState();
         return getAdaptiveSkill();
     }
 
@@ -291,6 +314,7 @@
         recordRoundResult,
         cancelRound,
         resetForLab,
+        clearPersistentState,
         recordLabResult,
         setAdaptSpeed,
         getAdaptSpeed,

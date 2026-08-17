@@ -1,6 +1,19 @@
 const OthelloAdaptiveCore = window.OthelloAICore;
 
 let adaptiveStrength = 35;
+const ADAPTIVE_STORAGE_KEY = "andis-game-foundry-othello-adaptive";
+
+function saveAdaptivePersistentState() {
+    try { localStorage.setItem(ADAPTIVE_STORAGE_KEY, JSON.stringify({ adaptiveStrength })); } catch (_) {}
+}
+
+function loadAdaptivePersistentState() {
+    try {
+        const stored = JSON.parse(localStorage.getItem(ADAPTIVE_STORAGE_KEY) || "null");
+        if (stored && Number.isFinite(stored.adaptiveStrength)) adaptiveStrength = Math.max(1, Math.min(100, stored.adaptiveStrength));
+    } catch (_) {}
+}
+loadAdaptivePersistentState();
 
 function calculatePlayerPerformance(profile) {
     if (!profile) return 50;
@@ -60,6 +73,7 @@ function startAdaptiveRound(profile, speed = "normal") {
     const lowerSkillBoost = 1.25 - getAdaptiveCurve(adaptiveStrength).challenge * 0.25;
     const scaledAdjustment = Math.max(-6, Math.min(6, adjustment * speedFactor * lowerSkillBoost));
     adaptiveStrength = Math.max(1, Math.min(100, adaptiveStrength + scaledAdjustment));
+    saveAdaptivePersistentState();
     return adaptiveStrength;
 }
 
@@ -138,6 +152,12 @@ function getAdaptiveBotThinkTime() {
 
 function resetAdaptiveForLab(initialSkill = 35) {
     adaptiveStrength = Math.max(1, Math.min(100, Number(initialSkill) || 35));
+    saveAdaptivePersistentState();
+}
+
+function clearAdaptivePersistentState(initialSkill = 35) {
+    try { localStorage.removeItem(ADAPTIVE_STORAGE_KEY); } catch (_) {}
+    resetAdaptiveForLab(initialSkill);
 }
 
 function recordAdaptiveLabResult(result, opponentPerformance = 50) {
@@ -148,6 +168,7 @@ function recordAdaptiveLabResult(result, opponentPerformance = 50) {
     if (result === "draw") adjustment = (performance - 50) * 0.02;
     const lowerSkillBoost = 1.25 - getAdaptiveCurve(adaptiveStrength).challenge * 0.25;
     adaptiveStrength = Math.max(1, Math.min(100, adaptiveStrength + adjustment * lowerSkillBoost));
+    saveAdaptivePersistentState();
     return Math.round(adaptiveStrength);
 }
 
@@ -155,5 +176,6 @@ window.OthelloAdaptiveBot = {
     getBotMove: getAdaptiveBotMove,
     getSkill: getAdaptiveStrength,
     resetForLab: resetAdaptiveForLab,
+    clearPersistentState: clearAdaptivePersistentState,
     recordLabResult: recordAdaptiveLabResult
 };

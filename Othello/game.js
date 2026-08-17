@@ -32,6 +32,7 @@ function updateAdaptiveStrengthUI(strength = getAdaptiveStrength()) {
     settingsStrengthValue.textContent = `${Math.round(strength)}%`;
     settingsStrengthBar.style.width = `${Math.max(1, Math.min(100, strength))}%`;
 }
+window.updateOthelloAdaptiveStrengthUI = updateAdaptiveStrengthUI;
 
 function updateBotLevelUI() {
     settingsOpponentRow.classList.remove("disabled");

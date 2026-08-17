@@ -102,8 +102,9 @@
         }).length;
     }
 
+    const PLAYER_PROFILE_KEY = "andis-game-foundry-quarto-player-profile";
     function createPlayerProfile() {
-        return {
+        const profile = {
             totalMoves: 0,
             selectionCount: 0,
             selectedPieces: Array(PIECE_COUNT).fill(0),
@@ -121,7 +122,14 @@
             },
             observationReady: false
         };
+        try {
+            const stored = JSON.parse(localStorage.getItem(PLAYER_PROFILE_KEY) || "null");
+            if (stored && typeof stored === "object") Object.keys(profile).forEach((key) => { if (key in stored) profile[key] = stored[key]; });
+        } catch (_) {}
+        return profile;
     }
+    function savePlayerProfile(profile) { try { localStorage.setItem(PLAYER_PROFILE_KEY, JSON.stringify(profile)); } catch (_) {} }
+    function clearPlayerProfile(profile) { try { localStorage.removeItem(PLAYER_PROFILE_KEY); } catch (_) {} const fresh = createPlayerProfile(); Object.keys(profile).forEach((key) => { profile[key] = fresh[key]; }); }
 
     function recordPieceAttributes(profile, piece) {
         if ((piece & 1) !== 0) profile.attributes.light += 1;
@@ -151,6 +159,7 @@
         const winningPlacements = countWinningPlacements(state, piece);
         if (recipient !== 0 && winningPlacements > 0) profile.tactics.dangerousGifts += 1;
         else if (recipient !== 0) profile.tactics.safeGifts += 1;
+        savePlayerProfile(profile);
     }
 
     function trackPlayerPlacement(profile, piece, cell, state) {
@@ -168,6 +177,7 @@
         if (winningCells.includes(cell)) profile.tactics.winningMoves += 1;
         else if (winningCells.length) profile.tactics.missedWins += 1;
         profile.observationReady = profile.totalMoves >= MIN_OBSERVATION_MOVES;
+        savePlayerProfile(profile);
     }
 
     function countOpenLinePotential(board) {
@@ -362,5 +372,6 @@
         getManualProfile,
         getManualReferenceProfile: () => getManualProfile("reference"),
         setManualProfileStrength
+        ,clearPlayerProfile: () => clearPlayerProfile(window.quartoPlayerProfile)
     };
 })();

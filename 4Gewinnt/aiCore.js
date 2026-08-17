@@ -180,6 +180,20 @@ function getConnectFourRankedMoves(board, depth, player, opponent) {
     }).sort((a, b) => b.score - a.score);
 }
 
+const CONNECT_FOUR_PLAYER_PROFILE_KEY = "andis-game-foundry-4gewinnt-player-profile";
+function mergeConnectFourProfile(target, source) {
+    if (!source || typeof source !== "object") return;
+    Object.keys(target).forEach((key) => {
+        if (!(key in source)) return;
+        if (target[key] && typeof target[key] === "object" && !Array.isArray(target[key])) mergeConnectFourProfile(target[key], source[key]);
+        else if (Array.isArray(target[key]) && Array.isArray(source[key])) target[key] = source[key].map(Number);
+        else if (typeof source[key] === "number") target[key] = source[key];
+    });
+}
+function saveConnectFourPlayerProfile(profile) { try { localStorage.setItem(CONNECT_FOUR_PLAYER_PROFILE_KEY, JSON.stringify(profile)); } catch (_) {} }
+function clearConnectFourPlayerProfile(profile) { resetConnectFourPlayerProfile(profile); try { localStorage.removeItem(CONNECT_FOUR_PLAYER_PROFILE_KEY); } catch (_) {} }
+function loadConnectFourPlayerProfile(profile) { try { mergeConnectFourProfile(profile, JSON.parse(localStorage.getItem(CONNECT_FOUR_PLAYER_PROFILE_KEY) || "null")); } catch (_) {} return profile; }
+
 function createConnectFourPlayerProfile() {
     const profile = {
         totalMoves: 0,
@@ -215,7 +229,7 @@ function createConnectFourPlayerProfile() {
         angriffsZuege: { get: () => profile.style.risky, set: value => { profile.style.risky = value; }, configurable: true }
     });
 
-    return profile;
+    return loadConnectFourPlayerProfile(profile);
 }
 
 function resetConnectFourPlayerProfile(profile) {
@@ -244,6 +258,7 @@ function trackConnectFourPlayerMove(profile, col, row, quality = 0) {
     if (quality >= 15) profile.tactics.pressureMoves++;
     if (quality >= 17) profile.style.offensive++;
     if (quality <= 0) profile.style.defensive++;
+    saveConnectFourPlayerProfile(profile);
 }
 
 function recordConnectFourPlayerEvent(profile, event) {
@@ -255,6 +270,7 @@ function recordConnectFourPlayerEvent(profile, event) {
     if (event === "missedBlock") profile.mistakes.missedBlocks++;
     if (event === "fork") profile.tactics.forks++;
     if (event === "pressure") profile.tactics.pressureMistakes++;
+    saveConnectFourPlayerProfile(profile);
 }
 
 function evaluateConnectFourPlayerMove(board, col, row, player) {
@@ -421,6 +437,7 @@ window.ConnectFourAICore = {
     getManualReferenceProfile: () => getConnectFourManualProfile("referenz"),
     setManualProfileStrength: setConnectFourManualProfileStrength,
     clearManualProfileOverrides: clearConnectFourManualProfileOverrides
+    ,clearPlayerProfile: () => clearConnectFourPlayerProfile(window.connectFourPlayerProfile)
 };
 
 // Das Profil muss vor adaptiveBot.js und game.js existieren, weil beide
