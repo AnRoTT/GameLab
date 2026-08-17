@@ -231,30 +231,18 @@ main { padding: 12px 18px 18px; }
     .piece-shape {
         height: auto;
         aspect-ratio: 1 / 1;
-        transform: translateZ(0);
-        -webkit-backface-visibility: hidden;
-        backface-visibility: hidden;
-    }
-    .piece-shape.hollow::after {
-        transform: translateZ(0);
-        -webkit-backface-visibility: hidden;
-        backface-visibility: hidden;
     }
     .piece-button .piece-shape.short {
         width: 70%;
-        height: 70%;
     }
     .piece-button .piece-shape.tall {
         width: 88%;
-        height: 88%;
     }
     .board-cell .piece-shape.short {
         width: 55%;
-        height: 55%;
     }
     .board-cell .piece-shape.tall {
         width: 72%;
-        height: 72%;
     }
     .piece-legend { gap: 3px; }
     .legend-item { font-size: .62rem; }
