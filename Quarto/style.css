@@ -226,6 +226,23 @@ main { padding: 12px 18px 18px; }
         padding: 5px;
         border-radius: 9px;
     }
+    /* Mobile-Rendering-Fix für Edge: Kreise und Innenringe auf einer
+       stabilen quadratischen Compositing-Fläche zeichnen. */
+    .piece-shape {
+        height: auto;
+        aspect-ratio: 1 / 1;
+        transform: translateZ(0);
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
+    }
+    .piece-shape.hollow {
+        overflow: hidden;
+    }
+    .piece-shape.hollow::after {
+        transform: translateZ(0);
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
+    }
     .piece-legend { gap: 3px; }
     .legend-item { font-size: .62rem; }
     .board { gap: 5px; padding: 7px; border-width: 3px; border-radius: 14px; }
