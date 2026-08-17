@@ -7,7 +7,14 @@
     <link rel="stylesheet" href="theme.css">
 </head>
 <body class="home-page">
-    <button id="soundToggle" type="button" aria-pressed="false">🔊 Ton an</button>
+    <button id="settingsToggle" class="secondary-button" type="button" aria-expanded="false" aria-controls="extraSettings" aria-label="Einstellungen" title="Einstellungen">⚙</button>
+    <span id="soundToggle" role="status" aria-live="polite" aria-label="Ton eingeschaltet">🔊</span>
+    <div id="settingsBackdrop" class="settings-backdrop" hidden></div>
+    <section id="extraSettings" class="extra-settings" hidden>
+        <h2>Einstellungen</h2>
+        <button id="settingsSound" class="settings-action" type="button">🔊 Sound an</button>
+        <button id="settingsClose" class="settings-action settings-close" type="button">Schließen</button>
+    </section>
     <main class="container">
         <h1 class="title">Andis Game Foundry</h1>
         <p class="subtitle">Interaktive Spiele mit anpassungsf&auml;higen Gegnern</p>
@@ -45,5 +52,6 @@
         <footer class="footer">Andis Game Foundry | by Andreas Rollinger | 2026.08.17</footer>
     </main>
     <script src="Shared/soundManager.js"></script>
+    <script src="Shared/settingsMenu.js"></script>
 </body>
 </html>

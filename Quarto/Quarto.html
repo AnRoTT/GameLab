@@ -7,10 +7,11 @@
     <link rel="stylesheet" href="../theme.css" />
     <link rel="stylesheet" href="style.css" />
 </head>
-<body class="game-page">
+<body class="game-page" data-adaptive-bot="QuartoAdaptiveBot">
     <div id="backIcon">⟵ Menü</div>
     <a id="helpIcon" class="help-button" href="Anleitung.html" aria-label="Kurzanleitung zu Quarto">Anleitung</a>
-    <button id="soundToggle" type="button" aria-pressed="false">🔊 Ton an</button>
+    <button id="settingsToggle" class="secondary-button" type="button" aria-expanded="false" aria-controls="extraSettings" aria-label="Einstellungen" title="Einstellungen">⚙</button>
+    <span id="soundToggle" role="status" aria-live="polite" aria-label="Ton eingeschaltet">🔊</span>
 
     <div class="app">
         <header class="top-bar">
@@ -38,11 +39,20 @@
                     </div>
                 </div>
 
-                <div class="round-actions">
-                    <button id="startButton" class="primary-button" type="button">Jetzt spielen</button>
-                </div>
             </div>
         </header>
+
+        <div class="game-actions">
+            <button id="startButton" class="primary-button" type="button">Jetzt spielen</button>
+        </div>
+        <div id="settingsBackdrop" class="settings-backdrop" hidden></div>
+        <section id="extraSettings" class="extra-settings" hidden>
+            <h2>Einstellungen</h2>
+            <button id="settingsSound" class="settings-action" type="button">🔊 Sound an</button>
+            <button id="resetPlayerValues" class="settings-action danger" type="button">Spielerwerte löschen</button>
+            <button id="settingsClose" class="settings-action settings-close" type="button">Schließen</button>
+            <div id="resetConfirm" class="reset-confirm" hidden><p>Adaptive Spielerwerte wirklich löschen?</p><div><button id="resetCancel" class="settings-action" type="button">Abbrechen</button><button id="resetConfirmButton" class="settings-action danger" type="button">Löschen</button></div></div>
+        </section>
 
         <main>
             <section class="status-panel" aria-live="polite">
@@ -97,6 +107,7 @@
     <script src="manuellBot.js"></script>
     <script src="adaptiveBot.js"></script>
     <script src="game.js"></script>
+    <script src="../Shared/settingsMenu.js"></script>
     <script>
         const backIcon = document.getElementById("backIcon");
         backIcon.style.display =

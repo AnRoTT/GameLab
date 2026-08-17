@@ -34,20 +34,28 @@
             }
             this.updateButton();
         },
+        playUiClick() {
+            if (this.muted) return;
+            const script = document.querySelector('script[src*="soundManager.js"]');
+            const soundUrl = script
+                ? new URL("../assets/sounds/Button_Click.mp3", script.src).href
+                : new URL("assets/sounds/Button_Click.mp3", document.baseURI).href;
+            const sound = new Audio(soundUrl);
+            sound.volume = 0.22;
+            sound.play().catch(() => {});
+        },
         updateButton() {
             const button = document.getElementById("soundToggle");
             if (!button) return;
             button.textContent = this.muted ? "🔇" : "🔊";
-            button.setAttribute("aria-pressed", String(this.muted));
+            button.removeAttribute("aria-pressed");
             button.setAttribute("aria-label", this.muted ? "Ton einschalten" : "Ton ausschalten");
         }
     };
 
-    const button = document.getElementById("soundToggle");
-    if (button) {
-        button.addEventListener("click", () => window.AndisSound.toggle());
-        window.AndisSound.updateButton();
-    }
+    // Der obere Soundhinweis ist nur eine Statusanzeige. Die Umschaltung
+    // erfolgt ausschließlich im Einstellungsmenü.
+    window.AndisSound.updateButton();
 
     function updateScrolledHeader() {
         document.body.classList.toggle("is-scrolled", window.scrollY > 12);

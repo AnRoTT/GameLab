@@ -1,5 +1,6 @@
 (function () {
     const TicTacToeAdaptiveCore = window.TicTacToeAICore;
+    const STORAGE_KEY = "andis-game-foundry-tictactoe-adaptive";
     const state = {
         adaptiveRoundStatus: "",
         adaptiveRoundSnapshot: null,
@@ -15,6 +16,37 @@
         // Das Profil wird zentral in aiCore.js erstellt und hier nur gelesen.
         playerProfile: window.ticTacToePlayerProfile
     };
+
+    function savePersistentState() {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                adaptiveSkill: state.adaptiveSkill,
+                adaptiveAI: state.adaptiveAI,
+                playerProfile: state.playerProfile
+            }));
+        } catch (_) {
+            // Der Bot funktioniert auch ohne LocalStorage weiter.
+        }
+    }
+
+    function loadPersistentState() {
+        try {
+            const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+            if (!stored) return;
+            if (Number.isFinite(stored.adaptiveSkill)) state.adaptiveSkill = adaptiveClamp(stored.adaptiveSkill);
+            if (stored.adaptiveAI && typeof stored.adaptiveAI === "object") {
+                state.adaptiveAI = { ...state.adaptiveAI, ...stored.adaptiveAI };
+            }
+            if (stored.playerProfile && typeof stored.playerProfile === "object") {
+                state.playerProfile = stored.playerProfile;
+                window.ticTacToePlayerProfile = state.playerProfile;
+            }
+        } catch (_) {
+            // Beschädigte oder blockierte Daten werden ignoriert.
+        }
+    }
+
+    loadPersistentState();
 
     function getLearningRate() {
         const baseRate = (() => {
@@ -322,6 +354,7 @@
         }
 
         decayAdaptiveMemory();
+        savePersistentState();
     }
 
     function resetForLab(initialSkill = 35) {
@@ -337,6 +370,17 @@
         state.adaptiveRoundSnapshot = null;
         state.labCells = null;
         state.drawStreak = 0;
+        window.ticTacToePlayerProfile = state.playerProfile;
+        savePersistentState();
+    }
+
+    function clearPersistentState(initialSkill = 35) {
+        try {
+            localStorage.removeItem(STORAGE_KEY);
+        } catch (_) {
+            // Der Reset funktioniert auch ohne LocalStorage.
+        }
+        resetForLab(initialSkill);
     }
 
     function getBotMoveForLab(board) {
@@ -366,6 +410,7 @@
         if (missedWin || missedBlock) {
             state.playerProfile.forksMissed += 1;
         }
+        savePersistentState();
     }
 
     function beginRound({ full, roundNumber, totalRounds, current, enabled }) {
@@ -391,6 +436,7 @@
         getBotMove,
         getBotMoveForLab,
         resetForLab,
+        clearPersistentState,
         recordLabResult,
         getBotDelay,
         observePlayerMove,
