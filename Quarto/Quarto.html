@@ -7,9 +7,10 @@
     <link rel="stylesheet" href="../theme.css" />
     <link rel="stylesheet" href="style.css" />
 </head>
-<body>
+<body class="game-page">
     <div id="backIcon">⟵ Menü</div>
     <a id="helpIcon" class="help-button" href="Anleitung.html" aria-label="Kurzanleitung zu Quarto">Anleitung</a>
+    <button id="soundToggle" type="button" aria-pressed="false">🔊 Ton an</button>
 
     <div class="app">
         <header class="top-bar">
@@ -26,10 +27,15 @@
                     <button id="matchButton" class="cycle-button" type="button">Einzelrunde</button>
                 </div>
 
-                <div class="cycle-group cycle-group-double">
-                    <span class="label">Gegner:</span>
-                    <button id="botLevelButton" class="cycle-button" type="button">Anfänger</button>
-                    <button id="adaptiveButton" class="cycle-button adaptive-speed-control" type="button" disabled aria-label="Anpassungsgeschwindigkeit">—</button>
+                <div class="opponent-pair">
+                    <div class="cycle-group">
+                        <span class="label">Gegner:</span>
+                        <button id="botLevelButton" class="cycle-button" type="button">Anfänger</button>
+                    </div>
+                    <div class="cycle-group">
+                        <span class="label">Anpassung:</span>
+                        <button id="adaptiveButton" class="cycle-button adaptive-speed-control" type="button" disabled aria-label="Anpassungsgeschwindigkeit">—</button>
+                    </div>
                 </div>
 
                 <div class="round-actions">
@@ -82,9 +88,10 @@
 
         </main>
 
-        <footer class="footer">Andis Game Foundry | Quarto | by Andreas Rollinger | 2026.08.16</footer>
+        <footer class="footer">Andis Game Foundry | Quarto | by Andreas Rollinger | 2026.08.17</footer>
     </div>
 
+    <script src="../Shared/soundManager.js"></script>
     <script src="../Shared/difficultyCore.js"></script>
     <script src="aiCore.js"></script>
     <script src="manuellBot.js"></script>
@@ -94,8 +101,23 @@
         const backIcon = document.getElementById("backIcon");
         backIcon.style.display =
             new URLSearchParams(location.search).get("menu") === "1" ? "block" : "none";
-        backIcon.addEventListener("click", () => {
-            window.location.href = "../index.html?menu=1";
+        backIcon.addEventListener("click", (event) => {
+            event.preventDefault();
+            const sound = new Audio("../assets/sounds/Button_Click.mp3");
+            sound.volume = 0.22;
+            sound.play().catch(() => {});
+            setTimeout(() => {
+                window.location.href = "../index.html?menu=1";
+            }, 100);
+        });
+        document.getElementById("helpIcon").addEventListener("click", (event) => {
+            event.preventDefault();
+            const sound = new Audio("../assets/sounds/Button_Click.mp3");
+            sound.volume = 0.22;
+            sound.play().catch(() => {});
+            setTimeout(() => {
+                window.location.href = document.getElementById("helpIcon").href;
+            }, 100);
         });
     </script>
 </body>

@@ -27,24 +27,24 @@
     position: fixed; /* GEÄNDERT: war absolute */
     top: 20px;
     left: 20px;
-    color: #3d7dff; /* BLAU */
+    color: var(--accent);
     font-size: 1.2rem;
     cursor: pointer;
     opacity: 0.8;
     transition: 0.2s;
     user-select: none;
-    background: #2c2c2c; 
+    background: var(--bg-panel);
     padding: 8px 14px;
     border-radius: 8px;
-    border: 2px solid #3d7dff; 
+    border: 2px solid var(--accent);
     z-index: 999; /* NEU: liegt immer oben */
 }
 
 #backIcon:hover {
     opacity: 1;
-    text-shadow: 0 0 10px #3d7dff;
-    background: #3a3a3a;
-    box-shadow: 0 0 10px #3d7dff88; /* blauer Glow */
+    text-shadow: 0 0 10px var(--accent);
+    background: var(--bg-panel-hover);
+    box-shadow: var(--shadow-soft);
 }
 
 body {
@@ -112,32 +112,6 @@ body {
     border-radius: var(--radius-md);
     padding: 4px 8px;
     border: 1px solid #252a3c;
-}
-
-/* NEU: Doppel-Button Gruppe für Gegner + Tempo */
-.cycle-group-double {
-    display: grid;
-    grid-template-columns: auto; /* Label auto | Gegner auto | Tempo auto */
-    gap: 8px;
-    align-items: center;
-    width: fit-content; /* NEU: nur so breit wie Inhalt */
-    margin: 0 auto; /* NEU: mittig zentrieren */
-    padding: 4px 10px; /* etwas weniger padding als normal */
-}
-
-.cycle-group-double .cycle-button {
-    min-width: 100px; /* Button nicht zu klein */
-    max-width: 130px;
-}
-
-/* Fallback für kleine Handys < 380px */
-@media (max-width: 380px) {
-   .cycle-group-double {
-        grid-template-columns: 80px 1fr 1fr;
-    }
-   .cycle-group-double #adaptSpeedButton {
-        grid-column: 2 / 4; /* geht über beide Spalten */
-    }
 }
 
 .cycle-group .label {
@@ -357,7 +331,7 @@ main {
 /* Board */
 
 .board-wrapper {
-	margin-top: 60px; /* oder 24px, je nach Geschmack */
+	margin-top: 16px;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -382,28 +356,32 @@ main {
 /* Column hover zones (for click on mobile & desktop) */
 
 .board-column-hover {
-    z-index: 300;
+	z-index: 300;
     position: absolute;
     top: 10px;
     bottom: 10px;
     width: calc((100% - 20px) / 7);
     cursor: pointer;
-
-    -webkit-tap-highlight-color: transparent;
-    user-select: none;
-    -webkit-user-select: none;
-    touch-action: manipulation;
 }
 
-.board {
-    -webkit-tap-highlight-color: transparent;
+/* Die Klickzonen bleiben unsichtbar; eine ganze Spalte darf nicht
+   wie eine markierte Zelle hervorgehoben werden. */
+.board .board-column-hover,
+.board .board-column-hover:focus,
+.board .board-column-hover:focus-visible,
+.board .board-column-hover.keyboard-focus {
+    opacity: 0 !important;
+    -webkit-tap-highlight-color: transparent !important;
+    background: transparent !important;
+    outline: none !important;
+    border: none !important;
+    box-shadow: none !important;
 }
 
-.board:focus-visible .board-column-hover.keyboard-focus {
-    background: rgba(120, 165, 255, 0.14);
-    outline: 2px solid rgba(255, 255, 255, 0.75);
-    outline-offset: -2px;
-    border-radius: 12px;
+.board,
+.board .cell,
+.board .board-column-hover {
+    -webkit-tap-highlight-color: transparent;
 }
 
 .board:focus-visible {
@@ -415,8 +393,7 @@ main {
     outline: none;
 }
 
-.board.touch-input:focus-visible .board-column-hover.keyboard-focus {
-    background: transparent;
+.board.touch-input:focus-visible {
     outline: none;
 }
 
@@ -600,6 +577,19 @@ main {
     pointer-events: none;
 }
 
+/* Einheitliches Steuerungsraster: Spieler/Match, Gegner/Anpassung */
+.controls-vertical {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(150px, 1fr));
+    gap: 8px 10px;
+    width: min(100%, 420px);
+}
+.controls-vertical .cycle-group { width: 100%; margin: 0; }
+.controls-vertical .cycle-group:nth-child(1) { order: 1; }
+.controls-vertical .cycle-group:nth-child(2) { order: 2; }
+.controls-vertical .cycle-group:nth-child(3) { order: 3; }
+.controls-vertical .round-actions { grid-column: 1 / -1; order: 4; }
+
 .round-actions {
     display: flex;
     align-items: center;
@@ -627,17 +617,26 @@ main {
     }
 }
 
+/* Finales, zentriertes Steuerungsraster */
+.controls-vertical { justify-items: stretch; }
+.controls-vertical .cycle-group { justify-content: center; }
+.controls-vertical .opponent-pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    grid-column: 1 / -1;
+    width: 100%;
+    order: 3;
+}
+.controls-vertical .opponent-pair .cycle-group { display: flex; flex-direction: column; align-items: stretch; gap: 5px; width: 100%; margin: 0; }
+.controls-vertical .opponent-pair .cycle-button { width: 100%; }
+
 /* A completed multi-round game always keeps the next-round action usable. */
 #roundActionButton:not(:disabled) {
     opacity: 1 !important;
     filter: none !important;
     pointer-events: auto !important;
     cursor: pointer;
-}
-
-#winner-banner-legacy,
-#adaptive-strength-legacy {
-    display: none !important;
 }
 
 .winner-info {
@@ -784,7 +783,7 @@ main {
     }
 
     .board-wrapper {
-        margin-top: 20px;
+        margin-top: 12px;
     }
 
     .board {

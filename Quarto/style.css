@@ -33,11 +33,20 @@ body {
     text-shadow: 0 0 12px rgba(79, 140, 255, .7), 0 0 30px rgba(79, 140, 255, .3);
 }
 
-.controls-vertical { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
+.controls-vertical {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(150px, 1fr));
+    align-items: center;
+    gap: 8px 10px;
+    width: min(100%, 420px);
+}
+.controls-vertical .cycle-group { width: 100%; margin: 0; }
+.controls-vertical .cycle-group:nth-child(1) { order: 1; }
+.controls-vertical .cycle-group:nth-child(2) { order: 2; }
+.controls-vertical .cycle-group:nth-child(3) { order: 3; }
+.controls-vertical .round-actions { grid-column: 1 / -1; order: 4; }
 .round-actions { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
 .round-actions .secondary-button { min-height: 42px; }
-.cycle-group-double { display: grid; grid-template-columns: auto; gap: 8px; width: fit-content; margin: 0 auto; }
-.cycle-group-double .cycle-button { min-width: 112px; }
 
 main { padding: 12px 18px 18px; }
 .status-panel {
@@ -134,6 +143,10 @@ main { padding: 12px 18px 18px; }
     box-shadow: 0 0 0 2px rgba(213, 169, 94, .2), 0 0 16px rgba(213, 169, 94, .75);
 }
 
+/* Die Auswahlsteine sollen die Touchflächen deutlich besser ausfüllen. */
+.piece-button .piece-shape.short { width: 70%; }
+.piece-button .piece-shape.tall { width: 88%; }
+
 .piece-shape { position: relative; display: block; width: 62%; height: auto; aspect-ratio: 1; border: 3px solid #7d8aa2; background: #202738; color: #9eabc1; box-shadow: 0 3px 7px rgba(0,0,0,.45); }
 .piece-shape.dark.solid { background: linear-gradient(145deg, #42516c, #121827); border-color: #9eabc1; }
 .piece-shape.light { border-color: #fff; color: #fff; }
@@ -169,8 +182,8 @@ main { padding: 12px 18px 18px; }
 .piece-button.selection-player-2.keyboard-focus, .board-cell.place-player-2.keyboard-focus { outline-color: var(--quarto-gold); }
 .board-cell.win { box-shadow: 0 0 16px rgba(213,169,94,.8); border-color: var(--quarto-gold); }
 .board-cell .piece-shape { width: 58%; height: auto; }
-.board-cell .piece-shape.short { width: 49%; height: auto; }
-.board-cell .piece-shape.tall { width: 66%; height: auto; }
+.board-cell .piece-shape.short { width: 55%; height: auto; }
+.board-cell .piece-shape.tall { width: 72%; height: auto; }
 
 .scoreboard { display: flex; justify-content: center; gap: 10px; width: 100%; margin-top: 8px; }
 .score { min-width: 88px; padding: 5px 10px; border: 1px solid #30364c; border-radius: var(--radius-md); background: #141726; }
@@ -218,6 +231,20 @@ main { padding: 12px 18px 18px; }
     .board { gap: 5px; padding: 7px; border-width: 3px; border-radius: 14px; }
     .adaptive-strength-row { gap: 7px; font-size: .7rem; }
 }
+
+/* Finales, zentriertes Steuerungsraster */
+.controls-vertical { justify-items: stretch; }
+.controls-vertical .cycle-group { justify-content: center; }
+.controls-vertical .opponent-pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    grid-column: 1 / -1;
+    width: 100%;
+    order: 3;
+}
+.controls-vertical .opponent-pair .cycle-group { display: flex; flex-direction: column; align-items: stretch; gap: 5px; width: 100%; margin: 0; }
+.controls-vertical .opponent-pair .cycle-button { width: 100%; }
 
 .title-center.game-title {
     width: 100%;

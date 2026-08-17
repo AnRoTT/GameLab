@@ -7,9 +7,10 @@
     <link rel="stylesheet" href="../theme.css">
     <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="game-page">
     <div id="backIcon">&#8592; Men&uuml;</div>
     <a id="helpIcon" class="help-button" href="Anleitung.html" aria-label="Kurzanleitung zu TicTacToe">Anleitung</a>
+    <button id="soundToggle" type="button" aria-pressed="false">🔊 Ton an</button>
 
     <h1 class="game-title">TicTacToe</h1>
 
@@ -19,17 +20,22 @@
             <button class="cycle-button" id="btnPlayers"><span id="valPlayers">1 Spieler</span></button>
         </div>
         <div class="cycle-group setting-row setting-row-wide" id="rowRounds">
-            <span class="label setting-label">Runden:</span>
+            <span class="label setting-label">Match:</span>
             <button class="cycle-button" id="btnRounds"><span id="valRounds">1</span></button>
         </div>
         <div class="cycle-group setting-row setting-row-wide" id="rowMode">
-            <span class="label setting-label">Modus:</span>
+            <span class="label setting-label">Regelmodus:</span>
             <button class="cycle-button" id="btnMode"><span id="valMode">Verk&uuml;rzt</span></button>
         </div>
-        <div class="cycle-group cycle-group-double setting-row" id="rowOpponent">
-            <span class="label">Gegner:</span>
-            <button class="cycle-button" id="btnDifficulty"><span id="valDifficulty">Anf&auml;nger</span></button>
-            <button class="cycle-button" id="btnAdapt"><span id="valAdapt">Normal</span></button>
+        <div class="opponent-pair setting-row" id="rowOpponent">
+            <div class="cycle-group">
+                <span class="label">Gegner:</span>
+                <button class="cycle-button" id="btnDifficulty"><span id="valDifficulty">Anf&auml;nger</span></button>
+            </div>
+            <div class="cycle-group">
+                <span class="label">Anpassung:</span>
+                <button class="cycle-button" id="btnAdapt"><span id="valAdapt">Normal</span></button>
+            </div>
         </div>
     </div>
 
@@ -55,8 +61,9 @@
 
     <div id="board" class="board"></div>
 
-    <footer class="footer">Andis Game Foundry | TicTacToe | by Andreas Rollinger | 2026.08.16</footer>
+    <footer class="footer">Andis Game Foundry | TicTacToe | by Andreas Rollinger | 2026.08.17</footer>
 
+    <script src="../Shared/soundManager.js"></script>
     <script src="../Shared/difficultyCore.js"></script>
     <script src="aiCore.js"></script>
     <script src="manuellBot.js"></script>
@@ -65,6 +72,15 @@
     <script>
         document.getElementById("backIcon").style.display =
             new URLSearchParams(location.search).get('menu') === '1' ? 'block' : 'none';
+        document.getElementById("helpIcon").addEventListener("click", (event) => {
+            event.preventDefault();
+            const sound = new Audio("../assets/sounds/Button_Click.mp3");
+            sound.volume = 0.22;
+            sound.play().catch(() => {});
+            setTimeout(() => {
+                window.location.href = document.getElementById("helpIcon").href;
+            }, 100);
+        });
     </script>
 </body>
 </html>

@@ -310,13 +310,16 @@ function attachColumnHoverZones() {
         zone.addEventListener("pointerdown", (event) => {
             if (gameOver) return;
             hoverInputMode = event.pointerType || "mouse";
-            if (hoverInputMode === "touch") {
+            const isTouchLike = hoverInputMode === "touch"
+                || window.matchMedia("(hover: none), (pointer: coarse)").matches;
+            if (isTouchLike) {
                 boardEl.classList.add("touch-input");
                 hoveredCol = null;
                 clearGhost();
                 boardEl.querySelectorAll(".board-column-hover.keyboard-focus").forEach((focusedZone) => {
                     focusedZone.classList.remove("keyboard-focus");
                 });
+                boardEl.blur();
             } else {
                 boardEl.classList.remove("touch-input");
             }
@@ -627,117 +630,6 @@ function placeChip(row, col, player) {
     chip.classList.add(player === PLAYER_RED ? "red" : "yellow", "drop-pending");
     animateChipDrop(row, col, player);
 
-}
-
-function animateChipDropLegacy(row, col, player) {
-    const cell = getCell(row, col);
-    if (!cell) return;
-
-    clearDropAnimation();
-    const boardRect = boardEl.getBoundingClientRect();
-    const cellRect = cell.getBoundingClientRect();
-    const targetChip = cell.querySelector(".chip");
-    const targetChipRect = targetChip.getBoundingClientRect();
-    const svgNamespace = "http://www.w3.org/2000/svg";
-    const svg = document.createElementNS(svgNamespace, "svg");
-    const defs = document.createElementNS(svgNamespace, "defs");
-    const clipPath = document.createElementNS(svgNamespace, "clipPath");
-    const dropCircle = document.createElementNS(svgNamespace, "circle");
-    const clipId = `connect-four-drop-${Date.now()}`;
-    const gradientId = `${clipId}-gradient`;
-    const radius = Math.min(targetChipRect.width, targetChipRect.height) / 2;
-
-    svg.classList.add("drop-svg");
-    svg.setAttribute("width", boardRect.width.toString());
-    svg.setAttribute("height", boardRect.height.toString());
-    svg.setAttribute("viewBox", `0 0 ${boardRect.width} ${boardRect.height}`);
-    svg.setAttribute("aria-hidden", "true");
-    clipPath.setAttribute("id", clipId);
-    clipPath.setAttribute("clipPathUnits", "userSpaceOnUse");
-
-    const gradient = document.createElementNS(svgNamespace, "radialGradient");
-    gradient.setAttribute("id", gradientId);
-    gradient.setAttribute("cx", "30%");
-    gradient.setAttribute("cy", "22%");
-    gradient.setAttribute("r", "78%");
-    const gradientStops = player === PLAYER_RED
-        ? [["0%", "#ff9a9a"], ["40%", "#ee3038"], ["100%", "#8d0c16"]]
-        : [["0%", "#fff8bd"], ["42%", "#f5c928"], ["100%", "#a97900"]];
-    gradientStops.forEach(([offset, color]) => {
-        const stop = document.createElementNS(svgNamespace, "stop");
-        stop.setAttribute("offset", offset);
-        stop.setAttribute("stop-color", color);
-        gradient.appendChild(stop);
-    });
-    defs.appendChild(gradient);
-
-    for (let clipRow = 0; clipRow < ROWS; clipRow++) {
-        const clipCell = getCell(clipRow, col);
-        const clipRect = clipCell.getBoundingClientRect();
-        const opening = document.createElementNS(svgNamespace, "circle");
-        opening.setAttribute("cx", (clipRect.left - boardRect.left + clipRect.width / 2).toString());
-        opening.setAttribute("cy", (clipRect.top - boardRect.top + clipRect.height / 2).toString());
-        opening.setAttribute("r", radius.toString());
-        clipPath.appendChild(opening);
-    }
-
-    dropCircle.classList.add("drop-svg-chip", player === PLAYER_RED ? "red" : "yellow");
-    dropCircle.setAttribute("cx", (targetChipRect.left - boardRect.left + targetChipRect.width / 2).toString());
-    dropCircle.setAttribute("cy", (-radius - 8).toString());
-    dropCircle.setAttribute("r", radius.toString());
-    dropCircle.setAttribute("fill", `url(#${gradientId})`);
-    dropCircle.setAttribute("clip-path", `url(#${clipId})`);
-    svg.appendChild(defs);
-    svg.appendChild(clipPath);
-    svg.appendChild(dropCircle);
-    boardEl.appendChild(svg);
-
-    chipDropActive = true;
-    const finishDrop = () => {
-        if (chipDropFrame !== null) {
-            window.cancelAnimationFrame(chipDropFrame);
-            chipDropFrame = null;
-        }
-        svg.remove();
-        const finalChip = cell.querySelector(".chip");
-        if (finalChip) {
-            finalChip.classList.remove("drop-pending");
-            finalChip.classList.add("visible", "landed");
-        }
-        chipDropActive = false;
-        chipDropTimer = null;
-    };
-
-    const startTime = performance.now();
-    const startY = -radius - 8;
-    const targetY = targetChipRect.top - boardRect.top + targetChipRect.height / 2;
-    const duration = Math.max(CHIP_DROP_DURATION, 260 + row * 95);
-    prepareChipSound();
-    let landingSoundScheduled = scheduleChipSound(duration);
-    const animate = (now) => {
-        if (!chipDropActive) return;
-        const progress = Math.min(1, (now - startTime) / duration);
-        let y;
-        if (progress < 0.84) {
-            const eased = 1 - Math.pow(1 - progress / 0.84, 3);
-            y = startY + (targetY - startY) * eased;
-        } else {
-            const settleProgress = (progress - 0.84) / 0.16;
-            y = targetY + Math.sin(settleProgress * Math.PI) * radius * 0.06 * (1 - settleProgress);
-        }
-        dropCircle.setAttribute("cy", y.toString());
-        if (!landingSoundScheduled && progress >= 0.96) {
-            landingSoundScheduled = true;
-            playChipSoundFallback();
-        }
-        if (progress < 1) {
-            chipDropFrame = window.requestAnimationFrame(animate);
-        } else {
-            finishDrop();
-        }
-    };
-
-    chipDropFrame = window.requestAnimationFrame(animate);
 }
 
 function clearDropAnimation() {

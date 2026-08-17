@@ -49,7 +49,7 @@ button {
     font-size: 1.2rem;
     cursor: pointer;
     opacity: 0.85;
-    transition: 0.2s;
+    transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
     user-select: none;
     background: var(--bg-panel);
     padding: 8px 14px;
@@ -83,7 +83,7 @@ button {
     font-size: 1rem;
     text-decoration: none;
     opacity: .85;
-    transition: .2s;
+    transition: background .2s ease, border-color .2s ease, box-shadow .2s ease, opacity .2s ease;
 }
 
 #helpIcon:hover,
@@ -93,6 +93,42 @@ button {
     box-shadow: var(--shadow-soft);
     text-shadow: 0 0 10px var(--accent);
     outline: none;
+}
+
+#soundToggle {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 999;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border: 2px solid var(--accent);
+    border-radius: var(--radius-md);
+    background: var(--bg-panel);
+    color: var(--accent);
+    font-size: 1rem;
+    white-space: nowrap;
+    transition: background .2s ease, border-color .2s ease, box-shadow .2s ease, opacity .2s ease;
+}
+
+#soundToggle:hover,
+#soundToggle:focus-visible {
+    background: var(--bg-panel-hover);
+    box-shadow: var(--shadow-soft);
+    outline: none;
+}
+
+/* Beim Scrollen bleiben die drei Kopfbuttons sichtbar, überdecken den Inhalt
+   aber nicht mehr mit einer deckenden Fläche. */
+body.is-scrolled #backIcon,
+body.is-scrolled #helpIcon,
+body.is-scrolled #soundToggle {
+    background: rgba(16, 18, 26, .22);
+    border-color: rgba(79, 140, 255, .58);
+    box-shadow: none;
+    opacity: .50;
 }
 
 .guide-container { width: min(100%, 680px); padding: 22px 18px; }
@@ -109,6 +145,7 @@ button {
 
 @media (max-width: 520px) {
     #helpIcon { top: 10px; right: 10px; max-width: calc(100vw - 20px); padding: 6px 12px; font-size: 16px; }
+    #soundToggle { top: 10px; padding: 6px 9px; font-size: .8rem; }
     .guide-container { padding: 18px 12px; }
     .guide-card { padding: 14px; }
 }
@@ -327,6 +364,121 @@ button {
     color: var(--text-muted);
 }
 
+/* Gemeinsame Kachelregel für Gegner und adaptive Anpassung */
+.opponent-pair {
+    align-items: stretch;
+}
+
+.opponent-pair .cycle-group {
+    align-items: stretch;
+    justify-content: flex-start;
+    min-width: 0;
+}
+
+.opponent-pair .cycle-group .label {
+    width: 100%;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.opponent-pair .cycle-group .cycle-button {
+    width: 100%;
+    min-width: 0;
+    min-height: 36px;
+    flex: 0 0 auto;
+}
+
+/* Einheitliches Steuerungs-Layout für alle Spiele */
+.settings,
+#settingsPanel,
+.controls-vertical {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    align-items: stretch;
+    justify-items: stretch;
+    width: min(100%, 420px) !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+.settings > .setting-row,
+#settingsPanel > .setting-row,
+.controls-vertical > .cycle-group {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 5px;
+    width: 100% !important;
+    min-width: 0;
+    margin: 0;
+}
+
+.settings > .setting-row .label,
+#settingsPanel > .setting-row .label,
+.controls-vertical > .cycle-group .label {
+    width: 100%;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.settings > .setting-row .cycle-button,
+#settingsPanel > .setting-row .cycle-button,
+.controls-vertical > .cycle-group .cycle-button {
+    width: 100%;
+    min-width: 0;
+    min-height: 36px;
+    flex: 0 0 auto;
+}
+
+/* Gegner und adaptive Geschwindigkeit bilden immer eine gemeinsame Zeile. */
+.settings > #rowOpponent,
+#settingsPanel > #botOpponentRow,
+.controls-vertical > .opponent-pair {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    width: 100% !important;
+}
+
+.settings > #rowOpponent .cycle-group,
+#settingsPanel > #botOpponentRow .cycle-group,
+.controls-vertical > .opponent-pair .cycle-group {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 5px;
+    width: 100%;
+    margin: 0;
+}
+
+/* Dritte Zeile: Regelmodus oder spielabhängige Sonderoption. */
+.settings > #rowMode,
+#settingsPanel > .setting-row:nth-child(2),
+.settings > #rowMode,
+#settingsPanel > .setting-row:nth-child(2) {
+    grid-column: 1 / -1;
+}
+
+.settings > #reset,
+#settingsPanel > #startBtn,
+.controls-vertical > .round-actions {
+    grid-column: 1 / -1;
+    justify-self: center;
+}
+
+@media (max-width: 520px) {
+    .settings,
+    #settingsPanel,
+    .controls-vertical {
+        width: min(100%, 420px) !important;
+        gap: 8px;
+    }
+}
+
 .cycle-button {
     padding: 6px 10px;
     border-radius: 6px;
@@ -443,5 +595,259 @@ button {
 
     .footer {
         margin-top: 16px;
+    }
+}
+
+/* Gemeinsames Einstellungsraster fuer alle Spiele.
+   Diese Regeln neutralisieren spiel-spezifische Altregeln, damit keine
+   Kachel durch Flex-Basis oder feste Hoehen aus dem Raster laeuft. */
+.settings,
+#settingsPanel,
+.controls-vertical {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-auto-rows: auto;
+    align-items: stretch !important;
+    justify-items: stretch !important;
+    gap: 10px !important;
+    width: min(100%, 420px) !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+.settings > .setting-row,
+#settingsPanel > .setting-row,
+.controls-vertical > .cycle-group {
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: flex-start !important;
+    gap: 5px !important;
+}
+
+.settings > .setting-row .label,
+#settingsPanel > .setting-row .label,
+.controls-vertical > .cycle-group .label {
+    width: 100% !important;
+    text-align: left !important;
+    white-space: nowrap;
+}
+
+.settings > .setting-row .cycle-button,
+#settingsPanel > .setting-row .cycle-button,
+.controls-vertical .cycle-button {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 36px !important;
+    height: auto !important;
+    flex: 0 0 auto !important;
+}
+
+/* Spieler/Match oben, Gegner/Anpassung darunter. */
+.settings > #rowOpponent,
+#settingsPanel > #botOpponentRow,
+.controls-vertical > .opponent-pair {
+    grid-column: 1 / -1 !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+    width: 100% !important;
+}
+
+.settings > #rowOpponent .cycle-group,
+#settingsPanel > #botOpponentRow .cycle-group,
+.controls-vertical > .opponent-pair .cycle-group {
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 5px !important;
+}
+
+.settings > #rowMode,
+#settingsPanel > #rulesRow,
+#settingsPanel > .setting-row:nth-child(2) {
+    grid-column: 1 / -1 !important;
+}
+
+.settings > #reset,
+#settingsPanel > #startBtn,
+.controls-vertical > .round-actions {
+    grid-column: 1 / -1 !important;
+    justify-self: center !important;
+}
+
+@media (max-width: 700px) {
+    .settings,
+    #settingsPanel,
+    .controls-vertical {
+        gap: 8px !important;
+    }
+}
+
+/* Kompakte Mobile-Steuerung: weniger Hoehe, weiterhin gut tappbar. */
+@media (max-width: 700px) {
+    .settings,
+    #settingsPanel,
+    .controls-vertical {
+        gap: 6px !important;
+        padding: 8px !important;
+        width: min(100%, 360px) !important;
+    }
+
+    .settings > .setting-row,
+    #settingsPanel > .setting-row,
+    .controls-vertical > .cycle-group,
+    .settings > #rowOpponent .cycle-group,
+    #settingsPanel > #botOpponentRow .cycle-group,
+    .controls-vertical > .opponent-pair .cycle-group {
+        gap: 3px !important;
+    }
+
+    .settings > .setting-row .cycle-button,
+    #settingsPanel > .setting-row .cycle-button,
+    .controls-vertical .cycle-button {
+        min-height: 34px !important;
+        padding: 2px 6px !important;
+        font-size: 0.78rem !important;
+        line-height: 1.15 !important;
+    }
+
+    .settings > #rowOpponent,
+    #settingsPanel > #botOpponentRow,
+    .controls-vertical > .opponent-pair {
+        gap: 6px !important;
+    }
+
+    .settings > #reset,
+    #settingsPanel > #startBtn,
+    .controls-vertical > .round-actions {
+        margin-top: 1px;
+    }
+}
+
+/* Mobile kompakt: Beschriftung und Auswahl liegen nebeneinander. */
+@media (max-width: 700px) {
+    .settings > .setting-row,
+    #settingsPanel > .setting-row,
+    .controls-vertical > .cycle-group,
+    .settings > #rowOpponent .cycle-group,
+    #settingsPanel > #botOpponentRow .cycle-group,
+    .controls-vertical > .opponent-pair .cycle-group {
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 6px !important;
+    }
+
+    .settings > .setting-row .label,
+    #settingsPanel > .setting-row .label,
+    .controls-vertical > .cycle-group .label {
+        width: auto !important;
+        flex: 0 0 auto !important;
+        white-space: nowrap;
+    }
+
+    .settings > .setting-row .cycle-button,
+    #settingsPanel > .setting-row .cycle-button,
+    .controls-vertical .cycle-button {
+        width: auto !important;
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+    }
+
+    /* Gegner/Anpassung bleiben in ihrer halben Spalte untereinander,
+       damit die Buttons nicht aus der Kachel herauslaufen. */
+    .settings > #rowOpponent .cycle-group,
+    #settingsPanel > #botOpponentRow .cycle-group,
+    .controls-vertical > .opponent-pair .cycle-group {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        justify-content: flex-start !important;
+        gap: 3px !important;
+    }
+
+    .settings > #rowOpponent .cycle-group .label,
+    #settingsPanel > #botOpponentRow .cycle-group .label,
+    .controls-vertical > .opponent-pair .cycle-group .label {
+        width: 100% !important;
+    }
+
+    .settings > #rowOpponent .cycle-group .cycle-button,
+    #settingsPanel > #botOpponentRow .cycle-group .cycle-button,
+    .controls-vertical > .opponent-pair .cycle-group .cycle-button {
+        width: 100% !important;
+        flex: 0 0 auto !important;
+    }
+}
+
+/* Auf sehr schmalen Displays bleibt die vertikale Variante lesbar. */
+@media (max-width: 360px) {
+    .settings > .setting-row,
+    #settingsPanel > .setting-row,
+    .controls-vertical > .cycle-group,
+    .settings > #rowOpponent .cycle-group,
+    #settingsPanel > #botOpponentRow .cycle-group,
+    .controls-vertical > .opponent-pair .cycle-group {
+        flex-direction: column !important;
+        align-items: stretch !important;
+    }
+
+    .settings > .setting-row .label,
+    #settingsPanel > .setting-row .label,
+    .controls-vertical > .cycle-group .label {
+        width: 100% !important;
+    }
+}
+
+/* Einheitlicher Spielkopf nach dem Quarto-Layout.
+   Die hohe Spezifitaet und !important verhindern, dass alte
+   spielbezogene body-/top-bar-Regeln die Position wieder verschieben. */
+.game-page {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    padding-top: 64px !important;
+}
+
+.game-page > .container > .game-title,
+.game-page > .game-title {
+    margin-top: 0 !important;
+    margin-bottom: 8px !important;
+}
+
+.game-page .top-bar {
+    padding: 0 18px 10px !important;
+    gap: 12px !important;
+}
+
+.game-page .top-bar .game-title {
+    margin-top: 0 !important;
+}
+
+/* Die Startseite nutzt denselben oberen, klaren Einstieg wie die Spiele. */
+.home-page {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    padding-top: 64px !important;
+}
+
+@media (max-width: 700px) {
+    .home-page {
+        padding-top: 64px !important;
+    }
+
+    #soundToggle {
+        width: 34px;
+        height: 34px;
+        padding: 0;
     }
 }

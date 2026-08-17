@@ -107,14 +107,19 @@ h1 {
     padding: 4px 8px;
 }
 
-.cycle-group-double.setting-row {
+/* Einheitliches Steuerungsraster: Spieler/Match, Gegner/Anpassung, Regelmodus */
+.settings {
     display: grid;
-    grid-template-columns: auto;
-    gap: 8px;
-    width: fit-content;
-    padding: 4px 10px;
+    grid-template-columns: repeat(2, minmax(150px, 1fr));
+    gap: 8px 10px;
+    width: min(100%, 420px);
 }
-
+.settings .setting-row { width: 100%; margin: 0; }
+#rowPlayers { order: 1; }
+#rowRounds { order: 2; }
+#rowOpponent { order: 3; }
+#rowMode { order: 4; }
+.settings #reset { grid-column: 1 / -1; order: 5; justify-self: center; }
 /* NEU: Wenn Zeile deaktiviert ist */
 .setting-row.disabled {
     opacity: 0.4;
@@ -137,14 +142,16 @@ h1 {
     grid-template-columns: repeat(3, 1fr);
     gap: 10px;
     width: min(90vw, 300px);
-    margin: 20px auto;
+    aspect-ratio: 1 / 1;
+    margin: 12px auto;
 }
 
 /* Cell */
 .cell {
     background: #2c2c2c;
     border: 2px solid #3d7dff;
-    height: 80px;
+    height: auto;
+    aspect-ratio: 1 / 1;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -438,6 +445,16 @@ h1 {
         padding-bottom: 8px;
     }
 }
+
+/* Finales, zentriertes Steuerungsraster */
+.settings { justify-items: stretch; }
+.settings .setting-row { justify-content: center; }
+.settings #rowOpponent { grid-column: 1 / -1; }
+.settings #rowMode { grid-column: 1 / -1; }
+.settings .opponent-pair { grid-column: 1 / -1; width: 100%; }
+.settings .opponent-pair .cycle-group { display: flex; flex-direction: column; align-items: stretch; gap: 5px; width: 100%; margin: 0; }
+.settings .opponent-pair .cycle-button { width: 100%; }
+.settings .opponent-pair .cycle-button { flex: 0 0 auto; height: auto; min-height: 36px; }
 
 /* Modernes Brett-Finish */
 .board {

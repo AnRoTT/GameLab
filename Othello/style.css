@@ -236,6 +236,25 @@
     .status { font-size: 1rem; }
     .score-bar { font-size: 0.9rem; gap: 15px; }
 }
+
+.opponent-pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    grid-column: 1 / -1;
+    width: 420px;
+    max-width: 100%;
+    margin: 0 auto;
+}
+.opponent-pair .cycle-group {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 5px;
+    width: 100%;
+    margin: 0;
+}
+.opponent-pair .cycle-button { width: 100%; }
 /* -----------------------------------------
    Abstände im Einstellungs-Bereich
    ----------------------------------------- */
@@ -274,14 +293,19 @@
     margin: 0 auto;
 }
 
-.cycle-group-double.setting-row {
+/* Einheitliches Steuerungsraster: Spieler/Match, Gegner/Anpassung, Regelmodus */
+#settingsPanel {
     display: grid;
-    grid-template-columns: auto;
-    gap: 8px;
-    width: fit-content;
-    padding: 4px 10px;
+    grid-template-columns: repeat(2, minmax(150px, 1fr));
+    gap: 8px 10px;
+    width: min(100%, 420px);
 }
-
+#settingsPanel .setting-row { width: 100%; margin: 0; }
+#settingsPanel .setting-row:nth-child(1) { order: 1; }
+#settingsPanel .setting-row:nth-child(3) { order: 2; }
+#settingsPanel .setting-row:nth-child(4) { order: 3; }
+#settingsPanel .setting-row:nth-child(2) { order: 4; }
+#settingsPanel #startBtn { grid-column: 1 / -1; order: 5; }
 .setting-row.disabled {
     opacity: 0.45;
     pointer-events: none;
@@ -383,7 +407,6 @@
 @media (max-height: 700px) {
     body {
         align-items: flex-start;
-        padding-top: 8px;
     }
 
     #settingsPanel {
