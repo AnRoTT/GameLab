@@ -464,6 +464,11 @@ main {
 
 /* Responsive */
 @media (max-width: 640px) {
+    main {
+        padding-left: 0;
+        padding-right: 0;
+    }
+
     .top-bar {
         flex-direction: column;
         align-items: center;
@@ -476,7 +481,8 @@ main {
     }
 
     .board {
-        max-width: 95vw;
+        width: 100%;
+        max-width: none;
         gap: 4px;
         padding: 6px;
         border-radius: 18px;
@@ -491,7 +497,8 @@ main {
         align-items: center;
         text-align: center;
         gap: 8px; /* NEU: mehr Abstand zwischen Text und Score */
-        width: min(100%, 400px);
+        width: 100%;
+        max-width: none;
         padding: 8px 10px;
     }
 
@@ -526,13 +533,6 @@ main {
     width: 100%;
     text-align: center;
     margin-bottom: 12px;
-}
-.controls-vertical {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    width: 100%;
-    align-items: center;
 }
 .chip.ghost {
     opacity: 0.35;
@@ -577,19 +577,6 @@ main {
     pointer-events: none;
 }
 
-/* Einheitliches Steuerungsraster: Spieler/Match, Gegner/Anpassung */
-.controls-vertical {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(150px, 1fr));
-    gap: 8px 10px;
-    width: min(100%, 420px);
-}
-.controls-vertical .cycle-group { width: 100%; margin: 0; }
-.controls-vertical .cycle-group:nth-child(1) { order: 1; }
-.controls-vertical .cycle-group:nth-child(2) { order: 2; }
-.controls-vertical .cycle-group:nth-child(3) { order: 3; }
-.controls-vertical .round-actions { grid-column: 1 / -1; order: 4; }
-
 .round-actions {
     display: flex;
     align-items: center;
@@ -616,20 +603,6 @@ main {
         white-space: nowrap;
     }
 }
-
-/* Finales, zentriertes Steuerungsraster */
-.controls-vertical { justify-items: stretch; }
-.controls-vertical .cycle-group { justify-content: center; }
-.controls-vertical .opponent-pair {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-    grid-column: 1 / -1;
-    width: 100%;
-    order: 3;
-}
-.controls-vertical .opponent-pair .cycle-group { display: flex; flex-direction: column; align-items: stretch; gap: 5px; width: 100%; margin: 0; }
-.controls-vertical .opponent-pair .cycle-button { width: 100%; }
 
 /* A completed multi-round game always keeps the next-round action usable. */
 #roundActionButton:not(:disabled) {
@@ -765,7 +738,9 @@ main {
 
 @media (max-height: 700px) {
     .app {
-        margin: 8px;
+        /* Kein zusätzlicher Außenrand: Die gemeinsame theme.css
+           bestimmt bereits den responsiven Seitenabstand. */
+        margin: 0;
     }
 
     .top-bar {
@@ -778,7 +753,7 @@ main {
     }
 
     main {
-        padding: 8px 12px 10px;
+        padding: 8px 0 10px;
         gap: 8px;
     }
 
@@ -787,7 +762,8 @@ main {
     }
 
     .board {
-        max-width: 92vw;
+        width: 100%;
+        max-width: none;
     }
 
     .footer {

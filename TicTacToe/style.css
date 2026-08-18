@@ -87,39 +87,12 @@ h1 {
     border-color: var(--accent);
 }
 
-/* NEU: Settings Block - nur so breit wie Inhalt */
-.settings {
-    width: fit-content;
-    margin: 20px auto;
-    margin-bottom: 15px;
-}
-
-.setting-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: fit-content;
-    margin: 10px auto;
-    min-width: 0;
-}
-
-.setting-row-wide {
-    padding: 4px 8px;
-}
-
-/* Einheitliches Steuerungsraster: Spieler/Match, Gegner/Anpassung, Regelmodus */
-.settings {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(150px, 1fr));
-    gap: 8px 10px;
-    width: min(100%, 420px);
-}
-.settings .setting-row { width: 100%; margin: 0; }
+/* Gemeinsames Einstellungsraster wird zentral in theme.css geregelt. */
+.setting-row-wide { padding: 4px 8px; }
 #rowPlayers { order: 1; }
 #rowRounds { order: 2; }
 #rowOpponent { order: 3; }
 #rowMode { order: 4; }
-.settings #reset { grid-column: 1 / -1; order: 5; justify-self: center; }
 
 .extra-settings-toggle {
     margin: 4px auto 10px;
@@ -321,7 +294,7 @@ h1 {
 @media (max-width: 500px) {
     
     body {
-        padding: 10px;
+        padding: 0;
     }
 
     h1 {
@@ -345,10 +318,10 @@ h1 {
     }
 
     .board {
-        width: 90vw; /* 90% der Bildschirmbreite */
-        height: 90vw; /* quadratisch */
-        max-width: 350px;
-        max-height: 350px;
+        width: 100%;
+        height: auto;
+        max-width: none;
+        max-height: none;
         gap: 4px;
     }
 
@@ -527,16 +500,6 @@ h1 {
         padding-bottom: 8px;
     }
 }
-
-/* Finales, zentriertes Steuerungsraster */
-.settings { justify-items: stretch; }
-.settings .setting-row { justify-content: center; }
-.settings #rowOpponent { grid-column: 1 / -1; }
-.settings #rowMode { grid-column: 1 / -1; }
-.settings .opponent-pair { grid-column: 1 / -1; width: 100%; }
-.settings .opponent-pair .cycle-group { display: flex; flex-direction: column; align-items: stretch; gap: 5px; width: 100%; margin: 0; }
-.settings .opponent-pair .cycle-button { width: 100%; }
-.settings .opponent-pair .cycle-button { flex: 0 0 auto; height: auto; min-height: 36px; }
 
 /* Modernes Brett-Finish */
 .board {

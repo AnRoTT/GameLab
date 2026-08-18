@@ -107,6 +107,25 @@ button {
 }
 .game-actions .primary-button,
 .game-actions .secondary-button { margin: 0; }
+.cycle-button,
+.primary-button,
+.secondary-button { overflow: hidden; white-space: nowrap; }
+.button-label {
+    display: inline-block;
+    max-width: 100%;
+    white-space: nowrap;
+}
+.is-overflowing .button-label {
+    animation: button-label-marquee 5.5s ease-in-out infinite alternate;
+    will-change: transform;
+}
+@keyframes button-label-marquee {
+    0%, 20% { transform: translateX(0); }
+    80%, 100% { transform: translateX(calc(-1 * var(--overflow-distance))); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .is-overflowing .button-label { animation: none; text-overflow: ellipsis; overflow: hidden; }
+}
 .round-actions { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 #settingsToggle {
     position: fixed;
@@ -496,6 +515,14 @@ button {
     margin-right: auto !important;
 }
 
+/* Das Einstellungsraster darf nicht durch einen schmalen Spielkopf
+   einzelner Spiele kuenstlich verkleinert werden. */
+.game-page .app,
+.game-page .top-bar {
+    width: 100% !important;
+    box-sizing: border-box;
+}
+
 .settings > .setting-row,
 #settingsPanel > .setting-row,
 .controls-vertical > .cycle-group {
@@ -784,6 +811,33 @@ button {
     }
 }
 
+/* Verbindlicher Abschlussstandard fuer alle Spieleinstellungen.
+   Spielbezogene Altregeln duerfen die gemeinsame Rasterbreite nicht mehr
+   veraendern. */
+.settings,
+#settingsPanel,
+.controls-vertical {
+    width: min(100%, 420px) !important;
+    max-width: 420px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+.settings > .setting-row,
+#settingsPanel > .setting-row,
+.controls-vertical > .cycle-group,
+.opponent-pair {
+    min-width: 0 !important;
+    width: 100% !important;
+}
+
+.settings .cycle-button,
+#settingsPanel .cycle-button,
+.controls-vertical .cycle-button {
+    width: 100% !important;
+    min-width: 0 !important;
+}
+
 /* Kompakte Mobile-Steuerung: weniger Hoehe, weiterhin gut tappbar. */
 @media (max-width: 700px) {
     .settings,
@@ -791,7 +845,6 @@ button {
     .controls-vertical {
         gap: 6px !important;
         padding: 8px !important;
-        width: min(100%, 360px) !important;
     }
 
     .settings > .setting-row,
@@ -917,8 +970,67 @@ button {
 }
 
 .game-page .top-bar {
-    padding: 0 18px 10px !important;
+    /* Der Einstellungsbereich liegt bei 4 Gewinnt und Quarto im
+       top-bar. Seitlicher Padding würde ihn dort gegenüber Othello
+       künstlich um 36px verkleinern. */
+    padding: 0 0 10px !important;
     gap: 12px !important;
+}
+
+/* Einheitliche äußere Breite für Spiele mit .app oder .container.
+   Spielbezogene Maximalbreiten bleiben bestehen; nur der verfügbare
+   Seitenraum und die automatische Zentrierung werden vereinheitlicht. */
+.game-page > .app,
+.game-page > .container {
+    width: 100% !important;
+    box-sizing: border-box;
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+/* Mobile: Haupt-Infoflächen nutzen die gesamte verfügbare Breite.
+   Die Desktop-Maximalbreiten der einzelnen Spiele bleiben erhalten. */
+@media (max-width: 700px) {
+    /* Einheitlicher Mobile-Inhaltsbereich für jedes Spiel. Alle sichtbaren
+       Hauptflächen teilen sich dieselbe Breite; einzelne vw-Sonderbreiten
+       der Spiel-CSS dürfen hier nicht mehr auseinanderlaufen. */
+    .game-page {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+    }
+
+    .game-page .game-info,
+    .game-page .status-panel,
+    .game-page .piece-panel,
+    .game-page .board-wrapper,
+    .game-page .board {
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+        box-sizing: border-box;
+    }
+
+    /* Einstellungsraster und Infofläche müssen auf Mobile dieselbe
+       verfügbare Seitenbreite erhalten. Die Desktop-Grenze von 420px
+       darf hier nicht weiter greifen. */
+    .game-page .settings,
+    .game-page #settingsPanel,
+    .game-page .controls-vertical,
+    .game-page .game-info,
+    .game-page .status-panel {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box;
+    }
+
+    /* Das Einstellungsraster darf die nutzbare Breite nicht durch
+       zusätzlichen seitlichen Innenabstand verkleinern. */
+    .game-page .settings,
+    .game-page #settingsPanel,
+    .game-page .controls-vertical {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
 }
 
 .game-page .top-bar .game-title {
