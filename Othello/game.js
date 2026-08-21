@@ -50,11 +50,9 @@ function stabilizeFullscreenBoard() {
     }
 
     requestAnimationFrame(() => requestAnimationFrame(() => {
-        const size = Math.max(240, Math.min(
-            window.innerHeight - 36,
-            window.innerWidth - 24,
-            760
-        ));
+        const size = window.AndisBoardLayout?.viewportBoard?.({
+            min: 240, max: 760, aspect: 1, widthOffset: 24, heightOffset: 58
+        }) ?? Math.max(240, Math.min(window.innerHeight - 36, window.innerWidth - 24, 760));
         const cell = Math.max(1, Math.floor((size - 16 - 7 - 6) / 8));
         boardEl.style.setProperty("--othello-board-size", `${Math.floor(size)}px`);
         boardEl.style.setProperty("--othello-cell-size", `${cell}px`);
@@ -106,7 +104,7 @@ window.setOthelloMatchSettingsLocked = function (locked) {
 };
 
 settingsStartButton.addEventListener("click", () => {
-    playSound(soundButton, 0.22);
+    window.AndisSound?.playUiClick?.(0.22);
     if (gameStarted && !gameOver) {
         resetGame();
         return;
@@ -116,33 +114,33 @@ settingsStartButton.addEventListener("click", () => {
 });
 settingsModeButton.addEventListener("click", () => {
     if (gameStarted && !gameOver) return;
-    playSound(soundButton, 0.22);
+    window.AndisSound?.playUiClick?.(0.22);
     vsComputer = !vsComputer;
     settingsModeButton.textContent = vsComputer ? "1 Spieler" : "2 Spieler";
     updateBotLevelUI();
 });
 settingsRulesButton.addEventListener("click", () => {
     if (gameStarted && !gameOver) return;
-    playSound(soundButton, 0.22);
+    window.AndisSound?.playUiClick?.(0.22);
     ruleMode = ruleMode === "standard" ? "tournament" : "standard";
     settingsRulesButton.textContent = ruleMode === "standard" ? "Standard" : "Turnier";
 });
 settingsMatchButton.addEventListener("click", () => {
     if (gameStarted && !gameOver) return;
-    playSound(soundButton, 0.22);
+    window.AndisSound?.playUiClick?.(0.22);
     matchModeIndex = (matchModeIndex + 1) % MATCH_OPTIONS.length;
     updateMatchModeUI();
     if (typeof updateMatchInfo === "function") updateMatchInfo();
 });
 settingsBotLevelButton.addEventListener("click", () => {
     if (gameStarted && !gameOver) return;
-    playSound(soundButton, 0.22);
+    window.AndisSound?.playUiClick?.(0.22);
     botLevelIndex = (botLevelIndex + 1) % BOT_LEVELS.length;
     updateBotLevelUI();
 });
 settingsAdaptSpeedButton.addEventListener("click", () => {
     if (settingsAdaptSpeedButton.disabled || (gameStarted && !gameOver)) return;
-    playSound(soundButton, 0.22);
+    window.AndisSound?.playUiClick?.(0.22);
     adaptSpeedIndex = (adaptSpeedIndex + 1) % ADAPT_SPEEDS.length;
     updateBotLevelUI();
 });
@@ -164,11 +162,10 @@ const adaptiveStrengthPanel = document.getElementById("adaptiveStrengthPanel");
 const adaptiveStrengthValue = document.getElementById("adaptiveStrengthValue");
 const adaptiveStrengthBar = document.getElementById("adaptiveStrengthBar");
 
-const soundButton = new Audio("../assets/sounds/Button_Click.mp3");
 const soundMove = new Audio("../assets/sounds/Click.mp3");
 const soundError = new Audio("../assets/sounds/Error_Tock.mp3");
 
-[soundButton, soundMove, soundError].forEach(sound => {
+[soundMove, soundError].forEach(sound => {
     sound.volume = 0.25;
     sound.preload = "auto";
 });
@@ -336,7 +333,7 @@ function showGameScreen() {
 }
 
 mobileGameAction?.addEventListener("click", () => {
-    playSound(soundButton, 0.22);
+    window.AndisSound?.playUiClick?.(0.22);
     resetGame();
     showSetupScreen();
 });

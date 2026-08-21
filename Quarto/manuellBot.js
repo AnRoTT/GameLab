@@ -22,6 +22,12 @@
         return core.getManualProfile(Math.max(1, Math.min(4, Number(level) || 1)));
     }
 
+    function getThinkTime(level = 1) {
+        const base = [350, 550, 800, 1100][Math.max(0, Math.min(3, Number(level) - 1))] || 350;
+        const variation = base * 0.18;
+        return Math.max(280, Math.round(base - variation + Math.random() * variation * 2));
+    }
+
     function chooseAction(state, botPlayer, level) {
         const actions = core.getLegalActions(state);
         if (!actions.length) return null;
@@ -69,6 +75,7 @@
 
     window.QuartoManualBot = {
         LEVELS,
+        getThinkTime,
         choosePiece(state, botPlayer = 1, level = 1) {
             if (state.selectedPiece !== null) return null;
             return chooseAction(state, botPlayer, level);

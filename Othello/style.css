@@ -115,6 +115,33 @@ body:not(.mobile-prototype) .game-screen-header .game-screen-controls {
     display: none !important;
 }
 
+@media (min-width: 701px) {
+    body.game-page:not(.mobile-prototype) .board {
+        --othello-cell-size: min(60px, max(36px, calc((100dvh - 250px) / 8)));
+        grid-template-columns: repeat(8, var(--othello-cell-size));
+        grid-template-rows: repeat(8, var(--othello-cell-size));
+        min-height: 0;
+    }
+    body.game-page:not(.mobile-prototype) .board .cell {
+        width: var(--othello-cell-size);
+        height: var(--othello-cell-size);
+    }
+    body.game-page:not(.mobile-prototype) .board .piece {
+        width: min(50px, calc(var(--othello-cell-size) * .83));
+        height: min(50px, calc(var(--othello-cell-size) * .83));
+    }
+}
+
+#boardWrapper {
+    margin-top: 10px;
+}
+
+/* Im Desktop-Layout bleibt nur der zentrale Setup-Titel sichtbar.
+   Der mobile Spiel-Header darf keinen zweiten Spielnamen erzeugen. */
+body:not(.mobile-prototype) .game-screen-header {
+    display: none !important;
+}
+
 body:not(.mobile-prototype) .setup-extra-settings-button {
     display: none !important;
 }
@@ -127,15 +154,6 @@ body:not(.mobile-prototype) .mobile-game-actions {
     .mobile-prototype .setup-extra-settings-button {
         display: none !important;
     }
-}
-
-.title.game-title {
-    margin: 0 0 8px;
-    font-size: 2rem;
-    line-height: 1.2;
-    font-weight: 400;
-    letter-spacing: normal;
-    text-shadow: 0 0 15px var(--accent);
 }
 
 /* Mobile-Settings-Grundstruktur nach Tic-Tac-Toe/4-Gewinnt. */
@@ -202,7 +220,6 @@ body:not(.mobile-prototype) .mobile-game-actions {
     .setup-screen > #settingsPanel {
         width: 100% !important;
         max-width: 420px !important;
-        margin: 0 !important;
     }
 
     .setup-screen > #settingsPanel .cycle-button {
@@ -217,7 +234,6 @@ body:not(.mobile-prototype) .mobile-game-actions {
         justify-content: center;
         width: 100%;
         gap: 9px;
-        margin: 0 !important;
     }
 
     .mobile-prototype .game-screen,
@@ -355,9 +371,7 @@ body:not(.mobile-prototype) .mobile-game-actions {
     .mobile-prototype:not(.game-active) .setup-screen > .game-actions {
         flex-direction: column;
         align-items: center;
-        justify-content: center;
         gap: 9px;
-        min-height: 122px;
     }
 
     .mobile-prototype:not(.game-active) .setup-screen > .game-actions > .primary-button {
@@ -483,6 +497,13 @@ body:not(.mobile-prototype) .mobile-game-actions {
     body.is-fullscreen.game-active #board .piece {
         width: 80%;
         height: 80%;
+    }
+}
+
+@media (orientation: landscape) and (max-width: 700px) {
+    .mobile-prototype.game-active #board {
+        width: min(70vh, calc(100dvh - 58px), 520px) !important;
+        max-width: none;
     }
 }
 
@@ -615,21 +636,6 @@ body:not(.mobile-prototype) .mobile-game-actions {
     .score-bar { font-size: 0.9rem; gap: 15px; }
 }
 
-/* -----------------------------------------
-   Abstände im Einstellungs-Bereich
-   ----------------------------------------- */
-#settingsPanel {
-    margin-bottom: 24px; /* Abstand nach "Jetzt spielen" Button */
-}
-
-.legacy-start-spacing {
-    display: block;
-    width: 165px;
-    margin-left: auto;
-    margin-right: auto;
-    margin-bottom: 16px; /* Abstand zwischen Button und Status */
-}
-
 .game-info {
     margin-top: 16px;    /* Abstand über der Infoleiste */
     margin-bottom: 24px; /* Abstand unter der Infoleiste bis zum Brett */
@@ -760,14 +766,6 @@ body:not(.mobile-prototype) .mobile-game-actions {
         align-items: flex-start;
     }
 
-    #settingsPanel {
-        margin-bottom: 12px;
-    }
-
-    .legacy-start-spacing {
-        margin-bottom: 8px;
-    }
-
     .game-info {
         margin-top: 8px;
         margin-bottom: 12px;
@@ -779,8 +777,6 @@ body:not(.mobile-prototype) .mobile-game-actions {
     }
 
     .footer {
-        margin-top: 12px;
-        padding: 8px 12px;
     }
 }
 

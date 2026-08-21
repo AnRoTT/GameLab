@@ -1,7 +1,10 @@
 h1 {
     width: 100%;
     text-align: center;
+    margin-bottom: 10px;
+    text-shadow: 0 0 10px #3d7dff;
 }
+
 
 body {
     display: flex;
@@ -20,7 +23,7 @@ body {
 /* Desktop: Abstand wie bei den übrigen Spielen zwischen Einstellungen
    und Startaktion. Die mobile Anordnung bleibt unverändert. */
 .game-page:not(.mobile-prototype) #reset {
-    margin-top: 14px;
+    margin: 0;
 }
 
 /* Die gemeinsame .game-actions-Kachel liefert bereits den Abstand nach
@@ -28,11 +31,6 @@ body {
    gegenüber den anderen Spielen unnötig vergrößern. */
 .game-page:not(.mobile-prototype) .game-info {
     margin-top: 0;
-}
-
-h1 {
-    margin-bottom: 10px;
-    text-shadow: 0 0 10px #3d7dff;
 }
 
 /* NEU: Score Header */
@@ -106,10 +104,6 @@ h1 {
 #rowRounds { order: 2; }
 #rowOpponent { order: 3; }
 #rowMode { order: 4; }
-
-.extra-settings-toggle {
-    margin: 4px auto 10px;
-}
 
 .settings-backdrop[hidden] { display: none; }
 
@@ -290,8 +284,6 @@ h1 {
 
 /* NEU: Footer mit Version + Autor */
 .footer {
-    margin-top: 30px;
-    padding-bottom: 15px;
     font-size: 0.8rem;
     color: #555;
     opacity: 0.7;
@@ -487,18 +479,10 @@ h1 {
         margin-bottom: 8px;
     }
 
-    .settings {
-        margin: 8px auto 10px;
-    }
-
     .setting-row {
         margin: 5px auto;
         padding-top: 4px;
         padding-bottom: 4px;
-    }
-
-    #reset {
-        margin-top: 4px;
     }
 
     .game-info {
@@ -513,8 +497,6 @@ h1 {
     }
 
     .footer {
-        margin-top: 10px;
-        padding-bottom: 8px;
     }
 }
 
@@ -579,15 +561,6 @@ h1 {
     50% { filter: brightness(1.28); text-shadow: 0 0 13px rgba(255,255,255,.92), 0 0 28px rgba(120,165,255,.7); }
 }
 
-h1.game-title {
-    width: 100%;
-    margin: 0 0 8px;
-    font-size: 2rem;
-    line-height: 1.2;
-    font-weight: 400;
-    letter-spacing: normal;
-    text-shadow: 0 0 15px var(--accent);
-}
 :root {
     --ttt-screen-gap: clamp(12px, 3vw, 24px);
 }
@@ -694,31 +667,6 @@ h1.game-title {
     opacity: .82;
 }
 
-.mobile-prototype .mobile-game-actions #mobileSettingsAction {
-    min-width: 150px;
-    min-height: 38px;
-    padding: 7px 12px;
-    border: 1px solid rgba(120, 165, 255, .65);
-    border-radius: var(--radius-md);
-    background: rgba(79, 140, 255, .1);
-    color: var(--text-main);
-    opacity: 1;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, .22);
-    cursor: pointer;
-    transition: background .15s ease, border-color .15s ease, transform .1s ease;
-}
-
-.mobile-prototype .mobile-game-actions #mobileSettingsAction:hover,
-.mobile-prototype .mobile-game-actions #mobileSettingsAction:focus-visible {
-    background: rgba(79, 140, 255, .2);
-    border-color: var(--accent);
-    outline: none;
-}
-
-.mobile-prototype .mobile-game-actions #mobileSettingsAction:active {
-    transform: translateY(1px);
-}
-
 .mobile-prototype .mobile-game-actions #mobileGameAction {
     order: 2;
 }
@@ -796,8 +744,6 @@ h1.game-title {
         grid-column: 2;
         grid-row: 2;
         width: 100%;
-        min-height: 122px;
-        justify-content: center;
         gap: 9px;
     }
 
@@ -921,8 +867,12 @@ h1.game-title {
         grid-row: 3;
     }
 
-    .mobile-prototype .game-screen .footer {
-        display: none;
+}
+
+@media (min-width: 701px) {
+    body.game-page:not(.mobile-prototype) .board {
+        width: min(90vw, 300px, max(220px, calc(100dvh - 280px)));
+        max-width: none;
     }
 }
 
@@ -935,6 +885,43 @@ h1.game-title {
         max-width: none;
         grid-template-columns: repeat(3, var(--ttt-cell-size, 1fr));
         grid-template-rows: repeat(3, var(--ttt-cell-size, 1fr));
+    }
+}
+
+/* Mobile-Landscape: Header und Brett müssen gemeinsam in den sichtbaren
+   Vollbildbereich passen; die Desktopregel oben darf hier nicht gelten. */
+@media (orientation: landscape) and (max-height: 700px) {
+    body.game-page.mobile-prototype.game-active main {
+        min-height: 0 !important;
+        height: calc(100dvh - 8px) !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        gap: 0 !important;
+        overflow: hidden !important;
+    }
+
+    body.game-page.mobile-prototype.game-active,
+    body.game-page.mobile-prototype.game-active > .app {
+        overflow: hidden !important;
+    }
+
+    .mobile-prototype.game-active .game-screen:not([hidden]) {
+        grid-template-rows: auto minmax(0, 1fr) !important;
+        align-content: stretch !important;
+        min-height: 0;
+        height: 100% !important;
+        max-height: 100% !important;
+        overflow: hidden;
+    }
+
+    .mobile-prototype.game-active .game-screen .game-side-panel,
+    .mobile-prototype.game-active .game-screen .board {
+        grid-row: 2 !important;
+    }
+
+    .mobile-prototype.game-active .game-screen .board {
+        width: min(70vh, calc(100dvh - 58px), 520px) !important;
+        max-width: none;
     }
 }
 

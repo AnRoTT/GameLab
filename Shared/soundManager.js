@@ -34,14 +34,14 @@
             }
             this.updateButton();
         },
-        playUiClick() {
+        playUiClick(volume = 0.22) {
             if (this.muted) return;
             const script = document.querySelector('script[src*="soundManager.js"]');
             const soundUrl = script
                 ? new URL("../assets/sounds/Button_Click.mp3", script.src).href
                 : new URL("assets/sounds/Button_Click.mp3", document.baseURI).href;
             const sound = new Audio(soundUrl);
-            sound.volume = 0.22;
+            sound.volume = volume;
             sound.play().catch(() => {});
         },
         updateButton() {

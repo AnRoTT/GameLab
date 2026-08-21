@@ -59,7 +59,6 @@ const reset = document.getElementById("reset");
 const setupScreen = document.getElementById("setupScreen");
 const gameScreen = document.getElementById("gameScreen");
 const mobileGameAction = document.getElementById("mobileGameAction");
-const mobileSettingsAction = document.getElementById("mobileSettingsAction");
 const mobileSettingsBack = document.getElementById("mobileSettingsBack");
 const fullscreenToggle = document.getElementById("fullscreenToggle");
 function syncMobileGameAction() {
@@ -67,7 +66,6 @@ function syncMobileGameAction() {
     const nextRoundPending = reset.textContent === "Neue Runde";
     mobileGameAction.hidden = nextRoundPending;
     mobileGameAction.textContent = reset.textContent || "Spiel abbrechen";
-    if (mobileSettingsAction) mobileSettingsAction.hidden = !matchOver;
 }
 function detectMobilePrototype() {
     return window.AndisMobileLayout?.detectMobileSession?.() ?? false;
@@ -86,15 +84,17 @@ const fullscreenController = screenController?.bindFullscreen?.({
 
 function stabilizeTicTacToeBoard() {
     if (!document.fullscreenElement || !document.body.classList.contains("game-active")) {
-        boardEl?.style.removeProperty("--ttt-board-size");
-        boardEl?.style.removeProperty("--ttt-cell-size");
+        board?.style.removeProperty("--ttt-board-size");
+        board?.style.removeProperty("--ttt-cell-size");
         return;
     }
     requestAnimationFrame(() => requestAnimationFrame(() => {
-        const size = Math.floor(Math.max(240, Math.min(window.innerHeight - 36, window.innerWidth - 24, 700)));
+        const size = window.AndisBoardLayout?.viewportBoard?.({
+            min: 240, max: 700, aspect: 1, widthOffset: 24, heightOffset: 58
+        }) ?? Math.floor(Math.max(240, Math.min(window.innerHeight - 36, window.innerWidth - 24, 700)));
         const cell = Math.floor((size - 20) / 3);
-        boardEl.style.setProperty("--ttt-board-size", `${size}px`);
-        boardEl.style.setProperty("--ttt-cell-size", `${cell}px`);
+        board.style.setProperty("--ttt-board-size", `${size}px`);
+        board.style.setProperty("--ttt-cell-size", `${cell}px`);
         render();
     }));
 }
@@ -109,16 +109,11 @@ screenController?.watchResponsiveMode?.((isMobile) => {
     mobilePrototype = isMobile;
 });
 /* --- Sound System --- */
-const uiClickSound = new Audio("../assets/sounds/Button_Click.mp3");
-uiClickSound.volume = 0.35;
-
 const boardClickSound = new Audio("../assets/sounds/Click.mp3");
 boardClickSound.volume = 0.4;
 
 function playUiClick(volume = 0.35) {
-    uiClickSound.volume = volume;
-    uiClickSound.currentTime = 0;
-    uiClickSound.play().catch(() => {});
+    window.AndisSound?.playUiClick?.(volume);
 }
 
 function playBoardClick(volume = 0.4) {
@@ -604,7 +599,6 @@ mobileGameAction?.addEventListener("click", () => {
     }
     reset.click();
 });
-mobileSettingsAction?.addEventListener("click", showSetupScreen);
 
 /* initial start - Board beim Start sperren */
 function init() {
@@ -632,10 +626,6 @@ document.querySelectorAll('.cycle-button').forEach(btn => {
 
 /* â­ NEU: Sound fÃ¼r Reset Button */
 reset.addEventListener('click', () => {
-    playUiClick(0.2);
-});
-
-mobileSettingsAction?.addEventListener('click', () => {
     playUiClick(0.2);
 });
 

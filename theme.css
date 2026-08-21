@@ -16,6 +16,12 @@
     --mobile-settings-side-padding: 16px;
     --mobile-settings-top-padding: 18px;
     --game-action-gap: 12px;
+    --setup-action-gap: 12px;
+    /* Gemeinsame responsive Grundlage: Spiele dürfen diese Werte für die
+       verfügbare Fläche verwenden; Brettform und konkrete Grenzen bleiben
+       spielabhängig. */
+    --game-board-viewport-width: 100%;
+    --game-board-viewport-height: 100dvh;
 }
 
 *,
@@ -39,6 +45,27 @@ body {
 button,
 a {
     font: inherit;
+}
+
+/* Verbindliche gemeinsame Bedienzustände für alle Spiele. Spiel-CSS darf
+   spielabhängige Farben und Hervorhebungen ergänzen, aber diese Basis nicht
+   durch abweichendes Eingabe- oder Fokusverhalten ersetzen. */
+.game-page button,
+.game-page .board,
+.game-page .cell,
+.game-page .board-cell,
+.game-page .piece-button {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.game-page button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.game-page button:disabled {
+    cursor: not-allowed;
 }
 
 button {
@@ -134,10 +161,95 @@ button {
     align-items: center;
     gap: 6px;
     width: 100%;
-    margin: 0 auto 14px;
+    margin: var(--setup-action-gap) auto 14px;
 }
 .game-actions .primary-button,
 .game-actions .secondary-button { margin: 0; }
+
+/* Verbindlicher Abstand im Settings-Screen: Der Einstellungsbereich liefert
+   keinen zusätzlichen unteren Abstand; die Startaktion besitzt allein die
+   definierten 12px Abstand. Dadurch bleiben alle Spiele in Desktop und
+   Portrait identisch. */
+.setup-screen > .settings + .game-actions,
+.setup-screen > #settingsPanel + .game-actions,
+.setup-screen > .controls-vertical + .game-actions {
+    margin-top: var(--setup-action-gap) !important;
+}
+
+.setup-screen > .settings,
+.setup-screen > #settingsPanel,
+.setup-screen > .controls-vertical {
+    margin-bottom: 0 !important;
+}
+
+/* 4 Gewinnt löst den Setup-Screen im Desktop über display: contents auf.
+   Der alte main-Gap würde dann zusätzlich zwischen Settings und Startaktion
+   greifen. Während der Setup-Screen sichtbar ist, ist dieser Gap deshalb 0;
+   im aktiven Spiel bleibt die spielbezogene main-Komposition erhalten. */
+@media (min-width: 701px) {
+    .game-page:not(.mobile-prototype) main:has(> .setup-screen:not([hidden])) {
+        gap: 0 !important;
+    }
+}
+
+/* Mobile Portrait: Die Startaktion folgt unmittelbar auf den Settings-Bereich.
+   Spielbezogene Legacy-Regeln dürfen hier keine zusätzliche Zentrierfläche
+   oder eigene Margins erzeugen. Der verbindliche Abstand beträgt 12px. */
+@media (orientation: portrait) and (max-width: 700px) {
+    /* 4 Gewinnt kapselt den Settings-Screen zusätzlich in main.
+       Der mobile obere Innenabstand darf den gemeinsamen Titelabstand
+       nicht gegenüber TTT und Othello verschieben. Desktop und Landscape
+       behalten den spielbezogenen main-Padding. */
+    .mobile-prototype:not(.game-active) main:has(> .setup-screen) {
+        padding-top: 0 !important;
+    }
+
+    /* 4 Gewinnt besitzt zusätzlich einen historischen Titel im top-bar.
+       Im mobilen Settings-Screen bleibt ausschließlich der Titel im
+       setup-screen sichtbar. */
+    .mobile-prototype:not(.game-active) .top-bar > .game-title {
+        display: none !important;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .game-title,
+    .mobile-prototype:not(.game-active) .setup-screen > .setup-screen-title {
+        display: block !important;
+        width: 100% !important;
+        margin: 0 0 2px !important;
+        font-size: 1.55rem !important;
+        line-height: 1.05 !important;
+        font-weight: 400 !important;
+        letter-spacing: normal !important;
+        text-align: center !important;
+        text-shadow: 0 0 15px var(--accent) !important;
+    }
+
+    /* Die Spielseiten verwenden teilweise einen allgemeinen Flex-Gap für
+       Titel, Settings und Aktion. Für die Settings-Aktion darf dieser Gap
+       nicht zusätzlich zum verbindlichen 12px-Abstand wirken. */
+    .mobile-prototype:not(.game-active) .setup-screen {
+        row-gap: 0 !important;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions {
+        min-height: 0 !important;
+        justify-content: flex-start !important;
+        margin-top: var(--setup-action-gap) !important;
+        margin-bottom: 14px !important;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .settings,
+    .mobile-prototype:not(.game-active) .setup-screen > #settingsPanel,
+    .mobile-prototype:not(.game-active) .setup-screen > .controls-vertical {
+        margin-bottom: 0 !important;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions > #reset,
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions > #startBtn,
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions > #resetGameButton {
+        margin-top: 0 !important;
+    }
+}
 .cycle-button,
 .primary-button,
 .secondary-button { overflow: hidden; white-space: nowrap; }
@@ -551,103 +663,12 @@ button {
     flex: 0 0 auto;
 }
 
-/* Einheitliches Steuerungs-Layout für alle Spiele */
-.settings,
-#settingsPanel,
-.controls-vertical {
-    display: grid !important;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-    align-items: stretch;
-    justify-items: stretch;
-    width: min(100%, 420px) !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-}
-
 /* Das Einstellungsraster darf nicht durch einen schmalen Spielkopf
    einzelner Spiele kuenstlich verkleinert werden. */
 .game-page .app,
 .game-page .top-bar {
     width: 100% !important;
     box-sizing: border-box;
-}
-
-.settings > .setting-row,
-#settingsPanel > .setting-row,
-.controls-vertical > .cycle-group {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    justify-content: flex-start;
-    gap: 5px;
-    width: 100% !important;
-    min-width: 0;
-    margin: 0;
-}
-
-.settings > .setting-row .label,
-#settingsPanel > .setting-row .label,
-.controls-vertical > .cycle-group .label {
-    width: 100%;
-    text-align: left;
-    white-space: nowrap;
-}
-
-.settings > .setting-row .cycle-button,
-#settingsPanel > .setting-row .cycle-button,
-.controls-vertical > .cycle-group .cycle-button {
-    width: 100%;
-    min-width: 0;
-    min-height: 36px;
-    flex: 0 0 auto;
-}
-
-/* Gegner und adaptive Geschwindigkeit bilden immer eine gemeinsame Zeile. */
-.settings > #rowOpponent,
-#settingsPanel > #botOpponentRow,
-.controls-vertical > .opponent-pair {
-    display: grid;
-    grid-column: 1 / -1;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-    width: 100% !important;
-}
-
-.settings > #rowOpponent .cycle-group,
-#settingsPanel > #botOpponentRow .cycle-group,
-.controls-vertical > .opponent-pair .cycle-group {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    justify-content: flex-start;
-    gap: 5px;
-    width: 100%;
-    margin: 0;
-}
-
-/* Dritte Zeile: Regelmodus oder spielabhängige Sonderoption. */
-.settings > #rowMode,
-#settingsPanel > .setting-row:nth-child(2),
-.settings > #rowMode,
-#settingsPanel > .setting-row:nth-child(2) {
-    grid-column: 1 / -1;
-}
-
-.settings > #reset,
-#settingsPanel > #startBtn,
-.controls-vertical > .round-actions {
-    grid-column: 1 / -1;
-    justify-self: center;
-}
-
-@media (max-width: 520px) {
-    .settings,
-    #settingsPanel,
-    .controls-vertical {
-        width: min(100%, 420px) !important;
-        gap: 8px;
-    }
 }
 
 .cycle-button {
@@ -947,18 +968,29 @@ body.game-page {
 body.game-page > .app {
     display: flex;
     flex-direction: column;
+    flex: 1 1 auto;
     width: 100%;
-    min-height: 100%;
+    min-height: 0;
 }
 
 body.game-page > .footer,
-body.game-page > .app > .footer {
+body.game-page > .app > .footer,
+body.game-page .game-screen > .footer {
     display: block !important;
     width: 100%;
     box-sizing: border-box;
     margin-top: auto !important;
     padding: 10px 16px 8px !important;
     text-align: center;
+}
+
+/* Auch ein Footer innerhalb des aktiven Spielscreens bleibt am unteren Ende
+   seiner jeweiligen Spielseite und darf nicht durch Spiel-CSS nach oben
+   zwischen Brett und Infobadge verschoben werden. */
+body.game-page .game-screen > .footer {
+    align-self: stretch;
+    grid-column: 1 / -1 !important;
+    grid-row: auto !important;
 }
 
 /* Vollbild-Grundlage: der mobile Spielscreen darf die gesamte Fläche nutzen. */
@@ -970,6 +1002,27 @@ body.game-page > .app > .footer {
     body.game-page.is-fullscreen.game-active .game-screen:not([hidden]) {
         width: 100% !important;
         max-width: none !important;
+    }
+}
+
+/* Mobiler Spielmodus: Der Footer gehört nicht in die fokussierte
+   Spielfläche und darf dort keinen zusätzlichen Scrollbereich erzeugen. */
+@media (max-width: 700px) {
+    body.game-page.mobile-prototype.game-active > .footer,
+    body.game-page.mobile-prototype.game-active > .app > .footer,
+    body.game-page.mobile-prototype.game-active .game-screen > .footer {
+        display: none !important;
+    }
+}
+
+/* Mobile Landscape kann trotz mobiler Darstellung mehr als 700 CSS-Pixel
+   breit sein. Die Ausblendung muss deshalb zusätzlich über die geringe
+   Landscape-Höhe greifen. */
+@media (orientation: landscape) and (max-height: 700px) {
+    body.game-page.mobile-prototype.game-active > .footer,
+    body.game-page.mobile-prototype.game-active > .app > .footer,
+    body.game-page.mobile-prototype.game-active .game-screen > .footer {
+        display: none !important;
     }
 }
 

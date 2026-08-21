@@ -22,20 +22,19 @@
     const mobileGameAction = document.getElementById("mobileGameAction");
     const fullscreenToggle = document.getElementById("fullscreenToggle");
     const detectMobile = () => window.AndisMobileLayout?.detectMobileSession?.() ?? false;
-    const updateMobileMode = () => document.body.classList.toggle("mobile-prototype", detectMobile());
-    updateMobileMode();
-    window.addEventListener("resize", updateMobileMode, { passive: true });
-    window.addEventListener("orientationchange", updateMobileMode, { passive: true });
     const screenController = window.AndisMobileLayout?.createScreenController?.({
         setupScreen,
         gameScreen,
         body: document.body
     });
-    const isMobile = detectMobile();
-    screenController?.applyMode(isMobile, false);
+    let mobilePrototype = detectMobile();
+    screenController?.applyMode(mobilePrototype, false);
+    screenController?.watchResponsiveMode?.((isMobile) => {
+        mobilePrototype = isMobile;
+    });
     const fullscreenController = screenController?.bindFullscreen?.({
         button: fullscreenToggle,
-        isMobile: () => detectMobile()
+        isMobile: () => mobilePrototype
     });
 
     // Robuste Landscape-Neuberechnung wie bei Othello: Quarto darf seine
@@ -48,23 +47,23 @@
         }
 
         requestAnimationFrame(() => requestAnimationFrame(() => {
-            const wrapperWidth = boardElement.parentElement?.clientWidth || window.innerWidth;
-            const size = Math.max(220, Math.min(
-                window.innerHeight - 48,
-                wrapperWidth,
-                window.innerWidth * 0.62,
-                520
-            ));
+            const wrapperWidth = window.AndisBoardLayout?.elementWidth?.(
+                boardElement.parentElement,
+                window.innerWidth
+            ) ?? window.innerWidth;
+            const size = window.AndisBoardLayout?.viewportBoard?.({
+                min: 220,
+                max: 520,
+                aspect: 1,
+                widthOffset: Math.max(0, window.innerWidth - Math.min(wrapperWidth, window.innerWidth * 0.62)),
+                heightOffset: 58
+            }) ?? Math.max(220, Math.min(window.innerHeight - 48, wrapperWidth, window.innerWidth * 0.62, 520));
             boardElement.style.setProperty("--quarto-board-size", `${Math.floor(size)}px`);
             render();
         }));
     }
 
     window.AndisBoardLayout?.bindResponsiveBoardLayout(stabilizeLandscapeBoard);
-    mobileSettingsBack?.addEventListener("click", () => {
-        fullscreenController?.exit();
-        startButton.click();
-    });
     mobileGameAction?.addEventListener("click", () => startButton.click());
     const QUARTO_BOT_PLAYER = 1;
     const BOT_LEVELS = ["Anfänger", "Hobbyspieler", "Vereinsspieler", "Meister", "Adaptiv"];
@@ -76,11 +75,10 @@
     let botLevelIndex = 0;
     let adaptSpeedIndex = 1;
 
-    const soundButton = new Audio("../assets/sounds/Button_Click.mp3");
     const soundSelect = new Audio("../assets/sounds/Click.mp3");
     const soundPlace = new Audio("../assets/sounds/chess_piece_place.mp3");
     const soundError = new Audio("../assets/sounds/Error_Tock.mp3");
-    [soundButton, soundSelect, soundPlace, soundError].forEach((sound) => {
+    [soundSelect, soundPlace, soundError].forEach((sound) => {
         sound.volume = 0.25;
         sound.preload = "auto";
     });
@@ -358,7 +356,9 @@
                     : QuartoManualBot.chooseCell(state, QUARTO_BOT_PLAYER, botLevelIndex + 1);
                 placeSelectedPiece(cell, true);
             }
-        }, 450);
+        }, isAdaptiveBot()
+            ? QuartoAdaptiveBot.getThinkTime()
+            : QuartoManualBot.getThinkTime(botLevelIndex + 1));
     }
 
     function finish(message, winningLine = [], winner = null) {
@@ -399,8 +399,10 @@
         startingChooser = 0;
         matchInProgress = false;
         gameStarted = false;
-        screenController?.showSetup?.();
-        fullscreenController?.exit();
+        if (mobilePrototype) {
+            screenController?.showSetup?.();
+            fullscreenController?.exit();
+        }
         gameOver = true;
         document.body.classList.remove("game-active");
         renderScores();
@@ -428,8 +430,10 @@
         gameStarted = true;
         gameOver = false;
         document.body.classList.add("game-active");
-        screenController?.showGame?.();
-        fullscreenController?.requestIfChosen();
+        if (mobilePrototype) {
+            screenController?.showGame?.();
+            fullscreenController?.requestIfChosen();
+        }
         QuartoAdaptiveBot.beginRound({ enabled: isAdaptiveBot(), adaptSpeed: adaptiveSpeed() });
         startButton.textContent = matchModeIndex > 0 ? "Match beenden" : "Spiel abbrechen";
         updateMobileGameAction("Spiel abbrechen");
@@ -474,7 +478,7 @@
     });
     [modeButton, botLevelButton, adaptiveButton, matchButton, startButton]
         .filter(Boolean)
-        .forEach((element) => element.addEventListener("click", () => playSound(soundButton, 0.22)));
+        .forEach((element) => element.addEventListener("click", () => window.AndisSound?.playUiClick?.(0.22)));
     document.addEventListener("keydown", (event) => {
         if (["Tab", "Enter", " ", "Spacebar", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) {
             keyboardMode = true;
@@ -489,4 +493,30 @@
     document.addEventListener("pointerdown", clearKeyboardFocus);
     renderScores();
     render();
+
+    const navigationState = {
+        isGameActive: () => document.body.classList.contains("game-active") || gameStarted,
+        isMatchRunning: () => gameStarted && !gameOver
+    };
+
+    window.AndisNavigation?.bindBackButton?.({
+        button: document.getElementById("backIcon"),
+        ...navigationState,
+        onAbortConfirmed: abortMatch,
+        onMenuBack: () => {
+            window.AndisSound?.playUiClick?.(0.22);
+            setTimeout(() => { window.location.href = "../index.html?menu=1"; }, 100);
+        }
+    });
+
+    window.AndisNavigation?.bindBackButton?.({
+        button: mobileSettingsBack,
+        ...navigationState,
+        onAbortConfirmed: abortMatch
+    });
+
+    window.AndisNavigation?.bindBrowserBack?.({
+        ...navigationState,
+        onAbortConfirmed: abortMatch
+    });
 })();

@@ -354,6 +354,16 @@ main {
     position: relative;
 }
 
+/* Desktop: Das Brett berücksichtigt den verfügbaren vertikalen Raum, damit
+   der Footer bei normalen Viewports nicht erst weit unterhalb des Screens
+   nach dem Brett erscheint. Mobile Layouts bleiben unverändert. */
+@media (min-width: 701px) {
+    body.game-page:not(.mobile-prototype) .board {
+        width: min(100%, 520px, max(280px, calc((100dvh - 360px) * 1.1667)));
+        max-width: none;
+    }
+}
+
 /* Column hover zones (for click on mobile & desktop) */
 
 .board-column-hover {
@@ -722,7 +732,6 @@ main {
     border-top: none;
     background: transparent;
     user-select: none;
-    margin-top: 20px;
     opacity: 0.8;
     transition: 0.2s;
 }
@@ -768,8 +777,6 @@ main {
     }
 
     .footer {
-        margin-top: 10px;
-        padding: 8px 12px;
     }
 }
 
@@ -835,6 +842,12 @@ body:not(.mobile-prototype) .game-screen-header .game-screen-controls {
     display: none !important;
 }
 
+/* Im Desktop-Layout bleibt nur der zentrale Setup-Titel sichtbar.
+   Der mobile Spiel-Header darf keinen zweiten Spielnamen erzeugen. */
+body:not(.mobile-prototype) .game-screen-header {
+    display: none !important;
+}
+
 body:not(.mobile-prototype) .setup-screen,
 body:not(.mobile-prototype) .game-screen { display: contents; }
 
@@ -885,92 +898,6 @@ body:not(.mobile-prototype) .game-screen { display: contents; }
 /* Querformat folgt dem bewährten Tic-Tac-Toe-Muster: Brett links,
    Informationen und Aktionen rechts. */
 @media (orientation: landscape) and (max-height: 700px) {
-    .mobile-prototype:not(.game-active) > #settingsToggle {
-        display: none !important;
-    }
-
-    .mobile-prototype:not(.game-active) > #backIcon,
-    .mobile-prototype:not(.game-active) > #helpIcon {
-        top: 6px;
-    }
-
-    .mobile-prototype:not(.game-active) > #soundToggle {
-        top: auto;
-        left: auto;
-        right: max(18px, calc((100vw - 900px) / 2));
-        bottom: 18px;
-        z-index: 20;
-    }
-
-    .mobile-prototype:not(.game-active) .top-bar {
-        display: none;
-    }
-
-    .mobile-prototype:not(.game-active) .setup-screen {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(180px, 260px);
-        grid-template-rows: auto 1fr;
-        align-items: center;
-        justify-content: center;
-        column-gap: clamp(16px, 4vw, 42px);
-        width: min(100%, 900px);
-        row-gap: 8px;
-    }
-
-    .mobile-prototype:not(.game-active) .setup-screen-title {
-        display: block;
-        grid-column: 1 / -1;
-        grid-row: 1;
-        width: 100%;
-        margin: 0 0 2px !important;
-        font-size: 1.55rem;
-        line-height: 1.05;
-        text-align: center;
-        text-shadow: 0 0 10px #3d7dff;
-    }
-
-    .mobile-prototype:not(.game-active) .setup-screen > .controls-vertical {
-        grid-column: 1;
-        grid-row: 2;
-        width: 100%;
-        max-width: 420px;
-    }
-
-    .mobile-prototype:not(.game-active) .setup-screen > .game-actions {
-        grid-column: 2;
-        grid-row: 2;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 9px;
-        width: 100%;
-        min-height: 122px;
-    }
-
-    .mobile-prototype:not(.game-active) .setup-screen > .game-actions .primary-button {
-        width: 100%;
-        min-height: 42px;
-        margin: 0;
-    }
-
-    .mobile-prototype:not(.game-active) .setup-screen > .game-actions .setup-extra-settings-button {
-        width: 42px;
-        min-width: 42px;
-        height: 36px;
-        padding: 0;
-        border: 2px solid var(--accent) !important;
-        border-radius: 8px;
-        background: var(--bg-panel) !important;
-        color: var(--accent) !important;
-        box-shadow: var(--shadow-soft);
-        display: inline-flex !important;
-        align-items: center;
-        justify-content: center;
-        font-size: 1rem;
-        margin-top: 8px;
-    }
-
     .mobile-prototype .game-screen:not([hidden]) {
         display: grid;
         grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
@@ -1054,6 +981,41 @@ body:not(.mobile-prototype) .game-screen { display: contents; }
         height: var(--connect-four-chip-size, 84%) !important;
         left: calc(50% - (var(--connect-four-chip-size, 84%) / 2)) !important;
         top: calc(50% - (var(--connect-four-chip-size, 84%) / 2)) !important;
+    }
+}
+
+@media (orientation: landscape) and (max-height: 700px) {
+    body.game-page.mobile-prototype.game-active main {
+        min-height: 0 !important;
+        height: calc(100dvh - 8px) !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        gap: 0 !important;
+        overflow: hidden !important;
+    }
+
+    body.game-page.mobile-prototype.game-active,
+    body.game-page.mobile-prototype.game-active > .app {
+        overflow: hidden !important;
+    }
+
+    .mobile-prototype.game-active .game-screen:not([hidden]) {
+        grid-template-rows: auto minmax(0, 1fr) !important;
+        align-content: stretch !important;
+        min-height: 0;
+        height: 100% !important;
+        max-height: 100% !important;
+        overflow: hidden;
+    }
+
+    .mobile-prototype.game-active .game-screen .game-side-panel,
+    .mobile-prototype.game-active .game-screen .board {
+        grid-row: 2 !important;
+    }
+
+    .mobile-prototype.game-active .game-screen .board {
+        width: min(84vh, calc((100dvh - 58px) * 1.1667), 520px) !important;
+        max-width: none;
     }
 }
 
@@ -1158,8 +1120,7 @@ body:not(.mobile-prototype) .game-screen { display: contents; }
     display: none !important;
 }
 
-/* Mobile Spielaktionen identisch zur Tic-Tac-Toe-Referenz:
-   Spieleinstellungen ändern oben, Hauptaktion darunter. */
+/* Mobile Spielaktion. */
 .game-connect-four.mobile-prototype .mobile-game-actions {
     display: flex !important;
     justify-content: center;
@@ -1169,30 +1130,10 @@ body:not(.mobile-prototype) .game-screen { display: contents; }
     width: 100%;
 }
 
-.game-connect-four.mobile-prototype .mobile-game-actions .secondary-button {
-    min-width: 130px;
-    min-height: 34px;
-    padding: 6px 10px;
-    font-size: .78rem;
-    opacity: .82;
-}
-
-.game-connect-four.mobile-prototype .mobile-game-actions #mobileSettingsAction {
-    min-width: 150px;
-    min-height: 38px;
-    padding: 7px 12px;
-    border: 1px solid rgba(120, 165, 255, .65);
-    border-radius: var(--radius-md);
-    background: rgba(79, 140, 255, .1);
-    color: var(--text-main);
-    opacity: 1;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, .22);
-    cursor: pointer;
-}
-
 .game-connect-four.mobile-prototype .mobile-game-actions #mobileGameAction {
     order: 2;
 }
+
 
 .top-bar h1.game-title {
     margin: 0 0 8px;
@@ -1211,113 +1152,6 @@ body:not(.mobile-prototype) .game-screen { display: contents; }
     flex-direction: column;
     align-items: center;
     gap: var(--ttt-screen-gap);
-}
-
-/* Gemeinsame Mobile-Referenz: dieselbe Setup-Komposition wie Tic-Tac-Toe. */
-@media (orientation: landscape) and (max-height: 700px) {
-    .mobile-prototype:not(.game-active) {
-        padding-top: 18px !important;
-    }
-
-    .mobile-prototype:not(.game-active) .app {
-        display: contents;
-    }
-
-    .mobile-prototype:not(.game-active) main {
-        width: 100%;
-        padding: 0;
-    }
-
-    .mobile-prototype:not(.game-active) .setup-screen {
-        grid-template-columns: minmax(0, 1fr) minmax(180px, 260px);
-        grid-template-rows: auto 1fr;
-        align-items: center;
-        justify-content: initial;
-        column-gap: clamp(16px, 4vw, 42px);
-        row-gap: var(--ttt-screen-gap);
-        gap: var(--ttt-screen-gap) clamp(16px, 4vw, 42px);
-        width: min(100%, 900px);
-    }
-
-    .mobile-prototype:not(.game-active) .setup-screen-title {
-        width: 100%;
-        margin: 0 0 8px !important;
-        font-size: 1.55rem;
-        line-height: 1.05;
-        text-align: center;
-        text-shadow: 0 0 15px var(--accent);
-        font-weight: 400;
-        letter-spacing: normal;
-    }
-
-    .mobile-prototype:not(.game-active) .setup-screen > .controls-vertical {
-        grid-column: 1;
-        grid-row: 2;
-        width: 100% !important;
-        max-width: none !important;
-        gap: 5px;
-    }
-
-    .mobile-prototype:not(.game-active) .setup-screen > .settings {
-        width: 100% !important;
-        max-width: none !important;
-    }
-
-    .mobile-prototype:not(.game-active) .setup-screen > .game-actions {
-        grid-column: 2;
-        grid-row: 2;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 9px;
-        width: 100%;
-        min-height: 122px;
-        margin: 0;
-    }
-
-    .mobile-prototype:not(.game-active) .setup-screen > .game-actions > #setupExtraSettingsToggle {
-        order: 2;
-    }
-
-    .mobile-prototype:not(.game-active) .setup-screen > .game-actions .landscape-setup-tools {
-        display: contents;
-        order: 1;
-    }
-
-    .mobile-prototype:not(.game-active) .setup-screen > .game-actions .landscape-setup-tools > #setupExtraSettingsToggle {
-        order: 2;
-    }
-
-    .mobile-prototype:not(.game-active) .setup-screen > .game-actions > #resetGameButton {
-        order: 2;
-        width: max-content !important;
-        min-width: 0;
-        min-height: 42px;
-        margin: 0;
-    }
-
-    .mobile-prototype:not(.game-active) .setup-screen > .game-actions > #roundActionButton {
-        display: none !important;
-    }
-
-    .mobile-prototype:not(.game-active) .setup-screen > .game-actions .landscape-setup-tools .setup-extra-settings-button {
-        width: 42px;
-        min-width: 42px;
-        height: 36px;
-        padding: 0;
-        align-self: center;
-        border: 2px solid var(--accent) !important;
-        border-radius: 8px;
-        background: var(--bg-panel) !important;
-        color: var(--accent) !important;
-        box-shadow: var(--shadow-soft);
-        display: inline-flex !important;
-        align-items: center;
-        justify-content: center;
-        font-size: 1rem;
-        margin-top: 8px;
-    }
 }
 
 /* Endgültige gemeinsame Setup-Darstellung nach Tic-Tac-Toe-Referenz. */
@@ -1380,7 +1214,8 @@ body:not(.mobile-prototype) .game-screen { display: contents; }
         text-shadow: 0 0 15px var(--accent);
     }
 
-    .mobile-prototype:not(.game-active) .setup-screen > .settings {
+    .mobile-prototype:not(.game-active) .setup-screen > .settings,
+    .mobile-prototype:not(.game-active) .setup-screen > .controls-vertical {
         display: grid !important;
         grid-column: 1;
         grid-row: 2;
@@ -1397,11 +1232,8 @@ body:not(.mobile-prototype) .game-screen { display: contents; }
         grid-row: 2;
         flex-direction: column;
         align-items: center;
-        justify-content: center;
         gap: 9px;
         width: 100%;
-        min-height: 122px;
-        margin: 0;
     }
 
     .mobile-prototype:not(.game-active) .setup-screen > .game-actions .landscape-setup-tools {

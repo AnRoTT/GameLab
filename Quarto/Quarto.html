@@ -91,7 +91,6 @@
 
             <section class="game-area">
                 <div class="piece-panel">
-                    <h2>Spielsteine</h2>
                     <div id="piecePool" class="piece-pool" aria-label="Verfügbare Quarto-Spielsteine"></div>
                 </div>
 
@@ -116,6 +115,7 @@
     <script src="manuellBot.js"></script>
     <script src="adaptiveBot.js"></script>
     <script src="../Shared/mobileLayout.js"></script>
+    <script src="../Shared/navigationGuard.js"></script>
     <script src="../Shared/boardLayout.js"></script>
     <script src="game.js"></script>
     <script src="../Shared/matchConfirm.js"></script>
@@ -125,15 +125,6 @@
         const backIcon = document.getElementById("backIcon");
         backIcon.style.display =
             new URLSearchParams(location.search).get("menu") === "1" ? "block" : "none";
-        backIcon.addEventListener("click", (event) => {
-            event.preventDefault();
-            const sound = new Audio("../assets/sounds/Button_Click.mp3");
-            sound.volume = 0.22;
-            sound.play().catch(() => {});
-            setTimeout(() => {
-                window.location.href = "../index.html?menu=1";
-            }, 100);
-        });
         document.getElementById("helpIcon").addEventListener("click", (event) => {
             event.preventDefault();
             const sound = new Audio("../assets/sounds/Button_Click.mp3");

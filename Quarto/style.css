@@ -41,7 +41,6 @@ main { padding: 12px 0 18px; }
 
 .game-area { display: flex; flex-direction: column; align-items: center; gap: 18px; }
 .piece-panel { width: min(100%, 560px); }
-.piece-panel h2 { margin: 0 0 8px; color: var(--text-muted); font-size: .85rem; font-weight: 500; text-align: center; }
 .piece-legend { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 0 0 10px; }
 .legend-item { display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--text-muted); font-size: .68rem; }
 .legend-pair { display: flex; align-items: center; justify-content: center; gap: 5px; min-height: 24px; }
@@ -161,6 +160,13 @@ main { padding: 12px 0 18px; }
 .board-cell .piece-shape.short { width: 55%; height: auto; }
 .board-cell .piece-shape.tall { width: 72%; height: auto; }
 
+@media (min-width: 701px) {
+    body.game-page:not(.mobile-prototype) .board {
+        width: min(92vw, 440px, max(240px, calc(100dvh - 280px)));
+        max-width: none;
+    }
+}
+
 .scoreboard { display: flex; justify-content: center; gap: 10px; width: 100%; margin-top: 8px; }
 .score { min-width: 88px; padding: 5px 10px; border: 1px solid #30364c; border-radius: var(--radius-md); background: #141726; }
 .score-label { display: block; color: var(--text-muted); font-size: .72rem; }
@@ -177,7 +183,6 @@ main { padding: 12px 0 18px; }
         padding: 6px 12px;
         font-size: 16px;
     }
-    .title-center { font-size: 1.9rem; }
     .piece-pool {
         display: flex;
         align-items: center;
@@ -231,19 +236,18 @@ main { padding: 12px 0 18px; }
     .adaptive-strength-row { gap: 7px; font-size: .7rem; }
 }
 
-.title-center.game-title {
-    width: 100%;
-    margin: 0 0 8px;
-    font-size: 2rem;
-    line-height: 1.2;
-    font-weight: 400;
-    letter-spacing: normal;
-    text-shadow: 0 0 15px var(--accent);
-}
-
 .game-screen-header,
 .mobile-game-actions {
     display: none;
+}
+
+
+/* Das zusätzliche Zahnrad gehört ausschließlich in den mobilen
+   Landscape-Settings-Screen. Desktop und Portrait dürfen den Startbutton
+   nicht durch dieses zusätzliche Element verschieben. */
+.landscape-setup-tools,
+.setup-extra-settings-button {
+    display: none !important;
 }
 
 /* Mobile Landscape: Quarto-Play-Screen. Die gemeinsame Kopfzeile kommt aus
@@ -290,6 +294,7 @@ main { padding: 12px 0 18px; }
         width: 100%;
         max-width: 100px;
         align-self: start;
+        justify-self: center;
     }
 
     .mobile-prototype.game-active .piece-panel h2 {
@@ -308,13 +313,14 @@ main { padding: 12px 0 18px; }
     .mobile-prototype.game-active .piece-pool {
         display: flex;
         flex-direction: column;
-        align-items: flex-end;
+        align-items: center;
         justify-content: flex-start;
         gap: 8px;
         width: 100%;
         min-height: 0;
         height: min(62vh, 320px);
         padding: 4px 0;
+        box-sizing: border-box;
         overflow-x: hidden;
         overflow-y: auto;
         overscroll-behavior-y: contain;
@@ -338,11 +344,6 @@ main { padding: 12px 0 18px; }
     }
 
     .mobile-prototype.game-active .board {
-        width: min(78vh, 520px);
-        max-width: 100%;
-    }
-
-    .mobile-prototype.game-active .board {
         width: var(--quarto-board-size, min(78vh, 520px));
         max-width: 100%;
     }
@@ -362,16 +363,14 @@ main { padding: 12px 0 18px; }
     }
 }
 
+@media (orientation: landscape) and (max-width: 700px) {
+    .mobile-prototype.game-active .game-screen .board {
+        width: min(78vh, calc(100dvh - 58px), 520px) !important;
+        max-width: none;
+    }
+}
+
 @media (max-width: 700px) and (orientation: portrait) {
-    .mobile-prototype:not(.game-active) .setup-extra-settings-button {
-        display: none !important;
-    }
-
-    .mobile-prototype.game-active .top-bar,
-    .mobile-prototype.game-active .app > .game-actions {
-        display: none;
-    }
-
     .mobile-prototype.game-active .game-screen-header {
         display: flex;
         align-items: center;
