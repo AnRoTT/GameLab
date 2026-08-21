@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TicTacToe</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="../theme.css">
+</head>
+<body class="game-page game-tictactoe" data-mobile-orientation="both" data-adaptive-bot="AdaptiveBot">
+    <div id="backIcon">&#8592; Men&uuml;</div>
+    <a id="helpIcon" class="help-button" href="Anleitung.html" aria-label="Kurzanleitung zu TicTacToe">Anleitung</a>
+    <button id="settingsToggle" class="secondary-button" type="button" aria-expanded="false" aria-controls="extraSettings" aria-label="Einstellungen" title="Einstellungen">⚙</button>
+    <span id="soundToggle" role="status" aria-live="polite" aria-label="Ton eingeschaltet">🔊</span>
+
+    <section id="setupScreen" class="screen setup-screen" aria-labelledby="setupTitle">
+    <h1 id="setupTitle" class="game-title">TicTacToe</h1>
+
+    <div class="settings">
+        <div class="cycle-group setting-row setting-row-wide" id="rowPlayers">
+            <span class="label setting-label">Spieler:</span>
+            <button class="cycle-button" id="btnPlayers"><span id="valPlayers">1 Spieler</span></button>
+        </div>
+        <div class="cycle-group setting-row setting-row-wide" id="rowRounds">
+            <span class="label setting-label">Match:</span>
+            <button class="cycle-button" id="btnRounds"><span id="valRounds">1</span></button>
+        </div>
+        <div class="cycle-group setting-row setting-row-wide" id="rowMode">
+            <span class="label setting-label">Regelmodus:</span>
+            <button class="cycle-button" id="btnMode"><span id="valMode">Verk&uuml;rzt</span></button>
+        </div>
+        <div class="opponent-pair setting-row" id="rowOpponent">
+            <div class="cycle-group">
+                <span class="label">Gegner:</span>
+                <button class="cycle-button" id="btnDifficulty"><span id="valDifficulty">Anf&auml;nger</span></button>
+            </div>
+            <div class="cycle-group">
+                <span class="label">Anpassung:</span>
+                <button class="cycle-button" id="btnAdapt"><span id="valAdapt">Normal</span></button>
+            </div>
+        </div>
+    </div>
+
+    <div class="game-actions">
+        <button id="reset" class="primary-button">Neu starten</button>
+        <div class="landscape-setup-tools" aria-label="Weitere Einstellungen">
+            <button id="setupExtraSettingsToggle" class="secondary-button setup-extra-settings-button" type="button" aria-label="Weitere Einstellungen" title="Weitere Einstellungen">⚙</button>
+        </div>
+    </div>
+    </section>
+    <div id="settingsBackdrop" class="settings-backdrop" hidden></div>
+    <section id="extraSettings" class="extra-settings" hidden>
+        <h2>Einstellungen</h2>
+        <button id="settingsSound" class="settings-action" type="button">🔊 Sound umschalten</button>
+        <button id="resetPlayerValues" class="settings-action danger" type="button">Spielerwerte löschen</button>
+        <button id="settingsClose" class="settings-action settings-close" type="button">Schließen</button>
+        <div id="resetConfirm" class="reset-confirm" hidden>
+            <p>Adaptive Spielerwerte wirklich löschen?</p>
+            <div>
+                <button id="resetCancel" class="settings-action" type="button">Abbrechen</button>
+                <button id="resetConfirmButton" class="settings-action danger" type="button">Löschen</button>
+            </div>
+        </div>
+    </section>
+
+    <section id="gameScreen" class="screen game-screen" hidden aria-live="polite">
+    <div class="game-screen-header">
+        <button id="mobileSettingsBack" class="mobile-settings-back" type="button" aria-label="Zu den Spieleinstellungen">← Einstellungen</button>
+        <h1 class="game-title">TicTacToe</h1>
+        <div class="game-screen-controls">
+            <button id="fullscreenToggle" class="secondary-button fullscreen-toggle" type="button" aria-label="Vollbild aktivieren">⛶ Vollbild</button>
+        </div>
+    </div>
+
+    <div class="game-side-panel">
+    <div class="game-info">
+        <div class="score-header">
+            <span id="scoreX">X: 0</span>
+            <span id="scoreDraw">Unentsch: 0</span>
+            <span id="scoreO">O: 0</span>
+        </div>
+        <div id="winnerBanner"></div>
+        <div id="status"></div>
+        <div id="roundCountdown" class="round-countdown" hidden></div>
+        <div id="adaptiveStrengthPanel" class="adaptive-strength hidden" hidden>
+            <span class="adaptive-strength-label">Adaptive Stärke</span>
+            <span id="adaptiveStrengthTrack" class="adaptive-strength-track" aria-label="Adaptive Stärke 35 von 100">
+                <span id="adaptiveStrengthFill" class="adaptive-strength-fill"></span>
+            </span>
+            <span id="adaptiveStrengthValue" class="adaptive-strength-value">35%</span>
+        </div>
+    </div>
+
+    <div class="mobile-game-actions">
+        <button id="mobileGameAction" class="primary-button" type="button">Match abbrechen</button>
+    </div>
+    </div>
+
+    <div id="board" class="board"></div>
+
+    </section>
+
+    <footer class="footer">Andis Game Foundry | TicTacToe | by Andreas Rollinger | 2026.08.17</footer>
+
+    <script src="../Shared/soundManager.js"></script>
+    <script src="../Shared/difficultyCore.js"></script>
+    <script src="aiCore.js"></script>
+    <script src="manuellBot.js"></script>
+    <script src="adaptiveBot.js"></script>
+<script src="../Shared/mobileLayout.js"></script>
+<script src="../Shared/navigationGuard.js"></script>
+<script src="../Shared/boardLayout.js"></script>
+<script src="game.js"></script>
+    <script src="../Shared/matchConfirm.js"></script>
+    <script src="../Shared/settingsMenu.js"></script>
+    <script src="../Shared/buttonOverflow.js"></script>
+    <script>
+        document.getElementById("backIcon").style.display =
+            new URLSearchParams(location.search).get('menu') === '1' ? 'block' : 'none';
+        document.getElementById("helpIcon").addEventListener("click", (event) => {
+            event.preventDefault();
+            const sound = new Audio("../assets/sounds/Button_Click.mp3");
+            sound.volume = 0.22;
+            sound.play().catch(() => {});
+            setTimeout(() => {
+                window.location.href = document.getElementById("helpIcon").href;
+            }, 100);
+        });
+    </script>
+</body>
+</html>

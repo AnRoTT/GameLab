@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8" />
+    <title>4 Gewinnt</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="../theme.css" />
+</head>
+<body class="game-page game-connect-four" data-adaptive-bot="ConnectFourAdaptiveBot">
+<div id="backIcon">⟵ Menü</div>
+<a id="helpIcon" class="help-button" href="Anleitung.html" aria-label="Kurzanleitung zu 4 Gewinnt">Anleitung</a>
+<button id="settingsToggle" class="secondary-button" type="button" aria-expanded="false" aria-controls="extraSettings" aria-label="Einstellungen" title="Einstellungen">⚙</button>
+<span id="soundToggle" role="status" aria-live="polite" aria-label="Ton eingeschaltet">🔊</span>
+<div class="app">
+<header class="top-bar">
+    <h1 class="title-center game-title">4 Gewinnt</h1>
+</header>
+
+    <main>
+    <section id="setupScreen" class="setup-screen">
+    <h1 class="setup-screen-title game-title">4 Gewinnt</h1>
+    <div class="settings controls-vertical">
+        <div class="cycle-group">
+            <span class="label">Spieler:</span>
+            <button id="modeButton" class="cycle-button" data-index="1">1 Spieler</button>
+        </div>
+
+        <div class="cycle-group">
+            <span class="label">Match:</span>
+            <button id="matchButton" class="cycle-button" data-index="0">Einzelrunde</button>
+        </div>
+
+        <div class="opponent-pair">
+            <div class="cycle-group">
+                <span class="label">Gegner:</span>
+                <button id="botLevelButton" class="cycle-button" data-index="0">Anfänger</button>
+            </div>
+            <div class="cycle-group">
+                <span class="label">Anpassung:</span>
+                <button id="adaptSpeedButton" class="cycle-button" data-index="0" disabled>—</button>
+            </div>
+        </div>
+
+    </div>
+    <div class="game-actions">
+            <button id="resetGameButton" class="primary-button" data-index="0">Neues Spiel</button>
+            <button id="roundActionButton" class="primary-button" type="button" disabled hidden>Neue Runde</button>
+            <div class="landscape-setup-tools" aria-label="Weitere Einstellungen">
+                <button id="setupExtraSettingsToggle" class="secondary-button setup-extra-settings-button" type="button" aria-label="Weitere Einstellungen" title="Weitere Einstellungen">⚙</button>
+            </div>
+    </div>
+    </section>
+        <div id="settingsBackdrop" class="settings-backdrop" hidden></div>
+        <section id="extraSettings" class="extra-settings" hidden>
+            <h2>Einstellungen</h2>
+            <button id="settingsSound" class="settings-action" type="button">🔊 Sound an</button>
+            <button id="resetPlayerValues" class="settings-action danger" type="button">Spielerwerte löschen</button>
+            <button id="settingsClose" class="settings-action settings-close" type="button">Schließen</button>
+            <div id="resetConfirm" class="reset-confirm" hidden><p>Adaptive Spielerwerte wirklich löschen?</p><div><button id="resetCancel" class="settings-action" type="button">Abbrechen</button><button id="resetConfirmButton" class="settings-action danger" type="button">Löschen</button></div></div>
+    </section>
+    <section id="gameScreen" class="game-screen" hidden>
+        <div class="game-screen-header">
+            <button id="mobileSettingsBack" class="mobile-settings-back" type="button" aria-label="Zu den Spieleinstellungen">← Einstellungen</button>
+            <h1 class="game-title">4 Gewinnt</h1>
+            <div class="game-screen-controls">
+                <button id="fullscreenToggle" class="secondary-button fullscreen-toggle" type="button" aria-label="Vollbild aktivieren">⛶ Vollbild</button>
+            </div>
+        </div>
+        <div class="game-side-panel">
+        <section class="status-panel">
+            <div id="statusText" class="status-text">
+                <div id="statusLine1">Bereit für Connect 4</div>
+                <div id="matchLine" class="match-line">Einzelrunde - Offizielle Regeln</div>
+            </div>
+            <div class="scoreboard">
+                <div class="score">
+                    <span class="score-label">Rot</span>
+                    <span id="scoreRed" class="score-value">0</span>
+                </div>
+                <div class="score">
+                    <span class="score-label">Gelb</span>
+                    <span id="scoreYellow" class="score-value">0</span>
+                </div>
+            </div>
+            <div id="winner-banner" class="winner-info hidden">
+                <span class="winner-icon"></span>
+                <span id="winner-text">Rot hat gewonnen!</span>
+                <button id="next-round-btn" hidden>Nächste Runde</button>
+            </div>
+            <div id="adaptive-strength" class="adaptive-strength hidden">
+                <span class="adaptive-strength-label">Adaptive Stärke</span>
+                <span id="adaptive-strength-track" class="adaptive-strength-track" style="--skill:35%" aria-label="Adaptive Stärke 35 von 100">
+                    <span id="adaptive-strength-fill" class="adaptive-strength-fill"></span>
+                </span>
+                <span id="adaptive-strength-value" class="adaptive-strength-value">35%</span>
+            </div>
+        </section>
+        <div class="mobile-game-actions" aria-label="Spielaktionen">
+            <button id="mobileGameAction" class="primary-button" type="button">Spiel abbrechen</button>
+        </div>
+        </div>
+        <section class="board-wrapper">
+            <div id="board" class="board">
+                <!-- 7 x 6 Grid -->
+                <!-- rows: 0..5, cols: 0..6 -->
+            </div>
+        </section>
+    </section>
+    </main>
+
+    <footer class="footer">Andis Game Foundry | 4 Gewinnt | by Andreas Rollinger | 2026.08.17</footer>
+
+</div>
+
+    <script src="../Shared/soundManager.js"></script>
+    <script src="../Shared/difficultyCore.js"></script>
+    <script src="aiCore.js?v=20260814-03"></script>
+    <script src="manuellBot.js?v=20260813-3"></script>
+<script src="adaptiveBot.js"></script>
+<script src="../Shared/mobileLayout.js"></script>
+<script src="../Shared/navigationGuard.js"></script>
+<script src="../Shared/boardLayout.js"></script>
+<script src="game.js?v=20260814-24"></script>
+<script src="../Shared/matchConfirm.js"></script>
+<script src="../Shared/settingsMenu.js"></script>
+<script src="../Shared/buttonOverflow.js"></script>
+<script>
+document.getElementById("backIcon").style.display =
+    new URLSearchParams(location.search).get('menu') === '1' ? 'block' : 'none';
+
+document.getElementById("helpIcon").addEventListener("click", (event) => {
+    event.preventDefault();
+    const sound = new Audio("../assets/sounds/Button_Click.mp3");
+    sound.volume = 0.22;
+    sound.play().catch(() => {});
+    setTimeout(() => {
+        window.location.href = document.getElementById("helpIcon").href;
+    }, 100);
+});
+</script>
+</body>
+</html>

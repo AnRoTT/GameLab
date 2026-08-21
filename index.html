@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Andis Game Foundry</title>
+    <link rel="stylesheet" href="theme.css">
+</head>
+<body class="home-page">
+    <button id="settingsToggle" class="secondary-button" type="button" aria-expanded="false" aria-controls="extraSettings" aria-label="Einstellungen" title="Einstellungen">⚙</button>
+    <span id="soundToggle" role="status" aria-live="polite" aria-label="Ton eingeschaltet">🔊</span>
+    <div id="settingsBackdrop" class="settings-backdrop" hidden></div>
+    <section id="extraSettings" class="extra-settings" hidden>
+        <h2>Einstellungen</h2>
+        <button id="settingsSound" class="settings-action" type="button">🔊 Sound an</button>
+        <button id="settingsClose" class="settings-action settings-close" type="button">Schließen</button>
+    </section>
+    <main class="container">
+        <h1 class="title">Andis Game Foundry</h1>
+        <p class="subtitle">Interaktive Spiele mit anpassungsf&auml;higen Gegnern</p>
+
+        <nav class="menu" aria-label="Spieleauswahl">
+            <a href="TicTacToe/TicTacToe.html?menu=1" class="menu-item">
+                <div class="menu-item-copy">
+                    <div class="label">TicTacToe</div>
+                    <div class="menu-item-description">Schnelles Strategiespiel</div>
+                </div>
+            </a>
+
+            <a href="4Gewinnt/4Gewinnt.html?menu=1" class="menu-item">
+                <div class="menu-item-copy">
+                    <div class="label">4 Gewinnt</div>
+                    <div class="menu-item-description">Verbinde vier Steine</div>
+                </div>
+            </a>
+
+            <a href="Othello/Othello.html?menu=1" class="menu-item">
+                <div class="menu-item-copy">
+                    <div class="label">Othello</div>
+                    <div class="menu-item-description">Mehrheit durch geschicktes Wenden</div>
+                </div>
+            </a>
+
+            <a href="Quarto/Quarto.html?menu=1" class="menu-item">
+                <div class="menu-item-copy">
+                    <div class="label">Quarto</div>
+                    <div class="menu-item-description">Vier Eigenschaften, ein Ziel</div>
+                </div>
+            </a>
+        </nav>
+
+        <footer class="footer">Andis Game Foundry | by Andreas Rollinger | 2026.08.17</footer>
+    </main>
+    <script src="Shared/soundManager.js"></script>
+    <script src="Shared/settingsMenu.js"></script>
+</body>
+</html>

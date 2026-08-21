@@ -1,0 +1,1556 @@
+:root {
+    --bg-main: #05060a;
+    --bg-panel: #10121a;
+    --bg-panel-hover: #1c2134;
+    --accent: #4f8cff;
+    --accent-soft: #7b5cff;
+    --text-main: #f5f7ff;
+    --text-muted: #9aa0b8;
+    --shadow-soft: 0 12px 30px rgba(0, 0, 0, 0.6);
+    --radius-md: 10px;
+    --radius-lg: 18px;
+    --mobile-settings-shell-width: 900px;
+    --mobile-settings-action-width: 260px;
+    --mobile-settings-gap: clamp(12px, 3vw, 24px);
+    --mobile-settings-column-gap: clamp(16px, 4vw, 42px);
+    --mobile-settings-side-padding: 16px;
+    --mobile-settings-top-padding: 18px;
+    --game-action-gap: 12px;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+body {
+    background: radial-gradient(circle at top, #15192b 0, var(--bg-main) 55%, #000000 100%);
+    color: var(--text-main);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    margin: 0;
+    min-height: 100dvh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 24px 16px;
+}
+
+button,
+a {
+    font: inherit;
+}
+
+button {
+    border: none;
+    cursor: pointer;
+    background: none;
+    color: inherit;
+}
+
+/* Verbindlicher Darstellungsstandard fuer runde Spielsteine.
+   Neue Spiele sollen diese Klasse verwenden. Der Aussenring wird bewusst
+   ueber border und nicht ueber inset box-shadow erzeugt, damit die Kreise
+   auch auf mobilen Chromium-Browsern stabil gerendert werden. */
+.round-piece {
+    position: relative;
+    display: block;
+    width: var(--piece-size, 70%);
+    height: auto;
+    aspect-ratio: 1 / 1;
+    border: 3px solid currentColor;
+    border-radius: 50%;
+    background: transparent;
+    box-shadow: 0 3px 7px rgba(0, 0, 0, .4);
+}
+
+.round-piece.hollow::after {
+    content: "";
+    position: absolute;
+    inset: 22%;
+    border: 1px solid currentColor;
+    border-radius: 50%;
+    opacity: .55;
+}
+
+/* Gemeinsames sekundäres Einstellungsmenü der Spiele. */
+.settings-backdrop[hidden],
+.extra-settings[hidden],
+.reset-confirm[hidden] { display: none; }
+.settings-backdrop { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,.58); backdrop-filter: blur(2px); }
+.extra-settings { position: fixed; top: 50%; left: 50%; z-index: 1002; transform: translate(-50%,-50%); display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; width: min(calc(100% - 24px), 420px); padding: 12px; border: 1px solid #262a3a; border-radius: var(--radius-md); background: rgba(16,18,26,.94); box-shadow: var(--shadow-soft); }
+.extra-settings h2 { width: 100%; margin: 0 0 2px; text-align: center; font-size: .95rem; }
+.settings-action { min-height: 32px; padding: 4px 9px; border: 1px solid #30364c; border-radius: 6px; background: #1c2134; color: var(--text-main); font-size: .78rem; }
+.settings-action.danger { color: #ffb4b4; }
+.settings-action.settings-close { color: var(--text-muted); }
+.reset-confirm { width: 100%; margin-top: 2px; padding-top: 8px; border-top: 1px solid #30364c; text-align: center; }
+.reset-confirm p { margin: 0 0 7px; color: var(--text-muted); font-size: .78rem; }
+.reset-confirm > div { display: flex; justify-content: center; gap: 6px; }
+
+.match-confirm-backdrop[hidden] { display: none; }
+.match-confirm-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    display: grid;
+    place-items: center;
+    padding: 18px;
+    background: rgba(0, 0, 0, .62);
+    backdrop-filter: blur(2px);
+}
+.match-confirm-dialog {
+    width: min(100%, 360px);
+    padding: 16px;
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-lg);
+    background: rgba(16, 18, 26, .98);
+    box-shadow: var(--shadow-soft);
+    text-align: center;
+}
+.match-confirm-dialog h2 { margin: 0 0 8px; font-size: 1rem; }
+.match-confirm-dialog p { margin: 0 0 14px; color: var(--text-muted); font-size: .85rem; }
+.match-confirm-actions { display: flex; justify-content: center; gap: 8px; }
+.settings > #settingsToggle,
+#settingsPanel > #settingsToggle,
+.controls-vertical > #settingsToggle { grid-column: 1 / -1; justify-self: center; }
+.settings > .game-actions,
+#settingsPanel > .game-actions,
+.controls-vertical > .game-actions {
+    grid-column: 1 / -1;
+    justify-self: center;
+}
+#settingsPanel > .round-actions {
+    grid-column: 1 / -1;
+    justify-self: center;
+    order: 5;
+}
+#settingsPanel > .setting-row:nth-child(1) { order: 1; }
+#settingsPanel > .setting-row:nth-child(3) { order: 2; }
+#settingsPanel > #botOpponentRow { order: 3; }
+#settingsPanel > .setting-row:nth-child(2) { order: 4; grid-column: 1 / -1; }
+.game-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    margin: 0 auto 14px;
+}
+.game-actions .primary-button,
+.game-actions .secondary-button { margin: 0; }
+.cycle-button,
+.primary-button,
+.secondary-button { overflow: hidden; white-space: nowrap; }
+
+/* Gemeinsamer Button-Stil für sekundäre Aktionen und Einstellungsbuttons. */
+.secondary-button {
+    border: 2px solid var(--accent);
+    border-radius: var(--radius-md);
+    background: var(--bg-panel);
+    color: var(--accent);
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: background .2s ease, border-color .2s ease, box-shadow .2s ease, opacity .2s ease;
+}
+
+.secondary-button:hover,
+.secondary-button:focus-visible {
+    background: var(--bg-panel-hover);
+    border-color: var(--accent);
+    box-shadow: var(--shadow-soft);
+    outline: none;
+}
+.button-label {
+    display: inline-block;
+    max-width: 100%;
+    white-space: nowrap;
+}
+.is-overflowing .button-label {
+    animation: button-label-marquee 5.5s ease-in-out infinite alternate;
+    will-change: transform;
+}
+@keyframes button-label-marquee {
+    0%, 20% { transform: translateX(0); }
+    80%, 100% { transform: translateX(calc(-1 * var(--overflow-distance))); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .is-overflowing .button-label { animation: none; text-overflow: ellipsis; overflow: hidden; }
+}
+.round-actions { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+#settingsToggle {
+    position: fixed;
+    top: 20px;
+    left: calc(50% - 42px);
+    z-index: 1000;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+}
+#settingsToggle:hover,
+#settingsToggle:focus-visible {
+    background: var(--bg-panel-hover);
+    box-shadow: var(--shadow-soft);
+    outline: none;
+}
+body.settings-open #settingsToggle {
+    position: fixed;
+    z-index: 999;
+    visibility: visible;
+}
+
+#backIcon {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    color: var(--accent);
+    font-size: 1.2rem;
+    cursor: pointer;
+    opacity: 0.85;
+    transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+    user-select: none;
+    background: var(--bg-panel);
+    padding: 8px 14px;
+    border-radius: var(--radius-md);
+    border: 2px solid var(--accent);
+    z-index: 999;
+}
+
+#backIcon:hover {
+    opacity: 1;
+    text-shadow: 0 0 10px var(--accent);
+    background: var(--bg-panel-hover);
+    box-shadow: var(--shadow-soft);
+}
+
+#helpIcon {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 999;
+    display: inline-flex !important;
+    visibility: visible !important;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    padding: 8px 14px;
+    border: 2px solid var(--accent);
+    border-radius: var(--radius-md);
+    background: var(--bg-panel);
+    color: var(--accent);
+    font-size: 1rem;
+    text-decoration: none;
+    opacity: .85;
+    transition: background .2s ease, border-color .2s ease, box-shadow .2s ease, opacity .2s ease;
+}
+
+#helpIcon:hover,
+#helpIcon:focus-visible {
+    opacity: 1;
+    background: var(--bg-panel-hover);
+    box-shadow: var(--shadow-soft);
+    text-shadow: 0 0 10px var(--accent);
+    outline: none;
+}
+
+/* Gemeinsame Kopfbutton-Größe */
+#backIcon,
+#helpIcon {
+    font-size: 1rem;
+    line-height: 1.2;
+}
+
+#soundToggle {
+    position: fixed;
+    top: 20px;
+    left: calc(50% + 4px);
+    z-index: 999;
+    width: 30px;
+    height: 38px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--accent);
+    font-size: 1.2rem;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: default;
+    transition: opacity .2s ease;
+}
+
+/* Beim Scrollen bleiben die drei Kopfbuttons sichtbar, überdecken den Inhalt
+   aber nicht mehr mit einer deckenden Fläche. */
+body.is-scrolled #backIcon,
+body.is-scrolled #helpIcon,
+body.is-scrolled #soundToggle,
+body.is-scrolled #settingsToggle {
+    background: rgba(16, 18, 26, .22);
+    border-color: rgba(79, 140, 255, .58);
+    box-shadow: none;
+    opacity: .50;
+}
+
+.guide-container { width: min(100%, 680px); padding: 22px 18px; }
+.guide-header { margin-bottom: 18px; text-align: center; }
+.guide-header h1 { margin: 0 0 8px; text-shadow: 0 0 15px var(--accent); }
+.guide-header p { margin: 0; color: var(--text-muted); }
+.guide-card { margin-bottom: 12px; padding: 16px 18px; border: 1px solid #262a3a; border-radius: var(--radius-lg); background: var(--bg-panel); box-shadow: var(--shadow-soft); }
+.guide-card h2 { margin: 0 0 8px; color: var(--text-main); font-size: 1rem; }
+.guide-card p, .guide-card li { color: var(--text-muted); font-size: .9rem; line-height: 1.5; }
+.guide-card p { margin: 0; }
+.guide-card ul { margin: 0; padding-left: 20px; }
+.guide-back { display: inline-block; margin-top: 8px; color: var(--accent); text-decoration: none; }
+.guide-back:hover, .guide-back:focus-visible { text-shadow: 0 0 8px var(--accent); }
+
+@media (max-width: 520px) {
+    #helpIcon { top: 10px; right: 10px; max-width: calc(100vw - 20px); padding: 6px 12px; font-size: 16px; }
+    #soundToggle { top: 10px; width: 28px; height: 34px; padding: 0; font-size: 1.1rem; }
+    #settingsToggle { top: 10px; left: calc(50% - 38px); width: 34px; height: 34px; font-size: .9rem; }
+    .guide-container { padding: 18px 12px; }
+    .guide-card { padding: 14px; }
+}
+
+.container {
+    width: 100%;
+    max-width: 520px;
+}
+
+.title {
+    font-size: 2rem;
+    margin-bottom: 8px;
+    text-shadow: 0 0 15px var(--accent);
+    text-align: center;
+}
+
+/* Einheitliche Spieltitel; einzelne Spiele koennen nur das Layout, nicht die Typografie, erweitern. */
+.game-title {
+    margin: 0 0 8px;
+    font-size: 2rem;
+    line-height: 1.2;
+    font-weight: 400;
+    letter-spacing: normal;
+    color: var(--text-main);
+    text-align: center;
+    text-shadow: 0 0 15px var(--accent);
+}
+
+.subtitle {
+    margin: 0 0 28px;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    line-height: 1.4;
+    text-align: center;
+}
+
+.menu {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    width: 100%;
+}
+
+.menu-item {
+    background: var(--bg-panel);
+    border: 2px solid var(--accent);
+    padding: 24px 20px;
+    border-radius: var(--radius-lg);
+    text-decoration: none;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    width: 100%;
+    text-align: center;
+    transition: transform 160ms ease, background 180ms ease, box-shadow 180ms ease;
+}
+
+.menu-item:active {
+    background: var(--bg-panel-hover);
+    transform: translateY(1px) scale(0.985);
+}
+
+.menu-item:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+}
+
+.menu-item .icon {
+    transition: transform 180ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .menu-item:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 24px rgba(79, 140, 255, 0.25);
+    }
+
+    .menu-item:hover .icon {
+        transform: scale(1.08);
+    }
+}
+
+@keyframes menu-item-enter {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.menu-item {
+    animation: menu-item-enter 360ms ease both;
+}
+
+.menu-item:nth-child(2) { animation-delay: 55ms; }
+.menu-item:nth-child(3) { animation-delay: 110ms; }
+.menu-item:nth-child(4) { animation-delay: 165ms; }
+
+@media (prefers-reduced-motion: reduce) {
+    .menu-item,
+    .menu-item .icon {
+        animation: none;
+        transition: none;
+    }
+}
+
+.menu-item .icon {
+    font-size: 2.6rem;
+    line-height: 1;
+}
+
+.menu-item .label {
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.menu-item-copy {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    text-align: center;
+}
+
+.menu-item-description {
+    color: var(--text-muted);
+    font-size: .8rem;
+    line-height: 1.3;
+}
+
+.menu-item.coming-soon {
+    border-color: #3d4356;
+}
+
+.menu-item.coming-soon .icon,
+.menu-item.coming-soon .label {
+    color: var(--text-muted);
+}
+
+.menu-item.disabled {
+    opacity: 0.4;
+    pointer-events: none;
+    border-color: #555;
+}
+
+.footer {
+    padding: 12px 16px;
+    font-size: 0.75rem;
+    color: #555;
+    text-align: center;
+    user-select: none;
+    opacity: 0.8;
+    transition: 0.2s;
+    margin-top: 22px;
+}
+
+.footer:hover {
+    color: var(--accent);
+    opacity: 1;
+    text-shadow: 0 0 8px rgba(61, 125, 255, 0.4);
+}
+
+button {
+    border: none;
+    cursor: pointer;
+    background: none;
+    color: inherit;
+}
+
+.shared-button {
+    background: var(--bg-panel);
+    border: 2px solid var(--accent);
+    color: var(--text-main);
+    border-radius: var(--radius-md);
+    transition: 0.2s;
+}
+
+.shared-button:hover {
+    background: var(--bg-panel-hover);
+    border-color: var(--accent-soft);
+    box-shadow: 0 0 8px rgba(61, 125, 255, 0.27);
+}
+
+.cycle-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #141726;
+    border-radius: 10px;
+    padding: 4px 8px;
+    border: 1px solid #252a3c;
+}
+
+.cycle-group-double {
+    display: grid;
+    grid-template-columns: auto;
+    gap: 8px;
+    align-items: center;
+    width: fit-content;
+    margin: 0 auto;
+    padding: 4px 10px;
+}
+
+.cycle-group-double .cycle-button {
+    min-width: 100px;
+    max-width: 130px;
+}
+
+.cycle-group .label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+/* Gemeinsame Kachelregel für Gegner und adaptive Anpassung */
+.opponent-pair {
+    align-items: stretch;
+}
+
+.opponent-pair .cycle-group {
+    align-items: stretch;
+    justify-content: flex-start;
+    min-width: 0;
+}
+
+.opponent-pair .cycle-group .label {
+    width: 100%;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.opponent-pair .cycle-group .cycle-button {
+    width: 100%;
+    min-width: 0;
+    min-height: 36px;
+    flex: 0 0 auto;
+}
+
+/* Einheitliches Steuerungs-Layout für alle Spiele */
+.settings,
+#settingsPanel,
+.controls-vertical {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    align-items: stretch;
+    justify-items: stretch;
+    width: min(100%, 420px) !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+/* Das Einstellungsraster darf nicht durch einen schmalen Spielkopf
+   einzelner Spiele kuenstlich verkleinert werden. */
+.game-page .app,
+.game-page .top-bar {
+    width: 100% !important;
+    box-sizing: border-box;
+}
+
+.settings > .setting-row,
+#settingsPanel > .setting-row,
+.controls-vertical > .cycle-group {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 5px;
+    width: 100% !important;
+    min-width: 0;
+    margin: 0;
+}
+
+.settings > .setting-row .label,
+#settingsPanel > .setting-row .label,
+.controls-vertical > .cycle-group .label {
+    width: 100%;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.settings > .setting-row .cycle-button,
+#settingsPanel > .setting-row .cycle-button,
+.controls-vertical > .cycle-group .cycle-button {
+    width: 100%;
+    min-width: 0;
+    min-height: 36px;
+    flex: 0 0 auto;
+}
+
+/* Gegner und adaptive Geschwindigkeit bilden immer eine gemeinsame Zeile. */
+.settings > #rowOpponent,
+#settingsPanel > #botOpponentRow,
+.controls-vertical > .opponent-pair {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    width: 100% !important;
+}
+
+.settings > #rowOpponent .cycle-group,
+#settingsPanel > #botOpponentRow .cycle-group,
+.controls-vertical > .opponent-pair .cycle-group {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 5px;
+    width: 100%;
+    margin: 0;
+}
+
+/* Dritte Zeile: Regelmodus oder spielabhängige Sonderoption. */
+.settings > #rowMode,
+#settingsPanel > .setting-row:nth-child(2),
+.settings > #rowMode,
+#settingsPanel > .setting-row:nth-child(2) {
+    grid-column: 1 / -1;
+}
+
+.settings > #reset,
+#settingsPanel > #startBtn,
+.controls-vertical > .round-actions {
+    grid-column: 1 / -1;
+    justify-self: center;
+}
+
+@media (max-width: 520px) {
+    .settings,
+    #settingsPanel,
+    .controls-vertical {
+        width: min(100%, 420px) !important;
+        gap: 8px;
+    }
+}
+
+.cycle-button {
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: #1c2134;
+    color: var(--text-main);
+    border: 1px solid #30364c;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.cycle-button:hover {
+    background: #252b40;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+}
+
+.primary-button {
+    padding: 7px 14px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #4f8cff, #7b5cff);
+    color: #ffffff;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border: 1px solid #6b8cff;
+    box-shadow: 0 6px 14px rgba(79, 140, 255, 0.35);
+    transition: transform 0.1s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.primary-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 20px rgba(79, 140, 255, 0.45);
+    filter: brightness(1.05);
+}
+
+.button-disabled {
+    pointer-events: none;
+    opacity: 0.45;
+    filter: grayscale(40%);
+}
+
+.cycle-button:disabled {
+    opacity: 0.45;
+    filter: grayscale(40%);
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+@media (min-width: 700px) {
+    body {
+        padding: 40px;
+    }
+
+    .container {
+        max-width: 560px;
+    }
+
+    .title {
+        font-size: 2.4rem;
+    }
+
+    .menu-item {
+        padding: 20px;
+    }
+
+    .menu-item .icon {
+        font-size: 2rem;
+    }
+
+    .menu-item .label {
+        font-size: 1.3rem;
+    }
+}
+
+@media (max-width: 480px) {
+    body {
+        align-items: flex-start;
+        padding: 18px 12px;
+    }
+
+    .container {
+        max-width: 100%;
+    }
+
+    .title {
+        font-size: 1.8rem;
+        margin-bottom: 6px;
+    }
+
+    .subtitle {
+        margin-bottom: 22px;
+        font-size: 0.85rem;
+    }
+
+    .menu {
+        gap: 14px;
+    }
+
+    .menu-item {
+        padding: 18px 16px;
+        gap: 14px;
+    }
+
+    .menu-item .icon {
+        font-size: 2rem;
+    }
+
+    .menu-item .label {
+        font-size: 1.2rem;
+    }
+
+    .menu-item-copy { align-items: center; }
+    .menu-item-description { font-size: .72rem; }
+
+    .footer {
+        margin-top: 16px;
+    }
+}
+
+/* Gemeinsames Einstellungsraster fuer alle Spiele.
+   Diese Regeln neutralisieren spiel-spezifische Altregeln, damit keine
+   Kachel durch Flex-Basis oder feste Hoehen aus dem Raster laeuft. */
+.settings,
+#settingsPanel,
+.controls-vertical {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    grid-auto-rows: auto;
+    align-items: stretch !important;
+    justify-items: stretch !important;
+    gap: 10px !important;
+    width: min(100%, 420px) !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+.settings > .setting-row,
+#settingsPanel > .setting-row,
+.controls-vertical > .cycle-group {
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    justify-content: flex-start !important;
+    gap: 5px !important;
+}
+
+.settings > .setting-row .label,
+#settingsPanel > .setting-row .label,
+.controls-vertical > .cycle-group .label {
+    width: 100% !important;
+    text-align: left !important;
+    white-space: nowrap;
+}
+
+.settings > .setting-row .cycle-button,
+#settingsPanel > .setting-row .cycle-button,
+.controls-vertical .cycle-button {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 36px !important;
+    height: auto !important;
+    flex: 0 0 auto !important;
+}
+
+/* Spieler/Match oben, Gegner/Anpassung darunter. */
+.settings > #rowOpponent,
+#settingsPanel > #botOpponentRow,
+.controls-vertical > .opponent-pair {
+    grid-column: 1 / -1 !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+    width: 100% !important;
+}
+
+.settings > #rowOpponent .cycle-group,
+#settingsPanel > #botOpponentRow .cycle-group,
+.controls-vertical > .opponent-pair .cycle-group {
+    width: 100% !important;
+    min-width: 0 !important;
+    margin: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 5px !important;
+}
+
+.settings > #rowMode,
+#settingsPanel > #rulesRow,
+#settingsPanel > .setting-row:nth-child(2) {
+    grid-column: 1 / -1 !important;
+}
+
+.settings > #reset,
+#settingsPanel > #startBtn,
+.controls-vertical > .round-actions {
+    grid-column: 1 / -1 !important;
+    justify-self: center !important;
+}
+
+@media (max-width: 700px) {
+    .settings,
+    #settingsPanel,
+    .controls-vertical {
+        gap: 8px !important;
+    }
+}
+
+/* Einheitlicher mobiler Game-Header im Landscape: Titel mittig,
+   Vollbild rechts, darunter beginnt das jeweilige Spielraster. */
+@media (orientation: landscape) and (max-height: 700px) {
+    body.game-page.mobile-prototype.game-active {
+        align-items: flex-start;
+        padding-top: 8px;
+        padding-bottom: 8px;
+    }
+
+    .mobile-prototype.game-active .game-screen-header {
+        grid-column: 1 / -1 !important;
+        grid-row: 1 !important;
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        width: 100%;
+        min-height: 32px;
+        padding: 0;
+    }
+
+    .mobile-prototype.game-active .game-screen-header .game-title {
+        width: auto;
+        margin: 0;
+        font-size: clamp(1rem, 3.2vh, 1.35rem);
+        line-height: 1;
+        text-align: center;
+        white-space: nowrap;
+    }
+
+    .mobile-prototype.game-active .game-screen-header .game-screen-controls {
+        position: absolute;
+        top: 50%;
+        right: 0;
+        transform: translateY(-50%);
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+    }
+
+    .mobile-prototype.game-active .game-screen-header .fullscreen-toggle {
+        min-height: 30px;
+        padding: 4px 8px;
+        font-size: clamp(.68rem, 2.4vh, .8rem);
+    }
+}
+
+/* Gemeinsame Kopfbuttons der mobilen Settings-Ansicht im Hochformat.
+   Spielbezogene Mobile-Regeln duerfen Groesse und Position hier nicht
+   auseinanderlaufen lassen. Die unterschiedliche Textbreite bleibt
+   erhalten, die Buttonhoehe und Ausrichtung sind identisch. */
+@media (orientation: portrait) and (max-width: 700px) {
+    .mobile-prototype:not(.game-active) > #backIcon,
+    .mobile-prototype:not(.game-active) > #helpIcon {
+        top: 10px !important;
+        min-height: 38px !important;
+        box-sizing: border-box !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 6px 12px !important;
+        font-size: 16px !important;
+        line-height: 1.2 !important;
+    }
+
+    .mobile-prototype:not(.game-active) > #backIcon {
+        left: 10px !important;
+        right: auto !important;
+    }
+
+    .mobile-prototype:not(.game-active) > #helpIcon {
+        left: auto !important;
+        right: 10px !important;
+    }
+}
+
+/* Verbindliche Footer-Position für alle Spielseiten. */
+body.game-page {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+}
+
+body.game-page > .app {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 100%;
+}
+
+body.game-page > .footer,
+body.game-page > .app > .footer {
+    display: block !important;
+    width: 100%;
+    box-sizing: border-box;
+    margin-top: auto !important;
+    padding: 10px 16px 8px !important;
+    text-align: center;
+}
+
+/* Vollbild-Grundlage: der mobile Spielscreen darf die gesamte Fläche nutzen. */
+@media (orientation: landscape) {
+    body.game-page.is-fullscreen.game-active {
+        padding: 8px 12px !important;
+    }
+
+    body.game-page.is-fullscreen.game-active .game-screen:not([hidden]) {
+        width: 100% !important;
+        max-width: none !important;
+    }
+}
+
+/* Gemeinsamer mobiler Spiel-Header im Hochformat.
+   Der Kopf sitzt direkt am oberen Rand des aktiven Spielscreens. Dadurch
+   bleibt die Überschrift kompakt und das spielbezogene Raster erhält mehr
+   vertikalen Platz. Die Brett-/Spielfeldgeometrie bleibt je Spiel frei. */
+@media (orientation: portrait) and (max-width: 700px) {
+    body.game-page.mobile-prototype.game-active {
+        align-items: center !important;
+        padding-top: 8px !important;
+        padding-bottom: 8px !important;
+    }
+
+    body.game-page.mobile-prototype.game-active main {
+        width: 100% !important;
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+    }
+
+    .mobile-prototype.game-active .game-screen:not([hidden]) {
+        width: 100% !important;
+        margin-top: 0 !important;
+        gap: 8px;
+    }
+
+    .mobile-prototype.game-active .game-screen-header {
+        display: flex !important;
+        position: relative !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 100% !important;
+        min-height: 32px !important;
+        padding: 0 !important;
+        gap: 0 !important;
+        flex-direction: row !important;
+    }
+
+    .mobile-prototype.game-active .game-screen-header .game-title {
+        width: auto !important;
+        margin: 0 !important;
+        font-size: clamp(1.1rem, 5vw, 1.35rem) !important;
+        line-height: 1 !important;
+        text-align: center !important;
+        white-space: nowrap;
+    }
+
+    .mobile-prototype.game-active .game-screen-header .game-screen-controls {
+        position: absolute !important;
+        top: 50% !important;
+        right: 0 !important;
+        transform: translateY(-50%) !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-end !important;
+    }
+
+    .mobile-prototype.game-active .game-screen-header .fullscreen-toggle {
+        min-height: 30px !important;
+        padding: 4px 8px !important;
+        font-size: .76rem !important;
+        white-space: nowrap;
+    }
+}
+
+/* Verbindlicher gemeinsamer Mobile-Settings-Screen im Querformat. */
+@media (orientation: landscape) and (max-height: 700px) {
+    /* Gemeinsamer Landscape-Settings-Header: globale Werkzeuge werden nicht
+       über dem Titel dupliziert. Das sichtbare Zahnrad kommt aus
+       .landscape-setup-tools innerhalb der Startaktion. */
+    .mobile-prototype:not(.game-active) > #settingsToggle {
+        display: none !important;
+    }
+
+    .mobile-prototype:not(.game-active) > #soundToggle {
+        top: auto !important;
+        left: auto !important;
+        right: max(18px, calc((100vw - 900px) / 2)) !important;
+        bottom: 18px !important;
+        z-index: 20;
+    }
+
+    .mobile-prototype:not(.game-active) {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        padding: var(--mobile-settings-top-padding)
+                 var(--mobile-settings-side-padding) 0 !important;
+    }
+
+    .mobile-prototype:not(.game-active) .app,
+    .mobile-prototype:not(.game-active) .top-bar {
+        display: contents !important;
+    }
+
+    .mobile-prototype:not(.game-active) .top-bar > .game-title {
+        display: none !important;
+    }
+
+    .mobile-prototype:not(.game-active) main {
+        display: block;
+        width: 100%;
+        padding: 0 !important;
+        margin: 0;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) var(--mobile-settings-action-width);
+        grid-template-rows: auto 1fr;
+        align-items: center;
+        width: min(100%, var(--mobile-settings-shell-width)) !important;
+        max-width: none !important;
+        margin: 0 auto;
+        column-gap: var(--mobile-settings-column-gap);
+        row-gap: var(--mobile-settings-gap);
+    }
+
+    .mobile-prototype:not(.game-active)
+    .setup-screen > .game-title,
+    .mobile-prototype:not(.game-active)
+    .setup-screen > .setup-screen-title {
+        display: block !important;
+        grid-column: 1 / -1;
+        grid-row: 1;
+        width: 100%;
+        margin: 0 0 2px !important;
+        font-size: 1.55rem;
+        line-height: 1.05;
+        font-weight: 400;
+        letter-spacing: normal;
+        text-align: center;
+        text-shadow: 0 0 15px var(--accent);
+    }
+
+    .mobile-prototype:not(.game-active)
+    .setup-screen > .settings,
+    .mobile-prototype:not(.game-active)
+    .setup-screen > .controls-vertical {
+        grid-column: 1;
+        grid-row: 2;
+        display: grid !important;
+        width: 100% !important;
+        max-width: none !important;
+        margin: 0;
+        padding: 0;
+    }
+
+    .mobile-prototype:not(.game-active)
+    .setup-screen > .game-actions {
+        grid-column: 2;
+        grid-row: 2;
+        display: flex !important;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 9px;
+        width: 100%;
+        min-height: 122px;
+        margin: 0;
+    }
+
+    .mobile-prototype:not(.game-active)
+    .setup-screen > .game-actions .landscape-setup-tools {
+        display: contents !important;
+        order: 1;
+    }
+
+    .mobile-prototype:not(.game-active)
+    .setup-screen > .game-actions .setup-extra-settings-button {
+        order: 2;
+        width: 42px;
+        min-width: 42px;
+        height: 36px;
+        padding: 0;
+        margin-top: 8px;
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .mobile-prototype:not(.game-active)
+    .setup-screen > .game-actions > .primary-button {
+        order: 3;
+        width: max-content !important;
+        min-width: 0;
+        min-height: 42px;
+        margin: 0;
+    }
+
+    .mobile-prototype:not(.game-active) .footer {
+        width: 100%;
+        margin-top: auto;
+        text-align: center;
+    }
+}
+
+/* Gemeinsamer mobiler Spielscreen: globale Kopfaktionen ausblenden. */
+.mobile-prototype.game-active > #backIcon,
+.mobile-prototype.game-active > #helpIcon,
+.mobile-prototype.game-active > #settingsToggle,
+.mobile-prototype.game-active > #soundToggle,
+.mobile-prototype.game-active .top-bar {
+    display: none !important;
+}
+
+/* Verbindlicher Abschlussstandard fuer alle Spieleinstellungen.
+   Spielbezogene Altregeln duerfen die gemeinsame Rasterbreite nicht mehr
+   veraendern. */
+.settings,
+#settingsPanel,
+.controls-vertical {
+    width: min(100%, 420px) !important;
+    max-width: 420px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+.settings > .setting-row,
+#settingsPanel > .setting-row,
+.controls-vertical > .cycle-group,
+.opponent-pair {
+    min-width: 0 !important;
+    width: 100% !important;
+}
+
+.settings .cycle-button,
+#settingsPanel .cycle-button,
+.controls-vertical .cycle-button {
+    width: 100% !important;
+    min-width: 0 !important;
+}
+
+/* Kompakte Mobile-Steuerung: weniger Hoehe, weiterhin gut tappbar. */
+@media (max-width: 700px) {
+    .settings,
+    #settingsPanel,
+    .controls-vertical {
+        gap: 6px !important;
+        padding: 8px !important;
+    }
+
+    .settings > .setting-row,
+    #settingsPanel > .setting-row,
+    .controls-vertical > .cycle-group,
+    .settings > #rowOpponent .cycle-group,
+    #settingsPanel > #botOpponentRow .cycle-group,
+    .controls-vertical > .opponent-pair .cycle-group {
+        gap: 3px !important;
+    }
+
+    .settings > .setting-row .cycle-button,
+    #settingsPanel > .setting-row .cycle-button,
+    .controls-vertical .cycle-button {
+        min-height: 34px !important;
+        padding: 2px 6px !important;
+        font-size: 0.78rem !important;
+        line-height: 1.15 !important;
+    }
+
+    .settings > #rowOpponent,
+    #settingsPanel > #botOpponentRow,
+    .controls-vertical > .opponent-pair {
+        gap: 6px !important;
+    }
+
+    .settings > #reset,
+    #settingsPanel > #startBtn,
+    .controls-vertical > .round-actions {
+        margin-top: 1px;
+    }
+}
+
+/* Mobile kompakt: Beschriftung und Auswahl liegen nebeneinander. */
+@media (max-width: 700px) {
+    .settings > .setting-row,
+    #settingsPanel > .setting-row,
+    .controls-vertical > .cycle-group,
+    .settings > #rowOpponent .cycle-group,
+    #settingsPanel > #botOpponentRow .cycle-group,
+    .controls-vertical > .opponent-pair .cycle-group {
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        gap: 6px !important;
+    }
+
+    .settings > .setting-row .label,
+    #settingsPanel > .setting-row .label,
+    .controls-vertical > .cycle-group .label {
+        width: auto !important;
+        flex: 0 0 auto !important;
+        white-space: nowrap;
+    }
+
+    .settings > .setting-row .cycle-button,
+    #settingsPanel > .setting-row .cycle-button,
+    .controls-vertical .cycle-button {
+        width: auto !important;
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+    }
+
+    /* Gegner/Anpassung bleiben in ihrer halben Spalte untereinander,
+       damit die Buttons nicht aus der Kachel herauslaufen. */
+    .settings > #rowOpponent .cycle-group,
+    #settingsPanel > #botOpponentRow .cycle-group,
+    .controls-vertical > .opponent-pair .cycle-group {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        justify-content: flex-start !important;
+        gap: 3px !important;
+    }
+
+    .settings > #rowOpponent .cycle-group .label,
+    #settingsPanel > #botOpponentRow .cycle-group .label,
+    .controls-vertical > .opponent-pair .cycle-group .label {
+        width: 100% !important;
+    }
+
+    .settings > #rowOpponent .cycle-group .cycle-button,
+    #settingsPanel > #botOpponentRow .cycle-group .cycle-button,
+    .controls-vertical > .opponent-pair .cycle-group .cycle-button {
+        width: 100% !important;
+        flex: 0 0 auto !important;
+    }
+}
+
+/* Auf sehr schmalen Displays bleibt die vertikale Variante lesbar. */
+@media (max-width: 360px) {
+    .settings > .setting-row,
+    #settingsPanel > .setting-row,
+    .controls-vertical > .cycle-group,
+    .settings > #rowOpponent .cycle-group,
+    #settingsPanel > #botOpponentRow .cycle-group,
+    .controls-vertical > .opponent-pair .cycle-group {
+        flex-direction: column !important;
+        align-items: stretch !important;
+    }
+
+    .settings > .setting-row .label,
+    #settingsPanel > .setting-row .label,
+    .controls-vertical > .cycle-group .label {
+        width: 100% !important;
+    }
+}
+
+/* Einheitlicher Spielkopf nach dem Quarto-Layout.
+   Die hohe Spezifitaet und !important verhindern, dass alte
+   spielbezogene body-/top-bar-Regeln die Position wieder verschieben. */
+.game-page {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    padding-top: 64px !important;
+}
+
+.game-page > .container > .game-title,
+.game-page > .game-title {
+    margin-top: 0 !important;
+    margin-bottom: 8px !important;
+}
+
+.game-page .top-bar {
+    /* Der Einstellungsbereich liegt bei 4 Gewinnt und Quarto im
+       top-bar. Seitlicher Padding würde ihn dort gegenüber Othello
+       künstlich um 36px verkleinern. */
+    padding: 0 0 10px !important;
+    gap: 12px !important;
+}
+
+/* Einheitliche äußere Breite für Spiele mit .app oder .container.
+   Spielbezogene Maximalbreiten bleiben bestehen; nur der verfügbare
+   Seitenraum und die automatische Zentrierung werden vereinheitlicht. */
+.game-page > .app,
+.game-page > .container {
+    width: 100% !important;
+    box-sizing: border-box;
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+
+/* Mobile: Haupt-Infoflächen nutzen die gesamte verfügbare Breite.
+   Die Desktop-Maximalbreiten der einzelnen Spiele bleiben erhalten. */
+@media (max-width: 700px) {
+    /* Einheitlicher Mobile-Inhaltsbereich für jedes Spiel. Alle sichtbaren
+       Hauptflächen teilen sich dieselbe Breite; einzelne vw-Sonderbreiten
+       der Spiel-CSS dürfen hier nicht mehr auseinanderlaufen. */
+    .game-page {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+    }
+
+    .game-page .game-info,
+    .game-page .status-panel,
+    .game-page .piece-panel,
+    .game-page .board-wrapper,
+    .game-page .board {
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+        box-sizing: border-box;
+    }
+
+    /* Einstellungsraster und Infofläche müssen auf Mobile dieselbe
+       verfügbare Seitenbreite erhalten. Die Desktop-Grenze von 420px
+       darf hier nicht weiter greifen. */
+    .game-page .settings,
+    .game-page #settingsPanel,
+    .game-page .controls-vertical,
+    .game-page .game-info,
+    .game-page .status-panel {
+        width: 100% !important;
+        max-width: 100% !important;
+        box-sizing: border-box;
+    }
+
+    /* Das Einstellungsraster darf die nutzbare Breite nicht durch
+       zusätzlichen seitlichen Innenabstand verkleinern. */
+    .game-page .settings,
+    .game-page #settingsPanel,
+    .game-page .controls-vertical {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+}
+
+.game-page .top-bar .game-title {
+    margin-top: 0 !important;
+}
+
+/* Die Startseite nutzt denselben oberen, klaren Einstieg wie die Spiele. */
+.home-page {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    padding-top: 64px !important;
+}
+
+@media (max-width: 700px) {
+    .home-page {
+        padding-top: 64px !important;
+    }
+
+    #soundToggle {
+        width: 34px;
+        height: 34px;
+        padding: 0;
+    }
+}
+
+/* Letzter gemeinsamer Header-Override nach allen spielbezogenen Altregeln. */
+@media (orientation: landscape) and (max-height: 700px) {
+    body.game-page.mobile-prototype.game-active {
+        align-items: flex-start !important;
+        padding-top: 0 !important;
+    }
+
+    .mobile-prototype.game-active .game-screen-header {
+        grid-column: 1 / -1 !important;
+        grid-row: 1 !important;
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        width: 100%;
+        min-height: 32px;
+        padding: 0;
+    }
+
+    .mobile-prototype.game-active .game-screen-header .game-title {
+        width: auto !important;
+        margin: 0 !important;
+        font-size: clamp(1rem, 3.2vh, 1.35rem) !important;
+        line-height: 1 !important;
+        text-align: center !important;
+        white-space: nowrap;
+    }
+
+    .mobile-prototype.game-active .game-screen-header .game-screen-controls {
+        position: absolute;
+        top: 50%;
+        right: 0;
+        transform: translateY(-50%);
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+    }
+}
+
+/* Gemeinsamer linker Settings-Zurueck-Button im mobilen Spiel-Header. */
+.mobile-prototype.game-active .game-screen-header .mobile-settings-back {
+    position: absolute !important;
+    top: 50% !important;
+    left: 0 !important;
+    right: auto !important;
+    z-index: 1;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 30px !important;
+    max-width: 42%;
+    margin: 0 !important;
+    padding: 4px 8px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: var(--text-main) !important;
+    font: inherit;
+    font-size: .76rem !important;
+    line-height: 1.1 !important;
+    opacity: .9;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transform: translateY(-50%) !important;
+    cursor: pointer;
+}
+
+.mobile-prototype.game-active .game-screen-header .mobile-settings-back:hover,
+.mobile-prototype.game-active .game-screen-header .mobile-settings-back:focus-visible {
+    background: transparent !important;
+    box-shadow: none;
+    color: var(--accent) !important;
+    text-shadow: 0 0 8px var(--accent);
+    outline: none;
+}
+
+/* Der Vollbildschalter ist im Spielheader ein textartiger Steuerhinweis
+   und kein gerahmter Sekundaerbutton. Er verwendet deshalb dieselbe
+   Darstellung wie der linke Einstellungen-Zurueck-Button. */
+.mobile-prototype.game-active .game-screen-header .fullscreen-toggle {
+    min-height: 30px !important;
+    margin: 0 !important;
+    padding: 4px 8px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: var(--text-main) !important;
+    font: inherit;
+    font-size: .76rem !important;
+    line-height: 1.1 !important;
+    opacity: .9;
+    box-shadow: none !important;
+    white-space: nowrap;
+}
+
+.mobile-prototype.game-active .game-screen-header .fullscreen-toggle:hover,
+.mobile-prototype.game-active .game-screen-header .fullscreen-toggle:focus-visible {
+    background: transparent !important;
+    box-shadow: none !important;
+    color: var(--accent) !important;
+    text-shadow: 0 0 8px var(--accent);
+    outline: none;
+}
+
+@media (max-width: 360px) {
+    .mobile-prototype.game-active .game-screen-header .mobile-settings-back {
+        max-width: 38%;
+        padding-left: 6px !important;
+        padding-right: 6px !important;
+        font-size: .7rem !important;
+    }
+}
+
+/* Gemeinsame kompakte Primäraktionen im mobilen Spielscreen.
+   Sie verwenden bewusst dieselben Maße wie der Settings-Button
+   "Neues Spiel"; spielbezogene Mindestbreiten werden damit aufgehoben. */
+.mobile-prototype.game-active .mobile-game-actions .primary-button {
+    width: max-content !important;
+    max-width: 100%;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    flex: 0 0 auto !important;
+    flex-basis: auto !important;
+    padding: 7px 14px !important;
+    border-radius: 8px !important;
+    font-size: .85rem !important;
+    font-weight: 600 !important;
+}

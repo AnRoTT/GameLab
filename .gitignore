@@ -1,0 +1,26 @@
+# Agent- und lokale Arbeitsanweisungen
+AGENTS.md
+**/AGENTS.md
+docs/
+
+# Lokale Codex-/Editor-Dateien
+.codex/
+.vscode/
+.idea/
+
+# Betriebssystem- und Editor-Artefakte
+.DS_Store
+Thumbs.db
+*~
+*.swp
+
+# Lokale Test-, Build- und Abdeckungsartefakte
+node_modules/
+dist/
+build/
+coverage/
+*.log
+
+# Temporäre Testdaten
+tmp/
+temp/
