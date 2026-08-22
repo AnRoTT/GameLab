@@ -1,7 +1,10 @@
 h1 {
     width: 100%;
     text-align: center;
+    margin-bottom: 10px;
+    text-shadow: 0 0 10px #3d7dff;
 }
+
 
 body {
     display: flex;
@@ -17,9 +20,17 @@ body {
     margin: 0 auto 12px;
 }
 
-h1 {
-    margin-bottom: 10px;
-    text-shadow: 0 0 10px #3d7dff;
+/* Desktop: Abstand wie bei den übrigen Spielen zwischen Einstellungen
+   und Startaktion. Die mobile Anordnung bleibt unverändert. */
+.game-page:not(.mobile-prototype) #reset {
+    margin: 0;
+}
+
+/* Die gemeinsame .game-actions-Kachel liefert bereits den Abstand nach
+   unten. Die zusätzliche TTT-Info-Marge würde den Abstand zum Infobadge
+   gegenüber den anderen Spielen unnötig vergrößern. */
+.game-page:not(.mobile-prototype) .game-info {
+    margin-top: 0;
 }
 
 /* NEU: Score Header */
@@ -53,14 +64,15 @@ h1 {
     max-width: none;
     margin: 0;
     gap: 8px;
-    justify-content: stretch;
+    justify-content: center;
     text-shadow: none;
 }
 
 .score-header > span {
-    flex: 1;
+    flex: 0 1 112px;
+    max-width: 112px;
     min-width: 0;
-    padding: 6px 7px;
+    padding: 5px 8px;
     border: 1px solid #30364c;
     border-radius: var(--radius-md);
     background: #141726;
@@ -93,10 +105,6 @@ h1 {
 #rowRounds { order: 2; }
 #rowOpponent { order: 3; }
 #rowMode { order: 4; }
-
-.extra-settings-toggle {
-    margin: 4px auto 10px;
-}
 
 .settings-backdrop[hidden] { display: none; }
 
@@ -277,8 +285,6 @@ h1 {
 
 /* NEU: Footer mit Version + Autor */
 .footer {
-    margin-top: 30px;
-    padding-bottom: 15px;
     font-size: 0.8rem;
     color: #555;
     opacity: 0.7;
@@ -327,6 +333,10 @@ h1 {
 
     .cell {
         font-size: clamp(2.1rem, 8vw, 3.75rem);
+    }
+
+    .cell .mark {
+        font-size: clamp(2.8rem, 12vw, 4.5rem);
     }
 
     #backIcon {
@@ -470,18 +480,10 @@ h1 {
         margin-bottom: 8px;
     }
 
-    .settings {
-        margin: 8px auto 10px;
-    }
-
     .setting-row {
         margin: 5px auto;
         padding-top: 4px;
         padding-bottom: 4px;
-    }
-
-    #reset {
-        margin-top: 4px;
     }
 
     .game-info {
@@ -496,8 +498,6 @@ h1 {
     }
 
     .footer {
-        margin-top: 10px;
-        padding-bottom: 8px;
     }
 }
 
@@ -523,6 +523,7 @@ h1 {
 
 .mark {
     display: inline-block;
+    font-size: 2.65rem;
     font-weight: 700;
     line-height: 1;
     text-shadow: 0 2px 4px rgba(0,0,0,.65);
@@ -561,12 +562,387 @@ h1 {
     50% { filter: brightness(1.28); text-shadow: 0 0 13px rgba(255,255,255,.92), 0 0 28px rgba(120,165,255,.7); }
 }
 
-h1.game-title {
+:root {
+    --ttt-screen-gap: clamp(12px, 3vw, 24px);
+}
+
+/* Prototype: setup and active game are separate mobile views. */
+.mobile-prototype .screen[hidden] {
+    display: none !important;
+}
+
+.mobile-prototype .setup-screen,
+.mobile-prototype .game-screen {
+    width: min(100%, 520px);
+    margin: 0 auto;
+}
+
+.mobile-prototype .setup-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--ttt-screen-gap);
+}
+
+.mobile-prototype .game-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--game-action-gap);
+}
+
+/* Im Desktop- und Hochkantlayout bleiben die bisherigen direkten
+   Game-Screen-Kinder erhalten; nur Landscape nutzt die gemeinsame rechte
+   Info-/Aktionsspalte. */
+.game-side-panel {
+    display: contents;
+}
+
+.mobile-prototype .game-screen-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
     width: 100%;
-    margin: 0 0 8px;
-    font-size: 2rem;
-    line-height: 1.2;
-    font-weight: 400;
-    letter-spacing: normal;
-    text-shadow: 0 0 15px var(--accent);
+}
+
+.mobile-prototype .game-screen-controls {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.mobile-prototype .game-screen-header .game-title {
+    margin: 0;
+    font-size: 1.55rem;
+}
+
+.mobile-prototype .fullscreen-toggle {
+    min-height: 38px;
+    padding: 7px 12px;
+    white-space: nowrap;
+}
+
+.mobile-prototype .game-screen .game-info {
+    order: 1;
+}
+
+.mobile-prototype .game-screen .board {
+    order: 2;
+}
+
+.mobile-prototype .game-screen .cell .mark {
+    font-size: clamp(3rem, 13vw, 4.7rem);
+}
+
+.mobile-prototype .game-screen .footer {
+    order: 3;
+}
+
+.mobile-prototype .mobile-game-actions {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+    order: 3;
+}
+
+.mobile-prototype .mobile-game-actions .primary-button {
+    min-width: 170px;
+    min-height: 42px;
+}
+
+.landscape-setup-tools {
+    display: none;
+}
+
+.mobile-prototype .mobile-game-actions .secondary-button {
+    min-width: 130px;
+    min-height: 34px;
+    padding: 6px 10px;
+    font-size: .78rem;
+    opacity: .82;
+}
+
+.mobile-prototype .mobile-game-actions #mobileGameAction {
+    order: 2;
+}
+
+/* Desktop keeps the original one-page presentation. */
+.game-page:not(.mobile-prototype) .game-screen-header {
+    display: none;
+}
+
+.game-page:not(.mobile-prototype) .setup-screen,
+.game-page:not(.mobile-prototype) .game-screen {
+    display: contents;
+}
+
+.game-page:not(.mobile-prototype) .mobile-game-actions {
+    display: none !important;
+}
+
+@media (orientation: landscape) and (max-height: 700px) {
+    .mobile-prototype {
+        padding-top: 18px !important;
+    }
+
+    /* In der kompakten Setup-Ansicht sind diese globalen Werkzeuge doppelt
+       bzw. nicht nötig und würden den Titel überlagern. */
+    .mobile-prototype:not(.game-active) > #settingsToggle {
+        display: none !important;
+    }
+
+    .mobile-prototype:not(.game-active) > #backIcon,
+    .mobile-prototype:not(.game-active) > #helpIcon {
+        top: 6px;
+    }
+
+    .mobile-prototype:not(.game-active) > #soundToggle {
+        top: auto;
+        left: auto;
+        right: max(18px, calc((100vw - 900px) / 2));
+        bottom: 18px;
+        z-index: 20;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(180px, 260px);
+        grid-template-rows: auto 1fr;
+        align-items: center;
+        column-gap: clamp(16px, 4vw, 42px);
+        width: min(100%, 900px);
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .game-title {
+        margin: 0 0 2px !important;
+        font-size: 1.55rem;
+        line-height: 1.05;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .settings {
+        gap: 5px !important;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .game-title {
+        grid-column: 1 / -1;
+        grid-row: 1;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .settings {
+        grid-column: 1;
+        grid-row: 2;
+        width: 100% !important;
+        max-width: none !important;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions {
+        grid-column: 2;
+        grid-row: 2;
+        width: 100%;
+        gap: 9px;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions .landscape-setup-tools {
+        display: contents;
+        order: 1;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions > #reset {
+        order: 3;
+        margin-top: 0;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions .landscape-setup-tools > #setupExtraSettingsToggle {
+        order: 2;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions .primary-button {
+        width: 100%;
+        min-height: 42px;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions .landscape-setup-tools {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        width: 100%;
+        margin-top: 8px;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions .landscape-setup-tools .secondary-button {
+        width: 100%;
+        min-height: 36px;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions .landscape-setup-tools .setup-extra-settings-button {
+        width: 42px;
+        min-width: 42px;
+        height: 36px;
+        padding: 0;
+        align-self: center;
+        font-size: 1rem;
+        border: 2px solid var(--accent) !important;
+        border-radius: 8px;
+        background: var(--bg-panel) !important;
+        color: var(--accent) !important;
+        box-shadow: var(--shadow-soft);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .mobile-prototype .game-screen {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
+        grid-template-rows: auto auto auto;
+        align-items: center;
+        align-content: center;
+        column-gap: clamp(16px, 4vw, 42px);
+        row-gap: 4px;
+        width: min(100%, 900px);
+    }
+
+    .mobile-prototype .game-screen .game-side-panel {
+        grid-column: 2;
+        grid-row: 2 / span 2;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--game-action-gap);
+        width: 100%;
+        min-width: 0;
+        align-self: start;
+    }
+
+    .mobile-prototype .game-screen-header {
+        grid-column: 2;
+        grid-row: 1;
+        width: 100%;
+    }
+
+    .mobile-prototype .game-screen .board {
+        grid-column: 1;
+        grid-row: 2 / span 2;
+        width: min(70vh, 520px) !important;
+        max-width: 70vh;
+        align-self: center;
+        margin-top: 0;
+        margin-bottom: 10px;
+    }
+
+    .mobile-prototype .game-screen .game-info {
+        width: 100%;
+        margin: 0 !important;
+    }
+
+    .mobile-prototype .mobile-game-actions {
+        width: 100%;
+        margin: 0 !important;
+        align-self: stretch;
+    }
+
+    .mobile-prototype .game-screen .cell .mark {
+        font-size: clamp(2.6rem, 8.5vh, 4.2rem);
+    }
+
+    .mobile-prototype .game-screen .game-info {
+        grid-column: 2;
+        grid-row: 2;
+        width: 100%;
+    }
+
+    .mobile-prototype .game-screen .footer {
+        grid-column: 2;
+        grid-row: 3;
+        width: 100%;
+    }
+
+    .mobile-prototype .mobile-game-actions {
+        grid-column: 2;
+        grid-row: 3;
+    }
+
+}
+
+@media (min-width: 701px) {
+    body.game-page:not(.mobile-prototype) .board {
+        width: min(90vw, 300px, max(220px, calc(100dvh - 280px)));
+        max-width: none;
+    }
+}
+
+@media (orientation: landscape) and (min-width: 701px) {
+    /* Robustheitsregel: Für komplexe Vollbildraster künftig Brett-,
+       Zell- und Symbolgrößen nach Vollbildwechsel pixelgenau berechnen.
+       Diese Spielgeometrie bleibt spielabhängig; nicht in theme.css verlagern. */
+    body.is-fullscreen.game-active .game-screen .board {
+        width: var(--ttt-board-size, min(82vh, 58vw, 700px)) !important;
+        max-width: none;
+        grid-template-columns: repeat(3, var(--ttt-cell-size, 1fr));
+        grid-template-rows: repeat(3, var(--ttt-cell-size, 1fr));
+    }
+}
+
+/* Mobile-Landscape: Header und Brett müssen gemeinsam in den sichtbaren
+   Vollbildbereich passen; die Desktopregel oben darf hier nicht gelten. */
+@media (orientation: landscape) and (max-height: 700px) {
+    body.game-page.mobile-prototype.game-active main {
+        min-height: 0 !important;
+        height: calc(100dvh - 8px) !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        gap: 0 !important;
+        overflow: hidden !important;
+    }
+
+    body.game-page.mobile-prototype.game-active,
+    body.game-page.mobile-prototype.game-active > .app {
+        overflow: hidden !important;
+    }
+
+    .mobile-prototype.game-active .game-screen:not([hidden]) {
+        grid-template-rows: auto minmax(0, 1fr) !important;
+        align-content: stretch !important;
+        min-height: 0;
+        height: 100% !important;
+        max-height: 100% !important;
+        overflow: hidden;
+    }
+
+    .mobile-prototype.game-active .game-screen .game-side-panel,
+    .mobile-prototype.game-active .game-screen .board {
+        grid-row: 2 !important;
+    }
+
+    .mobile-prototype.game-active .game-screen .board {
+        width: min(70vh, calc(100dvh - 58px), 520px) !important;
+        max-width: none;
+    }
+}
+
+/* Hochformat: Infobadge, Spielaktion und Brett in dieser Reihenfolge. */
+@media (orientation: portrait) and (max-width: 700px) {
+    .mobile-prototype .game-screen .game-info {
+        order: 1;
+        margin: 0 !important;
+    }
+
+    .mobile-prototype .mobile-game-actions {
+        order: 2;
+        margin: 0 !important;
+    }
+
+    .mobile-prototype .game-screen .board {
+        order: 3;
+    }
+
+    .mobile-prototype .game-screen .footer {
+        order: 4;
+    }
 }

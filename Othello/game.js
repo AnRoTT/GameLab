@@ -5,18 +5,18 @@ const ADAPT_SPEEDS = [
     { key: "fast", label: "Schnell" }
 ];
 const BOT_LEVELS = ["Anfänger", "Hobbyspieler", "Vereinsspieler", "Meister", "Adaptiv"];
-const MATCH_OPTIONS = ["Einzelrunde", "Abwechselnd", "Verlierer beginnt"];
+const MATCH_OPTIONS = ["Einzelrunde", "Abwechselnd"];
 
 let vsComputer = true;
 let botType = "adaptive";
 let botLevelIndex = 0;
 let adaptSpeedIndex = 1;
-let ruleMode = "standard";
+let showMoveHints = true;
 let matchModeIndex = 0;
 
 const settingsStartButton = document.getElementById("startBtn");
 const settingsModeButton = document.getElementById("modeBtn");
-const settingsRulesButton = document.getElementById("rulesBtn");
+const settingsMoveHintsButton = document.getElementById("moveHintsBtn");
 const settingsMatchButton = document.getElementById("matchBtn");
 const settingsOpponentRow = document.getElementById("botOpponentRow");
 const settingsBotLevelButton = document.getElementById("botLevelBtn");
@@ -24,6 +24,47 @@ const settingsAdaptSpeedButton = document.getElementById("adaptSpeedBtn");
 const settingsStrengthPanel = document.getElementById("adaptiveStrengthPanel");
 const settingsStrengthValue = document.getElementById("adaptiveStrengthValue");
 const settingsStrengthBar = document.getElementById("adaptiveStrengthBar");
+const setupScreen = document.getElementById("setupScreen");
+const gameScreen = document.getElementById("gameScreen");
+const fullscreenToggle = document.getElementById("fullscreenToggle");
+const mobileSettingsBack = document.getElementById("mobileSettingsBack");
+const mobileGameAction = document.getElementById("mobileGameAction");
+let mobilePrototype = window.AndisMobileLayout?.detectMobileSession?.() ?? false;
+const screenController = window.AndisMobileLayout?.createScreenController?.({
+    setupScreen,
+    gameScreen,
+    body: document.body
+});
+screenController?.applyMode(mobilePrototype, false);
+const fullscreenController = screenController?.bindFullscreen?.({
+    button: fullscreenToggle,
+    isMobile: () => mobilePrototype
+});
+
+function stabilizeFullscreenBoard() {
+    if (!document.fullscreenElement || !document.body.classList.contains("game-active")) {
+        boardEl.style.removeProperty("--othello-board-size");
+        boardEl.style.removeProperty("--othello-cell-size");
+        boardEl.style.removeProperty("--othello-piece-size");
+        return;
+    }
+
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        const size = window.AndisBoardLayout?.viewportBoard?.({
+            min: 240, max: 760, aspect: 1, widthOffset: 24, heightOffset: 58
+        }) ?? Math.max(240, Math.min(window.innerHeight - 36, window.innerWidth - 24, 760));
+        const cell = Math.max(1, Math.floor((size - 16 - 7 - 6) / 8));
+        boardEl.style.setProperty("--othello-board-size", `${Math.floor(size)}px`);
+        boardEl.style.setProperty("--othello-cell-size", `${cell}px`);
+        boardEl.style.setProperty("--othello-piece-size", `${Math.floor(cell * 0.8)}px`);
+        renderBoard();
+    }));
+}
+
+window.AndisBoardLayout?.bindResponsiveBoardLayout(stabilizeFullscreenBoard);
+screenController?.watchResponsiveMode?.((isMobile) => {
+    mobilePrototype = isMobile;
+});
 
 function updateAdaptiveStrengthUI(strength = getAdaptiveStrength()) {
     const visible = vsComputer && botType === "adaptive";
@@ -54,51 +95,53 @@ function updateMatchModeUI() {
 
 window.setOthelloMatchSettingsLocked = function (locked) {
     settingsModeButton.disabled = locked;
-    settingsRulesButton.disabled = locked;
+    settingsMoveHintsButton.disabled = locked;
     settingsMatchButton.disabled = locked;
     settingsBotLevelButton.disabled = locked || !vsComputer;
     settingsAdaptSpeedButton.disabled = locked || !vsComputer || botType !== "adaptive";
-    [settingsModeButton, settingsRulesButton, settingsMatchButton, settingsBotLevelButton, settingsAdaptSpeedButton]
+    [settingsModeButton, settingsMoveHintsButton, settingsMatchButton, settingsBotLevelButton, settingsAdaptSpeedButton]
         .forEach(button => button.classList.toggle("button-disabled", button.disabled));
 };
 
 settingsStartButton.addEventListener("click", () => {
-    playSound(soundButton, 0.22);
+    window.AndisSound?.playUiClick?.(0.22);
     if (gameStarted && !gameOver) {
         resetGame();
         return;
     }
     initGame();
+    showGameScreen();
 });
 settingsModeButton.addEventListener("click", () => {
     if (gameStarted && !gameOver) return;
-    playSound(soundButton, 0.22);
+    window.AndisSound?.playUiClick?.(0.22);
     vsComputer = !vsComputer;
     settingsModeButton.textContent = vsComputer ? "1 Spieler" : "2 Spieler";
     updateBotLevelUI();
+    updateScoreLabels();
 });
-settingsRulesButton.addEventListener("click", () => {
+settingsMoveHintsButton.addEventListener("click", () => {
     if (gameStarted && !gameOver) return;
-    playSound(soundButton, 0.22);
-    ruleMode = ruleMode === "standard" ? "tournament" : "standard";
-    settingsRulesButton.textContent = ruleMode === "standard" ? "Standard" : "Turnier";
+    window.AndisSound?.playUiClick?.(0.22);
+    showMoveHints = !showMoveHints;
+    settingsMoveHintsButton.textContent = showMoveHints ? "Ein" : "Aus";
 });
 settingsMatchButton.addEventListener("click", () => {
     if (gameStarted && !gameOver) return;
-    playSound(soundButton, 0.22);
+    window.AndisSound?.playUiClick?.(0.22);
     matchModeIndex = (matchModeIndex + 1) % MATCH_OPTIONS.length;
     updateMatchModeUI();
     if (typeof updateMatchInfo === "function") updateMatchInfo();
 });
 settingsBotLevelButton.addEventListener("click", () => {
     if (gameStarted && !gameOver) return;
-    playSound(soundButton, 0.22);
+    window.AndisSound?.playUiClick?.(0.22);
     botLevelIndex = (botLevelIndex + 1) % BOT_LEVELS.length;
     updateBotLevelUI();
 });
 settingsAdaptSpeedButton.addEventListener("click", () => {
     if (settingsAdaptSpeedButton.disabled || (gameStarted && !gameOver)) return;
-    playSound(soundButton, 0.22);
+    window.AndisSound?.playUiClick?.(0.22);
     adaptSpeedIndex = (adaptSpeedIndex + 1) % ADAPT_SPEEDS.length;
     updateBotLevelUI();
 });
@@ -108,7 +151,7 @@ updateMatchModeUI();
 
 const startBtn = document.getElementById("startBtn");
 const modeBtn = document.getElementById("modeBtn");
-const rulesBtn = document.getElementById("rulesBtn");
+const moveHintsBtn = document.getElementById("moveHintsBtn");
 const botLevelBtn = document.getElementById("botLevelBtn");
 const adaptSpeedBtn = document.getElementById("adaptSpeedBtn");
 const settingsPanel = document.getElementById("settingsPanel");
@@ -120,11 +163,10 @@ const adaptiveStrengthPanel = document.getElementById("adaptiveStrengthPanel");
 const adaptiveStrengthValue = document.getElementById("adaptiveStrengthValue");
 const adaptiveStrengthBar = document.getElementById("adaptiveStrengthBar");
 
-const soundButton = new Audio("../assets/sounds/Button_Click.mp3");
 const soundMove = new Audio("../assets/sounds/Click.mp3");
 const soundError = new Audio("../assets/sounds/Error_Tock.mp3");
 
-[soundButton, soundMove, soundError].forEach(sound => {
+[soundMove, soundError].forEach(sound => {
     sound.volume = 0.25;
     sound.preload = "auto";
 });
@@ -147,13 +189,25 @@ function getBotColor() {
     return otherColor(playerOneColor);
 }
 
+function getPlayerLabel(color) {
+    if (color === playerOneColor) return "Spieler 1";
+    return vsComputer ? "Bot" : "Spieler 2";
+}
+
+function getColorLabel(color) {
+    return color === "black" ? "Schwarz" : "Weiß";
+}
+
+function updateTurnStatus(color = currentPlayer) {
+    statusEl.textContent = `${getColorLabel(color)} am Zug – ${getPlayerLabel(color)}`;
+}
+
 function updateMatchInfo() {
     if (getMatchMode() === 0) {
-        matchLineEl.textContent = "Einzelrunde - Offizielle Regeln";
+        matchLineEl.textContent = "Einzelrunde";
         return;
     }
-    const matchStartMode = getMatchMode() === 1 ? "Abwechselnd" : "Verlierer beginnt";
-    matchLineEl.textContent = `${matchStartMode} - Runde ${matchRound} - Match ${matchWins.playerOne}:${matchWins.playerTwo}`;
+    matchLineEl.textContent = `Abwechselnd - Runde ${matchRound} - Match ${matchWins.playerOne}:${matchWins.playerTwo}`;
 }
 
 let board = [];
@@ -201,15 +255,16 @@ function initGame() {
     keyboardCol = 3;
     gameOver = false;
     gameStarted = true;
+    document.body.classList.add("game-active");
     turnTransitionActive = false;
     boardEl.classList.remove("disabled");
     boardEl.tabIndex = 0;
     // settingsPanel.classList.add("disabled"); // NICHT sperren wegen Abbrechen
 modeBtn.classList.add("disabled"); // nur Modus sperren
-rulesBtn.classList.add("disabled"); // nur Regeln sperren
+moveHintsBtn.classList.add("disabled"); // nur Zughilfe sperren
     renderBoard();
     updateScore();
-    statusEl.textContent = "Schwarz am Zug";
+    updateTurnStatus();
     startBtn.textContent = getMatchMode() > 0 ? "Match beenden" : "Spiel abbrechen";
     lastMoveWasPressure = false;
 
@@ -218,7 +273,19 @@ rulesBtn.classList.add("disabled"); // nur Regeln sperren
     if (typeof window.setOthelloMatchSettingsLocked === "function") {
         window.setOthelloMatchSettingsLocked(true);
     }
-    if(vsComputer && currentPlayer === getBotColor()) botMove(token); // Sofort Bot wenn er anfängt
+    if (vsComputer && currentPlayer === getBotColor()) {
+        const openingThinkTime = botType === "adaptive" && typeof getAdaptiveBotThinkTime === "function"
+            ? getAdaptiveBotThinkTime()
+            : typeof getOthelloBotThinkTime === "function"
+            ? getOthelloBotThinkTime(botLevelIndex + 1, currentPlayer)
+            : 300;
+        const openingDelay = window.getBotMoveDelay(openingThinkTime, true);
+        botMoveTimer = setTimeout(() => {
+            botMoveTimer = null;
+            if (token !== gameToken || !gameStarted || gameOver) return;
+            botMove(token);
+        }, openingDelay);
+    }
 }
 
 function cancelPendingTurnTimers() {
@@ -256,11 +323,13 @@ function resetGame() {
     keyboardCol = 3;
     gameStarted = false;
     gameOver = false;
+    document.body.classList.remove("game-active");
     turnTransitionActive = false;
     boardEl.classList.add("disabled");
     boardEl.tabIndex = -1;
 modeBtn.classList.remove("disabled"); // nur Modus wieder frei
-rulesBtn.classList.remove("disabled"); // nur Regeln wieder frei
+moveHintsBtn.classList.remove("disabled"); // nur Zughilfe wieder frei
+    playerOneColor = "black";
     renderBoard();
     updateScore();
     statusEl.textContent = "Klick 'Jetzt spielen' um zu starten";
@@ -269,7 +338,6 @@ rulesBtn.classList.remove("disabled"); // nur Regeln wieder frei
     matchInProgress = false;
     matchRound = 1;
     matchWins = { playerOne: 0, playerTwo: 0 };
-    playerOneColor = "black";
     updateMatchInfo();
     updateBotLevelUI();
     if (typeof window.setOthelloMatchSettingsLocked === "function") {
@@ -277,12 +345,28 @@ rulesBtn.classList.remove("disabled"); // nur Regeln wieder frei
     }
 }
 
+function showSetupScreen() {
+    if (!mobilePrototype) return;
+    fullscreenController?.exit();
+    screenController?.showSetup();
+}
+
+function showGameScreen() {
+    if (!mobilePrototype) return;
+    screenController?.showGame();
+    fullscreenController?.requestIfChosen();
+}
+
+mobileGameAction?.addEventListener("click", () => {
+    window.AndisSound?.playUiClick?.(0.22);
+    resetGame();
+    showSetupScreen();
+});
+
 function renderBoard() {
     boardEl.innerHTML = "";
-    // Gültige Züge sind in beiden Regelmodi identisch. Der Turniermodus
-    // verändert nur die Wertung der verbliebenen leeren Felder.
     const humanMayMove = isHumanTurn() && !turnTransitionActive;
-    const validMoves = (gameStarted && !gameOver && ruleMode !== "tournament" && humanMayMove)
+    const validMoves = (gameStarted && !gameOver && humanMayMove)
         ? getAllValidMoves(currentPlayer)
         : [];
 
@@ -301,7 +385,7 @@ function renderBoard() {
                 const piece = document.createElement("div");
                 piece.className = `piece ${board[r][c]}`;
                 cell.appendChild(piece);
-            } else if(validMoves.some(m => m.r === r && m.c === c)) {
+            } else if(showMoveHints && validMoves.some(m => m.r === r && m.c === c)) {
                 cell.classList.add("valid");
             }
             boardEl.appendChild(cell);
@@ -394,6 +478,12 @@ function updateScore() {
     });
     scoreBlackEl.textContent = black;
     scoreWhiteEl.textContent = white;
+    updateScoreLabels();
+}
+
+function updateScoreLabels() {
+    document.getElementById("scoreBlackLabel").textContent = getPlayerLabel("black");
+    document.getElementById("scoreWhiteLabel").textContent = getPlayerLabel("white");
 }
 
 function nextTurn() { // NEU: Zentrale Funktion für Spielerwechsel + Bot
@@ -413,7 +503,7 @@ function nextTurn() { // NEU: Zentrale Funktion für Spielerwechsel + Bot
             return;
         }
 
-        passMessage = `${passedPlayer === "black"? "Schwarz" : "Weiß"} muss aussetzen`;
+        passMessage = `${getColorLabel(passedPlayer)} (${getPlayerLabel(passedPlayer)}) muss aussetzen`;
         currentPlayer = otherPlayer;
     }
 
@@ -421,7 +511,7 @@ function nextTurn() { // NEU: Zentrale Funktion für Spielerwechsel + Bot
         passTimer = null;
         if (gameOver || !gameStarted) return;
 
-        statusEl.textContent = `${currentPlayer === "black"? "Schwarz" : "Weiß"} am Zug`;
+        updateTurnStatus();
         renderBoard();
 
         // Wenn Bot dran ist und Spiel läuft: nach seiner Denkzeit ziehen.
@@ -504,6 +594,7 @@ function checkGameOver() {
 function endGame() {
     if (gameOver) return;
     gameOver = true;
+    document.body.classList.add("game-active");
     boardEl.tabIndex = -1;
     cancelPendingTurnTimers();
     if (vsComputer && window.othelloPlayerProfile) {
@@ -512,17 +603,11 @@ function endGame() {
     boardEl.classList.add("disabled");
     settingsPanel.classList.remove("disabled"); // WICHTIG: wieder freigeben
     modeBtn.classList.remove("disabled");
-    rulesBtn.classList.remove("disabled");
+    moveHintsBtn.classList.remove("disabled");
     startBtn.textContent = "Jetzt spielen";
 
     let black = parseInt(scoreBlackEl.textContent);
     let white = parseInt(scoreWhiteEl.textContent);
-
-    if(ruleMode === "tournament") {
-        let empty = 64 - black - white;
-        if(black > white) black += empty;
-        else if(white > black) white += empty;
-    }
 
     let winner = black > white? "Schwarz gewinnt!" : white > black? "Weiß gewinnt!" : "Unentschieden!";
     scoreBlackEl.parentElement.classList.toggle("winner", black > white);
@@ -538,11 +623,7 @@ function endGame() {
         const winnerKey = roundWinnerColor === playerOneColor ? "playerOne" : "playerTwo";
         if (roundWinnerColor) matchWins[winnerKey] += 1;
 
-        if (getMatchMode() === 1 || roundWinnerColor === null) {
-            playerOneColor = otherColor(playerOneColor);
-        } else {
-            playerOneColor = otherColor(roundWinnerColor);
-        }
+        playerOneColor = otherColor(playerOneColor);
         matchRound += 1;
         updateMatchInfo();
         statusEl.textContent = `Runde beendet: ${winner} - Nächste Runde starten`;
@@ -558,6 +639,16 @@ function endGame() {
     }
 }
 
+boardEl.addEventListener("pointerdown", (e) => {
+    const cell = e.target.closest(".cell");
+    if (!cell) return;
+    const invalid = gameOver || !gameStarted || (vsComputer && currentPlayer !== playerOneColor);
+    if (!invalid) return;
+    e.preventDefault();
+    cell.blur();
+    playSound(soundError, 0.22);
+}, true);
+
 boardEl.addEventListener("click", (e) => {
     if(gameOver ||!gameStarted) return;
     if(vsComputer && currentPlayer !== playerOneColor) return; // Klick blocken wenn Bot dran
@@ -566,6 +657,11 @@ boardEl.addEventListener("click", (e) => {
     if(!cell) return;
     const r = parseInt(cell.dataset.r);
     const c = parseInt(cell.dataset.c);
+
+    if (!isValidMove(r, c, currentPlayer)) {
+        playSound(soundError, 0.22);
+        return;
+    }
 
     const learningBoard = board.map(row => row.slice());
     const learningPlayerMoves = getAllValidMoves(currentPlayer);
@@ -605,3 +701,22 @@ boardEl.addEventListener("click", (e) => {
 });
 
 resetGame();
+
+window.AndisNavigation?.bindBackButton?.({
+    button: mobileSettingsBack,
+    isGameActive: () => document.body.classList.contains("game-active") || gameStarted,
+    isMatchRunning: () => gameStarted && !gameOver,
+    onAbortConfirmed: () => {
+        resetGame();
+        showSetupScreen();
+    }
+});
+
+const browserBackGuard = window.AndisNavigation?.bindBrowserBack?.({
+    isGameActive: () => document.body.classList.contains("game-active") || gameStarted,
+    isMatchRunning: () => gameStarted && !gameOver,
+    onAbortConfirmed: () => {
+        resetGame();
+        showSetupScreen();
+    }
+});

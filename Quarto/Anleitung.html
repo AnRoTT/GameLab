@@ -5,6 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quarto - Kurzanleitung</title>
     <link rel="stylesheet" href="../theme.css">
+    <style>
+        .quarto-guide-legend { display: grid; gap: 8px; margin: 10px 0; }
+        .quarto-guide-legend > div { display: grid; grid-template-columns: 70px 1fr 1fr; align-items: center; gap: 8px; }
+        .quarto-guide-example { display: inline-flex; align-items: center; gap: 5px; }
+        .quarto-guide-swatch { width: 22px; height: 22px; display: inline-block; border: 3px solid #7d8aa2; border-radius: 5px; background: #202738; box-shadow: 0 3px 7px rgba(0,0,0,.45); }
+        .quarto-guide-swatch.light { background: linear-gradient(145deg,#fffdf6,#c8bda9); border-color: #fff; }
+        .quarto-guide-swatch.dark { background: linear-gradient(145deg,#42516c,#121827); border-color: #9eabc1; }
+        .quarto-guide-swatch.round { border-radius: 50%; }
+        .quarto-guide-swatch.square { border-radius: 5px; }
+        .quarto-guide-swatch.tall { height: 30px; width: 18px; margin-left: 2px; }
+        .quarto-guide-swatch.short { height: 18px; width: 18px; margin-left: 2px; }
+        .quarto-guide-swatch.solid { background: linear-gradient(145deg,#52647f,#182033); }
+        .quarto-guide-swatch.hollow { background: transparent; border-color: currentColor; box-shadow: 0 3px 7px rgba(0,0,0,.4); }
+        .quarto-guide-swatch.hollow::after { content: ""; display: block; width: 54%; height: 54%; margin: 20% auto; border: 1px solid currentColor; border-radius: inherit; opacity: .55; }
+    </style>
 </head>
 <body>
     <main class="guide-container">
@@ -18,7 +33,14 @@
         </section>
         <section class="guide-card">
             <h2>Die Steine</h2>
-            <p>Jeder Stein besitzt vier Eigenschaften: hell oder dunkel, rund oder eckig, hoch oder klein und gefüllt oder hohl.</p>
+            <p>Jeder Stein besitzt vier Eigenschaften:</p>
+            <div class="quarto-guide-legend" aria-label="Darstellung der vier Steineigenschaften">
+                <div><strong>Farbe</strong><span class="quarto-guide-example"><i class="quarto-guide-swatch light"></i>hell</span><span class="quarto-guide-example"><i class="quarto-guide-swatch dark"></i>dunkel</span></div>
+                <div><strong>Form</strong><span class="quarto-guide-example"><i class="quarto-guide-swatch round"></i>rund</span><span class="quarto-guide-example"><i class="quarto-guide-swatch square"></i>eckig</span></div>
+                <div><strong>Höhe</strong><span class="quarto-guide-example"><i class="quarto-guide-swatch tall"></i>hoch</span><span class="quarto-guide-example"><i class="quarto-guide-swatch short"></i>klein</span></div>
+                <div><strong>Füllung</strong><span class="quarto-guide-example"><i class="quarto-guide-swatch solid"></i>gefüllt</span><span class="quarto-guide-example"><i class="quarto-guide-swatch hollow"></i>hohl</span></div>
+            </div>
+            <p>Die Eigenschaften erkennst du direkt an der Darstellung der Spielsteine.</p>
         </section>
         <section class="guide-card">
             <h2>Spielablauf</h2>
@@ -35,20 +57,29 @@
             <h2>Steuerung</h2>
             <ul>
                 <li>Maus oder Touch: Wähle zuerst einen verfügbaren Stein aus und tippe anschließend auf ein freies Feld.</li>
+                <li>Nur im Landscape-Modus stehen die Spielsteine rechts neben dem Brett in einer vertikalen Auswahlleiste. Wische dort von oben nach unten, um weitere Steine zu erreichen.</li>
+                <li>Im Portrait-Modus bleibt die Auswahl in der bisherigen Anordnung.</li>
                 <li>Tastatur: Bewege die Auswahl mit den Pfeiltasten durch die Steine oder über das Brett und bestätige mit Enter oder Leertaste.</li>
             </ul>
         </section>
         <section class="guide-card">
+            <h2>Mobile Spielansicht</h2>
+            <p>Die Spieleinstellungen und der Spielbildschirm sind getrennt. Im Spielbildschirm findest du oben den Zurückweg zu den Spieleinstellungen und rechts den Vollbildschalter.</p>
+            <p>Der Vollbildmodus wird bewusst aktiviert und gilt nur für die aktuelle Sitzung. Beim Wechsel zurück zu den Einstellungen wird der Vollbildmodus beendet. Beim erneuten Start des Spiels kann er in derselben Sitzung wieder verwendet werden.</p>
+            <p>Über „Spiel abbrechen“ beendest du die laufende Partie nach Bestätigung.</p>
+        </section>
+        <section class="guide-card">
             <h2>Spielmodi</h2>
             <p>Im 2-Spieler-Modus spielt ihr gegeneinander. Im 1-Spieler-Modus trittst du gegen den gewählten Bot an. Der adaptive Bot passt seine Stärke während des Spiels an dein Spielniveau an.</p>
-            <p>Über Gegner und Anpassung wählst du den Bot und seine Anpassungsgeschwindigkeit. Im Match-Modus werden mehrere Runden gespielt.</p>
+            <p>Über Gegner und Anpassung wählst du den Bot und seine Anpassungsgeschwindigkeit. Bei Match stehen Einzelrunde und Abwechselnd zur Verfügung. Bei Abwechselnd wechselt der Startspieler nach jeder Runde.</p>
         </section>
         <section class="guide-card">
             <h2>Einstellungen und Sound</h2>
-            <p>Über das Zahnrad oben öffnest du die zusätzlichen Einstellungen. Dort kannst du den Sound ein- oder ausschalten und jederzeit mit „Spielerwerte löschen“ die gespeicherten adaptiven Lernwerte zurücksetzen.</p>
-            <p>Spielstände, Spielregeln und manuelle Botwerte werden dabei nicht verändert. Der Lautsprecher oben zeigt nur den aktuellen Soundstatus an.</p>
+            <p>Über das Zahnrad öffnest du die zusätzlichen Einstellungen. Dort kannst du den Sound ein- oder ausschalten und jederzeit mit „Spielerwerte löschen“ die gespeicherten adaptiven Lernwerte zurücksetzen.</p>
+            <p>Spielstände, Spielregeln und manuelle Botwerte werden dabei nicht verändert. Das Lautsprechersymbol zeigt nur den aktuellen Soundstatus an; im Landscape-Settings-Screen steht es unten rechts.</p>
         </section>
         <a class="guide-back" href="Quarto.html?menu=1">Zurück zum Spiel</a>
+        <footer class="footer">Andis Game Foundry | Quarto | by Andreas Rollinger | 2026.08.22</footer>
     </main>
 </body>
 </html>

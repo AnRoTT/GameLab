@@ -47,7 +47,6 @@ document.getElementById('btnDifficulty').onclick = () => { diffIdx = cycleSettin
 document.getElementById('btnAdapt').onclick = () => { adaptIdx = cycleSetting(adaptOptions, adaptIdx); updateSettingsUI(); };
 window.updateScore = function (x, draw, o) {
     document.getElementById('scoreX').textContent = `X: ${x}`;
-    document.getElementById('scoreDraw').textContent = `Unentsch: ${draw}`;
     document.getElementById('scoreO').textContent = `O: ${o}`;
 };
 updateSettingsUI();
@@ -56,22 +55,64 @@ const TicTacToeAICore = window.TicTacToeAICore;
 const status = document.getElementById("status");
 const roundCountdown = document.getElementById("roundCountdown");
 const reset = document.getElementById("reset");
+const setupScreen = document.getElementById("setupScreen");
+const gameScreen = document.getElementById("gameScreen");
+const mobileGameAction = document.getElementById("mobileGameAction");
+const mobileSettingsBack = document.getElementById("mobileSettingsBack");
+const fullscreenToggle = document.getElementById("fullscreenToggle");
+function syncMobileGameAction() {
+    if (!mobileGameAction) return;
+    const nextRoundPending = reset.textContent === "Neue Runde";
+    mobileGameAction.hidden = nextRoundPending;
+    mobileGameAction.textContent = reset.textContent || "Spiel abbrechen";
+}
+function detectMobilePrototype() {
+    return window.AndisMobileLayout?.detectMobileSession?.() ?? false;
+}
+let mobilePrototype = detectMobilePrototype();
+const screenController = window.AndisMobileLayout?.createScreenController?.({
+    setupScreen,
+    gameScreen,
+    body: document.body
+});
+screenController?.applyMode(mobilePrototype, false);
+const fullscreenController = screenController?.bindFullscreen?.({
+    button: fullscreenToggle,
+    isMobile: () => mobilePrototype
+});
+
+function stabilizeTicTacToeBoard() {
+    if (!document.fullscreenElement || !document.body.classList.contains("game-active")) {
+        board?.style.removeProperty("--ttt-board-size");
+        board?.style.removeProperty("--ttt-cell-size");
+        return;
+    }
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        const size = window.AndisBoardLayout?.viewportBoard?.({
+            min: 240, max: 700, aspect: 1, widthOffset: 24, heightOffset: 58
+        }) ?? Math.floor(Math.max(240, Math.min(window.innerHeight - 36, window.innerWidth - 24, 700)));
+        const cell = Math.floor((size - 20) / 3);
+        board.style.setProperty("--ttt-board-size", `${size}px`);
+        board.style.setProperty("--ttt-cell-size", `${cell}px`);
+        render();
+    }));
+}
+window.AndisBoardLayout?.bindResponsiveBoardLayout(stabilizeTicTacToeBoard);
 const winnerBanner = document.getElementById("winnerBanner");
 const adaptiveStrengthPanel = document.getElementById("adaptiveStrengthPanel");
 const adaptiveStrengthTrack = document.getElementById("adaptiveStrengthTrack");
 const adaptiveStrengthFill = document.getElementById("adaptiveStrengthFill");
 const adaptiveStrengthValue = document.getElementById("adaptiveStrengthValue");
-/* --- Sound System --- */
-const uiClickSound = new Audio("../assets/sounds/Button_Click.mp3");
-uiClickSound.volume = 0.35;
 
+screenController?.watchResponsiveMode?.((isMobile) => {
+    mobilePrototype = isMobile;
+});
+/* --- Sound System --- */
 const boardClickSound = new Audio("../assets/sounds/Click.mp3");
 boardClickSound.volume = 0.4;
 
 function playUiClick(volume = 0.35) {
-    uiClickSound.volume = volume;
-    uiClickSound.currentTime = 0;
-    uiClickSound.play().catch(() => {});
+    window.AndisSound?.playUiClick?.(volume);
 }
 
 function playBoardClick(volume = 0.4) {
@@ -354,7 +395,6 @@ function endRound(winner, winRow = null) {
     }
     updateScore(scoreX, scoreDraw, scoreO);
     document.getElementById("scoreX").classList.toggle("winner", winner === "X");
-    document.getElementById("scoreDraw").classList.toggle("winner", winner === "draw");
     document.getElementById("scoreO").classList.toggle("winner", winner === "O");
 
     startingPlayer = startingPlayer === "X"? "O" : "X";
@@ -414,18 +454,20 @@ if(matchFinished){
     winnerBanner.textContent = winnerText;
     winnerBanner.classList.add("show");
     reset.textContent = "Neues Spiel";
+    syncMobileGameAction();
 } else {
     status.textContent = message;
     winnerBanner.classList.remove("show");
     winnerBanner.textContent = "";
     reset.textContent = "Neue Runde";
+    syncMobileGameAction();
     startNextRoundCountdown();
 }
 }
 
 /* Reset - ÃœBERARBEITET */
 function resetGame(full = true) {
-    ["scoreX", "scoreDraw", "scoreO"].forEach(id => document.getElementById(id).classList.remove("winner"));
+    ["scoreX", "scoreO"].forEach(id => document.getElementById(id).classList.remove("winner"));
     cancelPendingBotMove();
     cancelNextRoundCountdown();
     if (full) {
@@ -469,12 +511,36 @@ function resetGame(full = true) {
     const roundLabel = full ? `Runde 1/${activeMatch.totalRounds}` : `Runde ${roundsPlayed + 1}/${activeMatch.totalRounds}`;
     status.textContent = `${roundLabel} - ${current} beginnt`;
     window.updateTicTacToeAdaptiveStrengthUI(adaptiveSkillValue);
-    reset.textContent = "Match abbrechen";
+    reset.textContent = "Spiel abbrechen";
+    syncMobileGameAction();
     render();
 
     if (canBotMove()) {
-        scheduleBotMove(300, false);
+        scheduleBotMove(getBotDelay(), true);
     }
+}
+
+function showSetupScreen() {
+    if (!mobilePrototype) return;
+    fullscreenController?.exit();
+    cancelPendingBotMove();
+    cancelNextRoundCountdown();
+    screenController?.showSetup();
+    gameOver = true;
+    waitingForNextRound = false;
+    matchOver = false;
+    applySettingsLock(false);
+    status.textContent = "Einstellungen wählen und 'Neues Spiel' klicken";
+    reset.textContent = "Neues Spiel";
+    syncMobileGameAction();
+    render();
+}
+
+function showGameScreen() {
+    if (!mobilePrototype) return;
+    screenController?.showGame();
+    browserBackGuard?.arm?.();
+    fullscreenController?.requestIfChosen();
 }
 
 function abortMatch() {
@@ -506,6 +572,11 @@ function abortMatch() {
 
 /* NEU: Reset Button Logik */
 reset.onclick = () => {
+    if (mobilePrototype && gameOver && !waitingForNextRound && !matchOver) {
+        showGameScreen();
+        resetGame(true);
+        return;
+    }
     if (matchOver) {
         resetGame(true);
     } else if(waitingForNextRound) {
@@ -516,6 +587,16 @@ reset.onclick = () => {
         abortMatch();
     }
 };
+
+mobileGameAction?.addEventListener("click", () => {
+    if (mobilePrototype && !gameOver && !waitingForNextRound && !matchOver) {
+        playUiClick(0.2);
+        abortMatch();
+        showSetupScreen();
+        return;
+    }
+    reset.click();
+});
 
 /* initial start - Board beim Start sperren */
 function init() {
@@ -530,6 +611,7 @@ function init() {
     matchOver = false;
     status.textContent = "Einstellungen wählen und 'Neues Spiel' klicken";
     reset.textContent = "Neues Spiel";
+    syncMobileGameAction();
     render();
 }
 
@@ -545,18 +627,47 @@ reset.addEventListener('click', () => {
     playUiClick(0.2);
 });
 
-/* â­ NEU: Sound fÃ¼r Back Button */
 const backBtn = document.getElementById("backIcon");
-if(backBtn) {
-    backBtn.addEventListener('click', () => {
-        playUiClick(0.22);
-        setTimeout(() => {
-            window.location.href = "../index.html?menu=1";
-        }, 100);
-    });
-}
-
 init();
+
+window.AndisNavigation?.bindBackButton?.({
+    button: backBtn,
+    isGameActive: () => document.body.classList.contains("game-active")
+        || !gameOver
+        || roundsPlayed > 0,
+    isMatchRunning: () => !gameOver && !waitingForNextRound && !matchOver,
+    onAbortConfirmed: () => {
+        abortMatch();
+        showSetupScreen();
+    },
+    onMenuBack: () => {
+        window.AndisSound?.playUiClick?.(0.22);
+        setTimeout(() => { window.location.href = "../index.html?menu=1"; }, 100);
+    }
+});
+
+window.AndisNavigation?.bindBackButton?.({
+    button: mobileSettingsBack,
+    isGameActive: () => document.body.classList.contains("game-active")
+        || !gameOver
+        || roundsPlayed > 0,
+    isMatchRunning: () => !gameOver && !waitingForNextRound && !matchOver,
+    onAbortConfirmed: () => {
+        abortMatch();
+        showSetupScreen();
+    }
+});
+
+const browserBackGuard = window.AndisNavigation?.bindBrowserBack?.({
+    isGameActive: () => document.body.classList.contains("game-active")
+        || !gameOver
+        || roundsPlayed > 0,
+    isMatchRunning: () => !gameOver && !waitingForNextRound && !matchOver,
+    onAbortConfirmed: () => {
+        abortMatch();
+        showSetupScreen();
+    }
+});
 
 
 

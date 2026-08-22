@@ -111,6 +111,14 @@
         return speed;
     }
 
+    function getThinkTime() {
+        const curve = getAdaptiveCurve();
+        const speedFactor = { slow: 1.25, normal: 1, fast: 0.75 }[speed] || 1;
+        const base = (450 + curve.challenge * 650) * speedFactor;
+        const variation = base * 0.18;
+        return Math.max(280, Math.round(base - variation + Math.random() * variation * 2));
+    }
+
     function snapshotProfile(profile) {
         if (!profile) return null;
         return {
@@ -320,6 +328,7 @@
         getAdaptSpeed,
         getAdaptiveSkill,
         getAdaptiveCurve,
+        getThinkTime,
         getUiState() {
             return { skill: getAdaptiveSkill(), speed, speedLabel: SPEED_LABELS[speed] };
         }

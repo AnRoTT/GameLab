@@ -1,4 +1,5 @@
 :root {
+    --ttt-screen-gap: clamp(12px, 3vw, 24px);
     --bg-main: #05060a;
     --bg-panel: #10121a;
     --bg-board: #0047ab; /* Hasbro-Blau für Brett */
@@ -351,6 +352,16 @@ main {
     grid-template-rows: repeat(6, 1fr);
     gap: 8px;
     position: relative;
+}
+
+/* Desktop: Das Brett berücksichtigt den verfügbaren vertikalen Raum, damit
+   der Footer bei normalen Viewports nicht erst weit unterhalb des Screens
+   nach dem Brett erscheint. Mobile Layouts bleiben unverändert. */
+@media (min-width: 701px) {
+    body.game-page:not(.mobile-prototype) .board {
+        width: min(100%, 520px, max(280px, calc((100dvh - 360px) * 1.1667)));
+        max-width: none;
+    }
 }
 
 /* Column hover zones (for click on mobile & desktop) */
@@ -721,7 +732,6 @@ main {
     border-top: none;
     background: transparent;
     user-select: none;
-    margin-top: 20px;
     opacity: 0.8;
     transition: 0.2s;
 }
@@ -767,8 +777,6 @@ main {
     }
 
     .footer {
-        margin-top: 10px;
-        padding: 8px 12px;
     }
 }
 
@@ -819,6 +827,198 @@ main {
     .chip { transition: none; }
 }
 
+/* Gemeinsame Zwei-Bildschirm-Struktur für die mobile Spielansicht. */
+.setup-screen[hidden],
+.game-screen[hidden] { display: none !important; }
+.mobile-game-actions { display: none; }
+.mobile-prototype .game-screen-header { display: none; }
+.game-side-panel { display: contents; }
+.setup-screen-title { display: none; }
+.setup-extra-settings-button { display: none !important; }
+
+/* Diese Spielnavigation ist ausschließlich für die mobile Spielansicht. */
+body:not(.mobile-prototype) .game-screen-header .mobile-settings-back,
+body:not(.mobile-prototype) .game-screen-header .game-screen-controls {
+    display: none !important;
+}
+
+/* Im Desktop-Layout bleibt nur der zentrale Setup-Titel sichtbar.
+   Der mobile Spiel-Header darf keinen zweiten Spielnamen erzeugen. */
+body:not(.mobile-prototype) .game-screen-header {
+    display: none !important;
+}
+
+body:not(.mobile-prototype) .setup-screen,
+body:not(.mobile-prototype) .game-screen { display: contents; }
+
+@media (max-width: 700px) {
+    .mobile-prototype .setup-screen,
+    .mobile-prototype .game-screen { width: 100%; }
+
+    .mobile-prototype .mobile-game-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
+        width: min(100%, 430px);
+        margin: 12px auto 0;
+    }
+
+    .mobile-prototype .mobile-game-actions button { flex: 1 1 150px; }
+
+    .mobile-prototype .game-screen-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        width: 100%;
+    }
+
+    .mobile-prototype .game-screen-header .game-title {
+        margin: 0;
+        font-size: 1.55rem;
+    }
+
+    .mobile-prototype .game-screen-controls {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+
+    .mobile-prototype .fullscreen-toggle {
+        min-height: 38px;
+        padding: 7px 12px;
+        white-space: nowrap;
+    }
+
+}
+
+/* Querformat folgt dem bewährten Tic-Tac-Toe-Muster: Brett links,
+   Informationen und Aktionen rechts. */
+@media (orientation: landscape) and (max-height: 700px) {
+    .mobile-prototype .game-screen:not([hidden]) {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
+        grid-template-rows: auto auto auto;
+        align-items: center;
+        align-content: center;
+        column-gap: clamp(16px, 4vw, 42px);
+        width: min(100%, 900px);
+        row-gap: 0;
+    }
+
+    .mobile-prototype .game-screen .game-side-panel {
+        grid-column: 2;
+        grid-row: 2 / span 2;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        width: 100%;
+        min-width: 0;
+        align-self: start;
+    }
+
+    .mobile-prototype .game-screen .board-wrapper {
+        grid-column: 1;
+        grid-row: 2 / span 2;
+        display: contents;
+    }
+
+    .mobile-prototype .game-screen .board {
+        grid-column: 1;
+        grid-row: 2 / span 2;
+        width: min(84vh, 520px) !important;
+        max-width: 84vh;
+        padding: 6px;
+        gap: 4px;
+        border-radius: 18px;
+        margin-top: 0 !important;
+        margin-bottom: 10px;
+        align-self: start;
+    }
+
+    .mobile-prototype .game-screen .status-panel {
+        width: 100%;
+        max-width: none;
+        margin: 0 !important;
+        align-self: stretch;
+        height: max-content;
+    }
+
+    .mobile-prototype .mobile-game-actions {
+        width: 100%;
+        margin: var(--game-action-gap) 0 0 !important;
+        align-self: stretch;
+    }
+
+    .mobile-prototype .mobile-game-actions button {
+        flex-basis: 100%;
+    }
+
+    .mobile-prototype .game-screen-header {
+        grid-column: 2;
+        grid-row: 1;
+        width: 100%;
+    }
+
+}
+
+@media (orientation: landscape) and (min-width: 701px) {
+    /* Robustheitsregel: Chips und Raster im Vollbild künftig aus einer
+       einmalig gemessenen Pixelgeometrie berechnen; nicht globalisieren. */
+    body.is-fullscreen.game-active .game-screen .board {
+        width: var(--connect-four-board-width, min(88vh, 58vw, 820px)) !important;
+        max-width: none;
+        grid-template-columns: repeat(7, var(--connect-four-cell-size, 1fr));
+        grid-template-rows: repeat(6, var(--connect-four-cell-size, 1fr));
+    }
+
+    body.is-fullscreen.game-active .game-screen .board .chip {
+        width: var(--connect-four-chip-size, 84%) !important;
+        height: var(--connect-four-chip-size, 84%) !important;
+        left: calc(50% - (var(--connect-four-chip-size, 84%) / 2)) !important;
+        top: calc(50% - (var(--connect-four-chip-size, 84%) / 2)) !important;
+    }
+}
+
+@media (orientation: landscape) and (max-height: 700px) {
+    body.game-page.mobile-prototype.game-active main {
+        min-height: 0 !important;
+        height: calc(100dvh - 8px) !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        gap: 0 !important;
+        overflow: hidden !important;
+    }
+
+    body.game-page.mobile-prototype.game-active,
+    body.game-page.mobile-prototype.game-active > .app {
+        overflow: hidden !important;
+    }
+
+    .mobile-prototype.game-active .game-screen:not([hidden]) {
+        grid-template-rows: auto minmax(0, 1fr) !important;
+        align-content: stretch !important;
+        min-height: 0;
+        height: 100% !important;
+        max-height: 100% !important;
+        overflow: hidden;
+    }
+
+    .mobile-prototype.game-active .game-screen .game-side-panel,
+    .mobile-prototype.game-active .game-screen .board {
+        grid-row: 2 !important;
+    }
+
+    .mobile-prototype.game-active .game-screen .board {
+        width: min(84vh, calc((100dvh - 58px) * 1.1667), 520px) !important;
+        max-width: none;
+    }
+}
+
 /* Kontinuierlicher Fall hinter der Brettflaeche, sichtbar nur in den Oeffnungen. */
 .chip.drop-pending { opacity: 0; }
 .chip.landed { opacity: 1; transform: translateY(0); transition: none !important; }
@@ -867,6 +1067,74 @@ main {
     transition: transform 180ms cubic-bezier(.2,.8,.3,1), opacity 120ms ease-out !important;
 }
 
+/* 4G: Die Sieganzeige bleibt in jeder Ansicht in einer kompakten Zeile. */
+.game-connect-four .scoreboard {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    flex-wrap: nowrap;
+}
+
+.game-connect-four .scoreboard .score {
+    display: inline-flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+    min-width: 76px;
+    padding: 5px 9px;
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-md);
+    background: #141726;
+}
+
+.game-connect-four .scoreboard .score-label::after {
+    content: ":";
+}
+
+.game-connect-four .scoreboard .score-label,
+.game-connect-four .scoreboard .score-value {
+    display: inline;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+}
+
+.game-connect-four .scoreboard .score.winner {
+    box-shadow: 0 0 10px rgba(79, 140, 255, 0.45);
+}
+
+.game-connect-four .scoreboard .score:first-child {
+    border-color: rgba(228, 30, 38, 0.5);
+    box-shadow: 0 0 10px rgba(228, 30, 38, 0.18);
+}
+
+.game-connect-four .scoreboard .score:last-child {
+    border-color: rgba(255, 215, 0, 0.45);
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.18);
+}
+
+/* Die nicht angezeigte adaptive Leiste darf keine Leerzeile im Infobadge reservieren. */
+.game-connect-four .status-panel .adaptive-strength.hidden {
+    display: none !important;
+}
+
+/* Mobile Spielaktion. */
+.game-connect-four.mobile-prototype .mobile-game-actions {
+    display: flex !important;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+}
+
+.game-connect-four.mobile-prototype .mobile-game-actions #mobileGameAction {
+    order: 2;
+}
+
+
 .top-bar h1.game-title {
     margin: 0 0 8px;
     font-size: 2rem;
@@ -874,4 +1142,132 @@ main {
     font-weight: 400;
     letter-spacing: normal;
     text-shadow: 0 0 15px var(--accent);
+}
+
+/* Gemeinsamer TTT-Setup-Grundaufbau für mobile Geräte. */
+.mobile-prototype .setup-screen {
+    width: min(100%, 520px);
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--ttt-screen-gap);
+}
+
+/* Endgültige gemeinsame Setup-Darstellung nach Tic-Tac-Toe-Referenz. */
+@media (orientation: landscape) and (max-height: 700px) {
+    .mobile-prototype:not(.game-active) {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        min-height: 100vh;
+        padding: 18px 16px 0 !important;
+    }
+
+    .mobile-prototype:not(.game-active) .app,
+    .mobile-prototype:not(.game-active) .top-bar {
+        display: contents !important;
+    }
+
+    .mobile-prototype:not(.game-active) .top-bar > .game-title {
+        display: none !important;
+    }
+
+    .mobile-prototype:not(.game-active) main {
+        display: block;
+        width: 100%;
+        padding: 0 !important;
+        margin: 0;
+    }
+
+    .mobile-prototype:not(.game-active) .footer {
+        width: 100%;
+        margin-top: auto;
+        padding: 10px 16px 8px;
+        text-align: center;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) minmax(180px, 260px);
+        grid-template-rows: auto 1fr;
+        align-items: center;
+        column-gap: clamp(16px, 4vw, 42px);
+        row-gap: var(--ttt-screen-gap);
+        width: min(100%, 900px) !important;
+        max-width: none !important;
+        margin: 0 auto;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen-title {
+        display: block !important;
+        grid-column: 1 / -1;
+        grid-row: 1;
+        width: 100%;
+        margin: 0 0 8px !important;
+        font-size: 1.55rem;
+        line-height: 1.05;
+        font-weight: 400;
+        letter-spacing: normal;
+        text-align: center;
+        text-shadow: 0 0 15px var(--accent);
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .settings,
+    .mobile-prototype:not(.game-active) .setup-screen > .controls-vertical {
+        display: grid !important;
+        grid-column: 1;
+        grid-row: 2;
+        width: 100% !important;
+        max-width: none !important;
+        margin: 0;
+        padding: 0;
+        gap: 5px;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions {
+        display: flex !important;
+        grid-column: 2;
+        grid-row: 2;
+        flex-direction: column;
+        align-items: center;
+        gap: 9px;
+        width: 100%;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions .landscape-setup-tools {
+        display: contents !important;
+        order: 1;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions #resetGameButton {
+        order: 3;
+        width: max-content !important;
+        min-width: 0;
+        min-height: 42px;
+        margin: 0;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions #setupExtraSettingsToggle {
+        order: 2;
+        width: 42px;
+        min-width: 42px;
+        height: 36px;
+        padding: 0;
+        margin-top: 8px;
+        border: 2px solid var(--accent) !important;
+        border-radius: 8px;
+        background: var(--bg-panel) !important;
+        color: var(--accent) !important;
+        box-shadow: var(--shadow-soft);
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions #roundActionButton {
+        display: none !important;
+    }
 }

@@ -37,10 +37,9 @@ const CHIP_DROP_DURATION = 180;
 
 // === SOUNDS ===
 const soundChip = new Audio('../assets/sounds/Chip_Drop.mp3');
-const soundButton = new Audio('../assets/sounds/Button_Click.mp3');
 const soundError = new Audio('../assets/sounds/Error_Tock.mp3');
 
-[soundChip, soundButton, soundError].forEach(s => {
+[soundChip, soundError].forEach(s => {
     s.volume = 0.25;
     s.preload = 'auto';
 });
@@ -68,10 +67,56 @@ const adaptSpeedButton = document.getElementById("adaptSpeedButton");
 const winnerBannerEl = document.getElementById("winner-banner");
 const winnerTextEl = document.getElementById("winner-text");
 const nextRoundBtnEl = document.getElementById("next-round-btn");
-const endMatchButton = document.getElementById("endMatchButton");
+const setupScreen = document.getElementById("setupScreen");
+const gameScreen = document.getElementById("gameScreen");
+const mobileGameAction = document.getElementById("mobileGameAction");
+const mobileSettingsBack = document.getElementById("mobileSettingsBack");
+const screenController = window.AndisMobileLayout?.createScreenController?.({
+    setupScreen,
+    gameScreen,
+    body: document.body
+});
+let mobilePrototype = window.AndisMobileLayout?.detectMobileSession?.() ?? false;
+screenController?.applyMode(mobilePrototype, false);
+
+screenController?.watchResponsiveMode?.((isMobile) => {
+    mobilePrototype = isMobile;
+});
+const fullscreenController = screenController?.bindFullscreen?.({
+    button: fullscreenToggle,
+    isMobile: () => mobilePrototype
+});
+
+function stabilizeConnectFourBoard() {
+    if (!document.fullscreenElement || !document.body.classList.contains("game-active")) {
+        boardEl.style.removeProperty("--connect-four-board-width");
+        boardEl.style.removeProperty("--connect-four-cell-size");
+        boardEl.style.removeProperty("--connect-four-chip-size");
+        return;
+    }
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        const panel = gameScreen.querySelector(".game-side-panel")?.getBoundingClientRect();
+        const screen = gameScreen.getBoundingClientRect();
+        const availableColumnWidth = panel
+            ? Math.max(280, panel.left - screen.left - 12)
+            : window.innerWidth - 360;
+        const boardWidth = window.AndisBoardLayout?.viewportBoard?.({
+            min: 280,
+            max: 820,
+            aspect: 7 / 6,
+            widthOffset: Math.max(0, window.innerWidth - availableColumnWidth),
+            heightOffset: 58
+        }) ?? Math.floor(Math.max(280, Math.min(availableColumnWidth, (window.innerHeight - 36) * 7 / 6, 820)));
+        const cell = Math.floor((boardWidth - 12 - 24) / 7);
+        boardEl.style.setProperty("--connect-four-board-width", `${boardWidth}px`);
+        boardEl.style.setProperty("--connect-four-cell-size", `${cell}px`);
+        boardEl.style.setProperty("--connect-four-chip-size", `${Math.floor(cell * .84)}px`);
+    }));
+}
+window.AndisBoardLayout?.bindResponsiveBoardLayout(stabilizeConnectFourBoard);
 
 const MODE_OPTIONS = ["2 Spieler", "1 Spieler"];
-const MATCH_OPTIONS = ["Einzelrunde", "Abwechselnd", "Verlierer beginnt"];
+const MATCH_OPTIONS = ["Einzelrunde", "Abwechselnd"];
 const BOT_LEVELS = ["Anfänger", "Hobbyspieler", "Vereinsspieler", "Meister", "Adaptiv"];
 const BOT_LEVEL_KEYS = ["anfänger", "hobby", "verein", "meister", "adaptiv"];
 const ADAPT_SPEED_OPTIONS = ["Langsam", "Normal", "Schnell"];
@@ -81,9 +126,8 @@ let botLevelIndex = 0;
 let adaptSpeedIndex = 1;
 window.currentAdaptSpeedFactor = ADAPT_SPEED_FACTORS[adaptSpeedIndex];
 let modeIndex = 1;
-let startRuleIndex = 1;
 let matchModeIndex = 0;
-const RESET_BUTTON_STATES = ["Jetzt spielen", "Jetzt spielen"];
+const RESET_BUTTON_STATES = ["Neues Spiel", "Neues Spiel"];
 let resetButtonIndex = 0;
 const ACTIVE_RESET_BUTTON_TEXT = "Match beenden";
 const FINISHED_RESET_BUTTON_TEXT = "Neues Match beginnen";
@@ -137,6 +181,20 @@ function setNextRoundButtonState(isVisible, isEnabled) {
     roundActionButton.hidden = true;
 }
 
+function syncMobileGameActions() {
+    if (!mobileGameAction) return;
+
+    if (!gameOver) {
+        mobileGameAction.hidden = false;
+        mobileGameAction.textContent = "Spiel abbrechen";
+        return;
+    }
+
+    const nextRoundPending = matchModeIndex > 0 && matchActive;
+    mobileGameAction.hidden = false;
+    mobileGameAction.textContent = nextRoundPending ? "Neue Runde" : "Neues Spiel";
+}
+
 function setResetButtonForRound(isRoundActive, isRoundFinished = false) {
     resetButtonIndex = isRoundActive ? 1 : 0;
     if (isRoundActive && matchModeIndex > 0) {
@@ -144,8 +202,9 @@ function setResetButtonForRound(isRoundActive, isRoundFinished = false) {
     } else {
         settingsResetGameButton.textContent = isRoundActive
             ? "Spiel abbrechen"
-            : isRoundFinished ? "Jetzt spielen" : RESET_BUTTON_STATES[resetButtonIndex];
+            : isRoundFinished ? "Neues Spiel" : RESET_BUTTON_STATES[resetButtonIndex];
     }
+    syncMobileGameActions();
 }
 
 function updateAdaptiveStrengthUI() {
@@ -164,8 +223,7 @@ function updateAdaptiveStrengthUI() {
 
 settingsModeButton.addEventListener("click", () => {
     if (settingsModeButton.disabled || matchActive) return;
-    soundButton.currentTime = 0;
-    soundButton.play().catch(() => {});
+    window.AndisSound?.playUiClick?.(0.22);
     modeIndex = (modeIndex + 1) % MODE_OPTIONS.length;
     settingsModeButton.textContent = MODE_OPTIONS[modeIndex];
     updateBotButtonState();
@@ -174,10 +232,8 @@ settingsModeButton.addEventListener("click", () => {
 
 settingsMatchButton.addEventListener("click", () => {
     if (settingsMatchButton.disabled || matchActive) return;
-    soundButton.currentTime = 0;
-    soundButton.play().catch(() => {});
+    window.AndisSound?.playUiClick?.(0.22);
     matchModeIndex = (matchModeIndex + 1) % MATCH_OPTIONS.length;
-    startRuleIndex = matchModeIndex === 2 ? 0 : 1;
     settingsMatchButton.textContent = MATCH_OPTIONS[matchModeIndex];
     setNextRoundButtonState(matchModeIndex > 0, false);
     updateUIStatus();
@@ -185,8 +241,7 @@ settingsMatchButton.addEventListener("click", () => {
 
 settingsBotLevelButton.addEventListener("click", () => {
     if (settingsBotLevelButton.disabled || matchActive) return;
-    soundButton.currentTime = 0;
-    soundButton.play().catch(() => {});
+    window.AndisSound?.playUiClick?.(0.22);
     botLevelIndex = (botLevelIndex + 1) % BOT_LEVELS.length;
     updateBotButtonState();
     updateUIStatus();
@@ -194,8 +249,7 @@ settingsBotLevelButton.addEventListener("click", () => {
 
 settingsAdaptSpeedButton.addEventListener("click", () => {
     if (settingsAdaptSpeedButton.disabled || matchActive) return;
-    soundButton.currentTime = 0;
-    soundButton.play().catch(() => {});
+    window.AndisSound?.playUiClick?.(0.22);
     adaptSpeedIndex = (adaptSpeedIndex + 1) % ADAPT_SPEED_OPTIONS.length;
     updateAdaptSpeedButtonState();
     updateUIStatus();
@@ -203,14 +257,17 @@ settingsAdaptSpeedButton.addEventListener("click", () => {
 
 settingsNewGameButton.addEventListener("click", () => {
     if (roundActionButton.disabled || matchModeIndex === 0 || !matchActive || !gameOver) return;
-    soundButton.currentTime = 0;
-    soundButton.play().catch(() => {});
+    window.AndisSound?.playUiClick?.(0.22);
     startNewRound();
 });
 
 settingsResetGameButton.addEventListener("click", () => {
-    soundButton.currentTime = 0;
-    soundButton.play().catch(() => {});
+    window.AndisSound?.playUiClick?.(0.22);
+    if (mobilePrototype) {
+        screenController?.showGame();
+        browserBackGuard?.arm?.();
+        fullscreenController?.requestIfChosen();
+    }
     if (gameOver) {
         hideWinner();
         startNewRound();
@@ -224,15 +281,38 @@ settingsResetGameButton.addEventListener("click", () => {
         setMatchInProgressLocked(true);
     } else {
         resetMatchOnly();
+        if (mobilePrototype) {
+            fullscreenController?.exit();
+            screenController?.showSetup();
+        }
         setResetButtonForRound(false);
         setMatchInProgressLocked(false);
         updateBotButtonState();
     }
 });
 
+mobileGameAction?.addEventListener("click", () => {
+    if (gameOver) {
+    window.AndisSound?.playUiClick?.(0.22);
+        if (mobilePrototype) {
+            screenController?.showGame();
+            browserBackGuard?.arm?.();
+            fullscreenController?.requestIfChosen();
+        }
+        startNewRound();
+        return;
+    }
+
+    resetMatchOnly();
+    if (mobilePrototype) fullscreenController?.exit();
+    setResetButtonForRound(false);
+    setMatchInProgressLocked(false);
+    updateBotButtonState();
+    if (mobilePrototype) screenController?.showSetup();
+});
+
 nextRoundBtnEl.addEventListener("click", () => {
-    soundButton.currentTime = 0;
-    soundButton.play().catch(() => {});
+    window.AndisSound?.playUiClick?.(0.22);
     hideWinner();
     startNewRound();
 });
@@ -252,7 +332,61 @@ setResetButtonForRound(false);
 // a completed multi-round match has produced an actual next round.
 setNextRoundButtonState(false, false);
 updateBotButtonState(); // <-- NEU
-window.addEventListener("resize", positionHoverZones);
+window.AndisBoardLayout?.bindBoardLayout?.({
+    element: boardEl,
+    update: positionHoverZones
+});
+
+window.AndisNavigation?.bindBackButton?.({
+    button: document.getElementById("backIcon"),
+    isGameActive: () => document.body.classList.contains("game-active")
+        || matchActive
+        || roundResultProcessed,
+    isMatchRunning: () => matchActive && !gameOver,
+    onAbortConfirmed: () => {
+        resetMatchOnly();
+        fullscreenController?.exit();
+        screenController?.showSetup();
+        setResetButtonForRound(false);
+        setMatchInProgressLocked(false);
+        updateBotButtonState();
+    },
+    onMenuBack: () => {
+        window.AndisSound?.playUiClick?.(0.22);
+        setTimeout(() => { window.location.href = "../index.html?menu=1"; }, 100);
+    }
+});
+
+window.AndisNavigation?.bindBackButton?.({
+    button: mobileSettingsBack,
+    isGameActive: () => document.body.classList.contains("game-active")
+        || matchActive
+        || roundResultProcessed,
+    isMatchRunning: () => matchActive && !gameOver,
+    onAbortConfirmed: () => {
+        resetMatchOnly();
+        fullscreenController?.exit();
+        screenController?.showSetup();
+        setResetButtonForRound(false);
+        setMatchInProgressLocked(false);
+        updateBotButtonState();
+    }
+});
+
+const browserBackGuard = window.AndisNavigation?.bindBrowserBack?.({
+    isGameActive: () => document.body.classList.contains("game-active")
+        || matchActive
+        || roundResultProcessed,
+    isMatchRunning: () => matchActive && !gameOver,
+    onAbortConfirmed: () => {
+        resetMatchOnly();
+        fullscreenController?.exit();
+        screenController?.showSetup();
+        setResetButtonForRound(false);
+        setMatchInProgressLocked(false);
+        updateBotButtonState();
+    }
+});
 
 // --- Board-Aufbau ----------------------------------------------------------
 
@@ -391,8 +525,8 @@ function playerName(player) {
 
 function updateUIStatus(message, keepLine2 = false) {
     matchLineEl.textContent = matchModeIndex === 0
-        ? "Einzelrunde - Offizielle Regeln"
-        : `${matchModeIndex === 1 ? "Abwechselnd" : "Verlierer beginnt"} - Match ${scores[PLAYER_RED]}:${scores[PLAYER_YELLOW]}`;
+        ? "Einzelrunde"
+        : "Abwechselnd";
     // A completed round owns the status line. No later refresh may make it
     // look like the next turn has already started.
     if (gameOver || roundResultProcessed) {
@@ -451,7 +585,7 @@ function startNewRound() {
     setMatchInProgressLocked(true);
     setResetButtonForRound(true);
     setNextRoundButtonState(matchModeIndex > 0, false);
-    maybeBotMove();
+    maybeBotMove(true);
     } finally {
         roundStartInProgress = false;
     }
@@ -530,7 +664,7 @@ function isBotTurn() {
     return modeIndex === 1 && currentPlayer === PLAYER_YELLOW; // <-- muss 1 sein
 }
 
-function maybeBotMove() {
+function maybeBotMove(isOpeningMove = false) {
     cancelPendingBotMove();
     if (!matchActive) return;
     if (modeIndex !== 1) return;
@@ -553,6 +687,7 @@ function maybeBotMove() {
     }
 
     baseTime = baseTime + Math.random() * 400 - 200;
+    baseTime = window.getBotMoveDelay(baseTime, isOpeningMove);
     // Wait slightly longer than the player chip animation, then use one
     // direct timer instead of recursively polling chipDropActive.
     baseTime = Math.max(CHIP_DROP_DURATION + 40, baseTime);
@@ -764,8 +899,6 @@ function onWin(player) {
     if (matchModeIndex === 0) {
         matchActive = false;
         setResetButtonForRound(false, true);
-    } else if (startRuleIndex === 0) {
-        startingPlayer = player === PLAYER_RED ? PLAYER_YELLOW : PLAYER_RED;
     } else {
         startingPlayer = startingPlayer === PLAYER_RED ? PLAYER_YELLOW : PLAYER_RED;
     }
@@ -808,7 +941,6 @@ function resetMatchOnly() {
     setNextRoundButtonState(matchModeIndex > 0, false);
     winnerBannerEl.classList.add("hidden");
     nextRoundBtnEl.hidden = true;
-    if (endMatchButton) endMatchButton.hidden = true;
 }
 
 function resetFullGame() {
@@ -832,8 +964,6 @@ function onDraw() {
         matchActive = false;
         setResetButtonForRound(false, true);
         setMatchInProgressLocked(false);
-    } else if (startRuleIndex === 0) {
-        startingPlayer = startingPlayer === PLAYER_RED ? PLAYER_YELLOW : PLAYER_RED;
     } else {
         startingPlayer = startingPlayer === PLAYER_RED ? PLAYER_YELLOW : PLAYER_RED;
     }
@@ -858,6 +988,5 @@ function hideWinner() {
     nextRoundBtnEl.hidden = true;
     boardEl.style.pointerEvents = "auto"; // Klicks wieder erlauben
     setNextRoundButtonState(matchModeIndex > 0, false);
-    if (endMatchButton) endMatchButton.hidden = true;
 }
 

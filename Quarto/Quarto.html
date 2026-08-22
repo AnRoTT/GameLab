@@ -4,31 +4,30 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Quarto</title>
-    <link rel="stylesheet" href="../theme.css" />
     <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="../theme.css" />
 </head>
-<body class="game-page" data-adaptive-bot="QuartoAdaptiveBot">
+<body class="game-page game-quarto" data-mobile-orientation="both" data-adaptive-bot="QuartoAdaptiveBot">
     <div id="backIcon">⟵ Menü</div>
     <a id="helpIcon" class="help-button" href="Anleitung.html" aria-label="Kurzanleitung zu Quarto">Anleitung</a>
     <button id="settingsToggle" class="secondary-button" type="button" aria-expanded="false" aria-controls="extraSettings" aria-label="Einstellungen" title="Einstellungen">⚙</button>
     <span id="soundToggle" role="status" aria-live="polite" aria-label="Ton eingeschaltet">🔊</span>
 
-    <div class="app">
-        <header class="top-bar">
-            <h1 class="title-center game-title">Quarto</h1>
+        <section id="setupScreen" class="screen setup-screen" aria-labelledby="setupTitle">
+            <h1 id="setupTitle" class="game-title">Quarto</h1>
 
-            <div class="controls-vertical">
-                <div class="cycle-group">
+            <div class="settings">
+                <div class="cycle-group setting-row">
                     <span class="label">Spieler:</span>
                     <button id="modeButton" class="cycle-button" type="button">1 Spieler</button>
                 </div>
 
-                <div class="cycle-group">
+                <div class="cycle-group setting-row">
                     <span class="label">Match:</span>
                     <button id="matchButton" class="cycle-button" type="button">Einzelrunde</button>
                 </div>
 
-                <div class="opponent-pair">
+                <div class="opponent-pair setting-row" id="rowOpponent">
                     <div class="cycle-group">
                         <span class="label">Gegner:</span>
                         <button id="botLevelButton" class="cycle-button" type="button">Anfänger</button>
@@ -40,11 +39,13 @@
                 </div>
 
             </div>
-        </header>
-
         <div class="game-actions">
             <button id="startButton" class="primary-button" type="button">Jetzt spielen</button>
+            <div class="landscape-setup-tools" aria-label="Weitere Einstellungen">
+                <button id="setupExtraSettingsToggle" class="secondary-button setup-extra-settings-button" type="button" aria-label="Weitere Einstellungen" title="Weitere Einstellungen">⚙</button>
+            </div>
         </div>
+        </section>
         <div id="settingsBackdrop" class="settings-backdrop" hidden></div>
         <section id="extraSettings" class="extra-settings" hidden>
             <h2>Einstellungen</h2>
@@ -54,10 +55,19 @@
             <div id="resetConfirm" class="reset-confirm" hidden><p>Adaptive Spielerwerte wirklich löschen?</p><div><button id="resetCancel" class="settings-action" type="button">Abbrechen</button><button id="resetConfirmButton" class="settings-action danger" type="button">Löschen</button></div></div>
         </section>
 
+        <section id="gameScreen" class="screen game-screen" hidden aria-live="polite">
+        <div class="game-screen-header" aria-label="Spielsteuerung">
+            <button id="mobileSettingsBack" class="mobile-settings-back" type="button" aria-label="Zu den Spieleinstellungen">← Einstellungen</button>
+            <h1 class="game-title">Quarto</h1>
+            <div class="game-screen-controls">
+                <button id="fullscreenToggle" class="secondary-button fullscreen-toggle" type="button" aria-label="Vollbild aktivieren">⛶ Vollbild</button>
+            </div>
+        </div>
+
         <main>
             <section class="status-panel" aria-live="polite">
                 <div id="statusText" class="status-text">Spiel starten</div>
-                <div id="matchLine" class="match-line">Einzelrunde - Offizielle Regeln</div>
+                <div id="matchLine" class="match-line">Einzelrunde</div>
                 <div class="scoreboard" aria-label="Punktestand">
                     <div class="score">
                         <span class="score-label">Spieler 1</span>
@@ -81,13 +91,6 @@
 
             <section class="game-area">
                 <div class="piece-panel">
-                    <h2>Verfügbare Spielsteine</h2>
-                    <div class="piece-legend" aria-label="Bedeutung der vier Steineigenschaften">
-                        <span class="legend-item"><span class="legend-pair"><i class="legend-swatch dark"></i><i class="legend-swatch light"></i></span>Farbe</span>
-                        <span class="legend-item"><span class="legend-pair"><i class="legend-swatch round"></i><i class="legend-swatch square"></i></span>Form</span>
-                        <span class="legend-item"><span class="legend-pair"><i class="legend-swatch short"></i><i class="legend-swatch tall"></i></span>Höhe</span>
-                        <span class="legend-item"><span class="legend-pair"><i class="legend-swatch solid"></i><i class="legend-swatch hollow"></i></span>Füllung</span>
-                    </div>
                     <div id="piecePool" class="piece-pool" aria-label="Verfügbare Quarto-Spielsteine"></div>
                 </div>
 
@@ -96,32 +99,33 @@
                 </div>
             </section>
 
+            <div class="mobile-game-actions" aria-label="Spielaktionen">
+                <button id="mobileGameAction" class="primary-button" type="button">Spiel abbrechen</button>
+            </div>
+
         </main>
 
-        <footer class="footer">Andis Game Foundry | Quarto | by Andreas Rollinger | 2026.08.17</footer>
-    </div>
+        </section>
+
+        <footer class="footer">Andis Game Foundry | Quarto | by Andreas Rollinger | 2026.08.22</footer>
 
     <script src="../Shared/soundManager.js"></script>
     <script src="../Shared/difficultyCore.js"></script>
     <script src="aiCore.js"></script>
     <script src="manuellBot.js"></script>
     <script src="adaptiveBot.js"></script>
+    <script src="../Shared/botTiming.js"></script>
+    <script src="../Shared/mobileLayout.js"></script>
+    <script src="../Shared/navigationGuard.js"></script>
+    <script src="../Shared/boardLayout.js"></script>
     <script src="game.js"></script>
+    <script src="../Shared/matchConfirm.js"></script>
     <script src="../Shared/settingsMenu.js"></script>
     <script src="../Shared/buttonOverflow.js"></script>
     <script>
         const backIcon = document.getElementById("backIcon");
         backIcon.style.display =
             new URLSearchParams(location.search).get("menu") === "1" ? "block" : "none";
-        backIcon.addEventListener("click", (event) => {
-            event.preventDefault();
-            const sound = new Audio("../assets/sounds/Button_Click.mp3");
-            sound.volume = 0.22;
-            sound.play().catch(() => {});
-            setTimeout(() => {
-                window.location.href = "../index.html?menu=1";
-            }, 100);
-        });
         document.getElementById("helpIcon").addEventListener("click", (event) => {
             event.preventDefault();
             const sound = new Audio("../assets/sounds/Button_Click.mp3");

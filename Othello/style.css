@@ -2,6 +2,14 @@
    Klassisches Othello Brett mit Gitter
    ----------------------------------------- */
 
+body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 20px 16px 0;
+}
+
 .board {
     display: grid;
     grid-template-columns: repeat(8, 60px);
@@ -101,13 +109,402 @@
     }
 }
 
-.title.game-title {
-    margin: 0 0 8px;
-    font-size: 2rem;
-    line-height: 1.2;
-    font-weight: 400;
-    letter-spacing: normal;
-    text-shadow: 0 0 15px var(--accent);
+/* Diese Spielnavigation ist ausschließlich für die mobile Spielansicht. */
+body:not(.mobile-prototype) .game-screen-header .mobile-settings-back,
+body:not(.mobile-prototype) .game-screen-header .game-screen-controls {
+    display: none !important;
+}
+
+@media (min-width: 701px) {
+    body.game-page:not(.mobile-prototype) .board {
+        --othello-cell-size: min(60px, max(36px, calc((100dvh - 250px) / 8)));
+        grid-template-columns: repeat(8, var(--othello-cell-size));
+        grid-template-rows: repeat(8, var(--othello-cell-size));
+        min-height: 0;
+    }
+    body.game-page:not(.mobile-prototype) .board .cell {
+        width: var(--othello-cell-size);
+        height: var(--othello-cell-size);
+    }
+    body.game-page:not(.mobile-prototype) .board .piece {
+        width: min(50px, calc(var(--othello-cell-size) * .83));
+        height: min(50px, calc(var(--othello-cell-size) * .83));
+    }
+}
+
+#boardWrapper {
+    margin-top: 10px;
+}
+
+/* Im Desktop-Layout bleibt nur der zentrale Setup-Titel sichtbar.
+   Der mobile Spiel-Header darf keinen zweiten Spielnamen erzeugen. */
+body:not(.mobile-prototype) .game-screen-header {
+    display: none !important;
+}
+
+body:not(.mobile-prototype) .setup-extra-settings-button {
+    display: none !important;
+}
+
+body:not(.mobile-prototype) .mobile-game-actions {
+    display: none !important;
+}
+
+@media (max-width: 700px) and (orientation: portrait) {
+    .mobile-prototype .setup-extra-settings-button {
+        display: none !important;
+    }
+}
+
+/* Mobile-Settings-Grundstruktur nach Tic-Tac-Toe/4-Gewinnt. */
+.setup-screen {
+    width: min(100%, 520px);
+    margin: 0 auto;
+}
+
+.setup-screen[hidden],
+.game-screen[hidden] {
+    display: none !important;
+}
+
+.setup-screen-title {
+    display: block;
+    text-align: center;
+}
+
+@media (orientation: portrait) and (max-width: 700px) {
+    #backIcon,
+    #helpIcon {
+        top: 10px !important;
+        min-height: 38px !important;
+        box-sizing: border-box !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding: 6px 12px !important;
+        font-size: 16px !important;
+        line-height: 1.2 !important;
+    }
+
+    #backIcon {
+        left: 10px !important;
+        right: auto !important;
+    }
+
+    #helpIcon {
+        left: auto !important;
+        right: 10px !important;
+    }
+
+    body:not(.game-active) .game-content {
+        display: none !important;
+    }
+
+    .setup-screen {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--mobile-settings-gap);
+        width: min(100%, 420px);
+        margin: 0 auto;
+    }
+
+    .setup-screen > .setup-screen-title {
+        width: 100%;
+        margin: 0 0 2px;
+        font-size: 1.55rem;
+        line-height: 1.05;
+        font-weight: 400;
+    }
+
+    .setup-screen > #settingsPanel {
+        width: 100% !important;
+        max-width: 420px !important;
+    }
+
+    .setup-screen > #settingsPanel .cycle-button {
+        width: 100% !important;
+        min-height: 36px !important;
+        height: 36px !important;
+        box-sizing: border-box;
+    }
+
+    .setup-screen > .game-actions {
+        display: flex;
+        justify-content: center;
+        width: 100%;
+        gap: 9px;
+    }
+
+    .mobile-prototype .game-screen,
+    .game-page.game-active .game-screen {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+        margin: 0 auto;
+    }
+
+    .game-page.game-active .game-screen-header {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        width: 100%;
+        min-height: 32px;
+    }
+
+    .game-page.game-active .game-screen-header .game-title {
+        margin: 0;
+        font-size: 1.35rem;
+        line-height: 1;
+    }
+
+    .game-page.game-active .game-screen-controls {
+        position: absolute;
+        top: 50%;
+        right: 0;
+        transform: translateY(-50%);
+    }
+
+    .game-page.game-active .fullscreen-toggle {
+        min-height: 30px;
+        padding: 4px 8px;
+        font-size: .76rem;
+    }
+
+    .game-page.game-active .game-side-panel {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        width: 100%;
+    }
+
+    .game-page.game-active .game-info {
+        order: 1;
+        position: static;
+        width: 100%;
+        min-height: 0;
+        margin: 0 !important;
+    }
+
+    .game-page.game-active .mobile-game-actions {
+        order: 2;
+        display: flex;
+        justify-content: center;
+        width: 100%;
+        margin: var(--game-action-gap) 0 0;
+    }
+
+    .game-page.game-active .mobile-game-actions .primary-button {
+        width: max-content;
+        min-width: 170px;
+        min-height: 42px;
+        margin: 0;
+    }
+
+    .game-page.game-active #boardWrapper {
+        order: 3;
+        width: 100%;
+        margin: 0 !important;
+    }
+
+    .game-page.game-active #board {
+        width: min(100%, 420px);
+        min-height: 0;
+    }
+
+    .game-page > .footer {
+        display: block;
+        width: 100%;
+        margin-top: auto !important;
+        padding: 10px 12px 8px;
+        box-sizing: border-box;
+        text-align: center;
+    }
+}
+
+@media (max-width: 500px) {
+    body {
+        padding: 0;
+    }
+}
+
+/* Mobile Landscape: gemeinsame Spielscreen-Struktur nach TTT/4 Gewinnt. */
+@media (orientation: landscape) and (max-height: 700px) {
+    .mobile-prototype:not(.game-active) > #settingsToggle {
+        display: none !important;
+    }
+
+    .mobile-prototype:not(.game-active) > #soundToggle {
+        top: auto;
+        left: auto;
+        right: max(18px, calc((100vw - 900px) / 2));
+        bottom: 18px;
+    }
+
+    .mobile-prototype:not(.game-active) .landscape-setup-tools {
+        display: contents;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-extra-settings-button {
+        display: inline-flex !important;
+        order: 2;
+        width: 42px;
+        min-width: 42px;
+        height: 36px;
+        padding: 0;
+        margin-top: 8px;
+        align-self: center;
+        font-size: 1rem;
+        border: 2px solid var(--accent) !important;
+        border-radius: 8px;
+        background: var(--bg-panel) !important;
+        color: var(--accent) !important;
+        box-shadow: var(--shadow-soft);
+        align-items: center;
+        justify-content: center;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions {
+        flex-direction: column;
+        align-items: center;
+        gap: 9px;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions > .primary-button {
+        order: 3;
+        width: max-content;
+        min-height: 42px;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen {
+        width: min(100%, 900px) !important;
+    }
+
+    .mobile-prototype .game-screen:not([hidden]) {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
+        grid-template-rows: auto auto auto;
+        align-items: center;
+        align-content: center;
+        column-gap: var(--mobile-settings-column-gap);
+        row-gap: 4px;
+        width: min(100%, 900px);
+        margin: 0 auto;
+    }
+
+    .mobile-prototype .game-screen-header {
+        grid-column: 2;
+        grid-row: 1;
+        width: 100%;
+    }
+
+    .mobile-prototype .game-side-panel {
+        grid-column: 2;
+        grid-row: 2 / span 2;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        width: 100%;
+        min-width: 0;
+        align-self: start;
+    }
+
+    .mobile-prototype .game-info {
+        order: 1;
+        position: static;
+        width: 100%;
+        min-height: 0;
+        margin: 0 !important;
+    }
+
+    .mobile-prototype .mobile-game-actions {
+        order: 2;
+        display: flex;
+        justify-content: center;
+        width: 100%;
+        margin: var(--game-action-gap) 0 0;
+    }
+
+    .mobile-prototype .mobile-game-actions .primary-button {
+        width: max-content;
+        min-width: 170px;
+        min-height: 42px;
+        margin: 0;
+    }
+
+    .mobile-prototype #boardWrapper {
+        grid-column: 1;
+        grid-row: 2 / span 2;
+        display: contents;
+    }
+
+    .mobile-prototype #board {
+        grid-column: 1;
+        grid-row: 2 / span 2;
+        width: min(70vh, 520px);
+        max-width: 70vh;
+        min-height: 0;
+        aspect-ratio: 1 / 1;
+        grid-template-columns: repeat(8, var(--othello-cell-size, minmax(0, 1fr)));
+        grid-template-rows: repeat(8, var(--othello-cell-size, minmax(0, 1fr)));
+        padding: 6px;
+        gap: 3px;
+        align-self: start;
+        margin: 0 0 10px;
+    }
+
+    .mobile-prototype #board .cell {
+        width: var(--othello-cell-size, auto) !important;
+        height: var(--othello-cell-size, auto) !important;
+    }
+
+    .mobile-prototype #board .piece {
+        width: var(--othello-piece-size, 80%) !important;
+        height: var(--othello-piece-size, 80%) !important;
+    }
+}
+
+@media (orientation: landscape) and (min-width: 701px) {
+    body.is-fullscreen.game-active #boardWrapper {
+        min-width: 0;
+        min-height: 0;
+        overflow: visible;
+    }
+
+    body.is-fullscreen.game-active #board {
+        width: var(--othello-board-size, min(calc(100svh - 36px), calc(100svw - 24px), 760px)) !important;
+        width: var(--othello-board-size, min(calc(100dvh - 36px), calc(100dvw - 24px), 760px)) !important;
+        max-width: none;
+        min-height: 0;
+        height: auto;
+        box-sizing: border-box;
+        grid-template-columns: repeat(8, minmax(0, 1fr));
+        grid-template-rows: repeat(8, minmax(0, 1fr));
+    }
+
+    body.is-fullscreen.game-active #board .cell {
+        width: auto;
+        height: auto;
+        min-width: 0;
+        min-height: 0;
+    }
+
+    body.is-fullscreen.game-active #board .piece {
+        width: 80%;
+        height: 80%;
+    }
+}
+
+@media (orientation: landscape) and (max-width: 700px) {
+    .mobile-prototype.game-active #board {
+        width: min(70vh, calc(100dvh - 58px), 520px) !important;
+        max-width: none;
+    }
 }
 
 .piece.black {
@@ -177,6 +574,9 @@
 
 .score-bar > span {
     min-width: 102px;
+    box-sizing: border-box;
+    white-space: nowrap;
+    text-align: center;
     padding: 4px 9px;
     border-radius: 6px;
     border: 1px solid;
@@ -239,21 +639,6 @@
     .score-bar { font-size: 0.9rem; gap: 15px; }
 }
 
-/* -----------------------------------------
-   Abstände im Einstellungs-Bereich
-   ----------------------------------------- */
-#settingsPanel {
-    margin-bottom: 24px; /* Abstand nach "Jetzt spielen" Button */
-}
-
-#startBtn {
-    display: block;
-    width: 165px;
-    margin-left: auto;
-    margin-right: auto;
-    margin-bottom: 16px; /* Abstand zwischen Button und Status */
-}
-
 .game-info {
     margin-top: 16px;    /* Abstand über der Infoleiste */
     margin-bottom: 24px; /* Abstand unter der Infoleiste bis zum Brett */
@@ -296,6 +681,15 @@
 .cell.valid:hover::after {
     background: rgba(0, 0, 0, 0.45);
     transform: scale(1.2);
+}
+
+.cell:not(.valid):hover,
+.cell:not(.valid):active,
+.cell:not(.valid):focus,
+.cell:not(.valid):focus-visible {
+    outline: none;
+    box-shadow: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
 @media (max-width: 520px) {
@@ -375,14 +769,6 @@
         align-items: flex-start;
     }
 
-    #settingsPanel {
-        margin-bottom: 12px;
-    }
-
-    #startBtn {
-        margin-bottom: 8px;
-    }
-
     .game-info {
         margin-top: 8px;
         margin-bottom: 12px;
@@ -394,8 +780,6 @@
     }
 
     .footer {
-        margin-top: 12px;
-        padding: 8px 12px;
     }
 }
 
@@ -432,6 +816,22 @@
 
 .piece.white {
     background: radial-gradient(circle at 30% 25%, #ffffff 0, #e8e8e8 42%, #aeb3bb 100%);
+}
+
+/* Letzte Vollbildregel: Die Steine müssen mit den Zellen mitskalieren.
+   Sie steht bewusst nach allen spielbezogenen .piece-Regeln. */
+@media (orientation: landscape) and (min-width: 701px) {
+    body.is-fullscreen.game-active #board .piece {
+        width: 80% !important;
+        height: 80% !important;
+        max-width: none;
+        max-height: none;
+        transform-style: flat;
+        backface-visibility: visible;
+        overflow: visible;
+        will-change: auto;
+    }
+
 }
 
 /* Ruhigeres Setzen statt eines starken Pop-Effekts. */

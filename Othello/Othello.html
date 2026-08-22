@@ -4,28 +4,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Othello / Reversi</title>
-    <link rel="stylesheet" href="../theme.css">
     <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="../theme.css">
 </head>
-<body class="game-page" data-adaptive-bot="OthelloAdaptiveBot">
+<body class="game-page game-othello" data-mobile-orientation="both" data-adaptive-bot="OthelloAdaptiveBot">
 <a id="helpIcon" class="help-button" href="Anleitung.html" aria-label="Kurzanleitung zu Othello">Anleitung</a>
 <button id="settingsToggle" class="secondary-button" type="button" aria-expanded="false" aria-controls="extraSettings" aria-label="Einstellungen" title="Einstellungen">⚙</button>
 <span id="soundToggle" role="status" aria-live="polite" aria-label="Ton eingeschaltet">🔊</span>
 
 <div id="backIcon">⟵ Menü</div>
 
-<div class="container">
-    <div class="title game-title">Othello</div>
+    <section id="setupScreen" class="screen setup-screen" aria-labelledby="setupTitle">
+    <h1 id="setupTitle" class="title game-title setup-screen-title">Othello</h1>
 
     <!-- Einstellungen -->
-    <div id="settingsPanel" class="menu">
+    <div id="settingsPanel" class="menu settings">
         <div class="cycle-group setting-row">
             <div class="label">Spieler</div>
             <button id="modeBtn" class="cycle-button">1 Spieler</button>
         </div>
         <div class="cycle-group setting-row">
-            <div class="label">Regelmodus</div>
-            <button id="rulesBtn" class="cycle-button">Standard</button>
+            <div class="label">Zughilfe</div>
+            <button id="moveHintsBtn" class="cycle-button">Ein</button>
         </div>
         <div class="cycle-group setting-row">
             <div class="label">Match</div>
@@ -45,7 +45,11 @@
 
     <div class="game-actions">
         <button id="startBtn" class="primary-button">Jetzt spielen</button>
+        <div class="landscape-setup-tools" aria-label="Weitere Einstellungen">
+            <button id="setupExtraSettingsToggle" class="secondary-button setup-extra-settings-button" type="button" aria-label="Weitere Einstellungen" title="Weitere Einstellungen">⚙</button>
+        </div>
     </div>
+    </section>
     <div id="settingsBackdrop" class="settings-backdrop" hidden></div>
     <section id="extraSettings" class="extra-settings" hidden>
         <h2>Einstellungen</h2>
@@ -55,13 +59,23 @@
         <div id="resetConfirm" class="reset-confirm" hidden><p>Adaptive Spielerwerte wirklich löschen?</p><div><button id="resetCancel" class="settings-action" type="button">Abbrechen</button><button id="resetConfirmButton" class="settings-action danger" type="button">Löschen</button></div></div>
     </section>
 
-<!-- NEU: Infoleiste - die einzige mit status/score -->
-<div id="gameInfo" class="game-info">
+    <section id="gameScreen" class="screen game-screen" hidden aria-live="polite">
+    <div class="game-screen-header">
+        <button id="mobileSettingsBack" class="mobile-settings-back" type="button" aria-label="Zu den Spieleinstellungen">← Einstellungen</button>
+        <h1 class="game-title">Othello</h1>
+        <div class="game-screen-controls">
+            <button id="fullscreenToggle" class="secondary-button fullscreen-toggle" type="button" aria-label="Vollbild aktivieren">⛶ Vollbild</button>
+        </div>
+    </div>
+
+    <div class="game-side-panel">
+<!-- Infoleiste -->
+<div id="gameInfo" class="game-info game-content">
     <div id="status" class="status">Wähle den Modus und starte</div> <!-- DIESE ZEILE NEU -->
-    <div id="matchLine" class="match-line">Einzelrunde - Offizielle Regeln</div>
+    <div id="matchLine" class="match-line">Einzelrunde</div>
     <div class="score-bar">
-        <span>Schwarz: <span id="scoreBlack">2</span></span>
-        <span>Weiß: <span id="scoreWhite">2</span></span>
+        <span><span id="scoreBlackLabel">Spieler 1</span>: <span id="scoreBlack">2</span></span>
+        <span><span id="scoreWhiteLabel">Spieler 2</span>: <span id="scoreWhite">2</span></span>
     </div>
     <div id="adaptiveStrengthPanel" class="adaptive-strength" hidden>
         <span class="adaptive-strength-label">Adaptive Stärke</span>
@@ -72,21 +86,31 @@
     </div>
 </div>
 
+    <div class="mobile-game-actions">
+        <button id="mobileGameAction" class="primary-button" type="button">Spiel abbrechen</button>
+    </div>
+    </div>
+
     <!-- Spielfeld -->
-    <div id="boardWrapper" style="margin-top:10px;">
+    <div id="boardWrapper" class="game-content">
         <div id="board" class="board disabled"></div>
     </div>
 
-    <footer class="footer">Andis Game Foundry | Othello | by Andreas Rollinger | 2026.08.17</footer>
-</div>
+    </section>
 
+    <footer class="footer">Andis Game Foundry | Othello | by Andreas Rollinger | 2026.08.22</footer>
 <script src="../Shared/soundManager.js"></script>
 <script src="../Shared/difficultyCore.js"></script>
 <script src="aiCore.js"></script>
 <script src="manuellBot.js"></script>
-<script src="adaptiveBot.js"></script>
-<script src="game.js"></script>
-<script src="../Shared/settingsMenu.js"></script>
+    <script src="adaptiveBot.js"></script>
+    <script src="../Shared/botTiming.js"></script>
+    <script src="../Shared/mobileLayout.js"></script>
+    <script src="../Shared/navigationGuard.js"></script>
+    <script src="../Shared/boardLayout.js"></script>
+    <script src="game.js"></script>
+    <script src="../Shared/matchConfirm.js"></script>
+    <script src="../Shared/settingsMenu.js"></script>
 <script src="../Shared/buttonOverflow.js"></script>
 <script>
     const backIcon = document.getElementById("backIcon");
