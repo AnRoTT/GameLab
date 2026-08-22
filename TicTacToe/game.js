@@ -47,7 +47,6 @@ document.getElementById('btnDifficulty').onclick = () => { diffIdx = cycleSettin
 document.getElementById('btnAdapt').onclick = () => { adaptIdx = cycleSetting(adaptOptions, adaptIdx); updateSettingsUI(); };
 window.updateScore = function (x, draw, o) {
     document.getElementById('scoreX').textContent = `X: ${x}`;
-    document.getElementById('scoreDraw').textContent = `Unentsch: ${draw}`;
     document.getElementById('scoreO').textContent = `O: ${o}`;
 };
 updateSettingsUI();
@@ -396,7 +395,6 @@ function endRound(winner, winRow = null) {
     }
     updateScore(scoreX, scoreDraw, scoreO);
     document.getElementById("scoreX").classList.toggle("winner", winner === "X");
-    document.getElementById("scoreDraw").classList.toggle("winner", winner === "draw");
     document.getElementById("scoreO").classList.toggle("winner", winner === "O");
 
     startingPlayer = startingPlayer === "X"? "O" : "X";
@@ -469,7 +467,7 @@ if(matchFinished){
 
 /* Reset - ÃœBERARBEITET */
 function resetGame(full = true) {
-    ["scoreX", "scoreDraw", "scoreO"].forEach(id => document.getElementById(id).classList.remove("winner"));
+    ["scoreX", "scoreO"].forEach(id => document.getElementById(id).classList.remove("winner"));
     cancelPendingBotMove();
     cancelNextRoundCountdown();
     if (full) {
@@ -518,7 +516,7 @@ function resetGame(full = true) {
     render();
 
     if (canBotMove()) {
-        scheduleBotMove(300, false);
+        scheduleBotMove(getBotDelay(), true);
     }
 }
 

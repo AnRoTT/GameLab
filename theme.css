@@ -1372,6 +1372,7 @@ body.game-page .game-screen > .footer {
     }
 }
 
+
 /* Einheitlicher Spielkopf nach dem Quarto-Layout.
    Die hohe Spezifitaet und !important verhindern, dass alte
    spielbezogene body-/top-bar-Regeln die Position wieder verschieben. */

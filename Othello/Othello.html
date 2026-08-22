@@ -24,8 +24,8 @@
             <button id="modeBtn" class="cycle-button">1 Spieler</button>
         </div>
         <div class="cycle-group setting-row">
-            <div class="label">Regelmodus</div>
-            <button id="rulesBtn" class="cycle-button">Standard</button>
+            <div class="label">Zughilfe</div>
+            <button id="moveHintsBtn" class="cycle-button">Ein</button>
         </div>
         <div class="cycle-group setting-row">
             <div class="label">Match</div>
@@ -72,10 +72,10 @@
 <!-- Infoleiste -->
 <div id="gameInfo" class="game-info game-content">
     <div id="status" class="status">Wähle den Modus und starte</div> <!-- DIESE ZEILE NEU -->
-    <div id="matchLine" class="match-line">Einzelrunde - Offizielle Regeln</div>
+    <div id="matchLine" class="match-line">Einzelrunde</div>
     <div class="score-bar">
-        <span>Schwarz: <span id="scoreBlack">2</span></span>
-        <span>Weiß: <span id="scoreWhite">2</span></span>
+        <span><span id="scoreBlackLabel">Spieler 1</span>: <span id="scoreBlack">2</span></span>
+        <span><span id="scoreWhiteLabel">Spieler 2</span>: <span id="scoreWhite">2</span></span>
     </div>
     <div id="adaptiveStrengthPanel" class="adaptive-strength" hidden>
         <span class="adaptive-strength-label">Adaptive Stärke</span>
@@ -104,6 +104,7 @@
 <script src="aiCore.js"></script>
 <script src="manuellBot.js"></script>
     <script src="adaptiveBot.js"></script>
+    <script src="../Shared/botTiming.js"></script>
     <script src="../Shared/mobileLayout.js"></script>
     <script src="../Shared/navigationGuard.js"></script>
     <script src="../Shared/boardLayout.js"></script>

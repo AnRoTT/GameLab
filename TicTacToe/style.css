@@ -64,14 +64,15 @@ body {
     max-width: none;
     margin: 0;
     gap: 8px;
-    justify-content: stretch;
+    justify-content: center;
     text-shadow: none;
 }
 
 .score-header > span {
-    flex: 1;
+    flex: 0 1 112px;
+    max-width: 112px;
     min-width: 0;
-    padding: 6px 7px;
+    padding: 5px 8px;
     border: 1px solid #30364c;
     border-radius: var(--radius-md);
     background: #141726;

@@ -5,18 +5,18 @@ const ADAPT_SPEEDS = [
     { key: "fast", label: "Schnell" }
 ];
 const BOT_LEVELS = ["Anfänger", "Hobbyspieler", "Vereinsspieler", "Meister", "Adaptiv"];
-const MATCH_OPTIONS = ["Einzelrunde", "Abwechselnd", "Verlierer beginnt"];
+const MATCH_OPTIONS = ["Einzelrunde", "Abwechselnd"];
 
 let vsComputer = true;
 let botType = "adaptive";
 let botLevelIndex = 0;
 let adaptSpeedIndex = 1;
-let ruleMode = "standard";
+let showMoveHints = true;
 let matchModeIndex = 0;
 
 const settingsStartButton = document.getElementById("startBtn");
 const settingsModeButton = document.getElementById("modeBtn");
-const settingsRulesButton = document.getElementById("rulesBtn");
+const settingsMoveHintsButton = document.getElementById("moveHintsBtn");
 const settingsMatchButton = document.getElementById("matchBtn");
 const settingsOpponentRow = document.getElementById("botOpponentRow");
 const settingsBotLevelButton = document.getElementById("botLevelBtn");
@@ -95,11 +95,11 @@ function updateMatchModeUI() {
 
 window.setOthelloMatchSettingsLocked = function (locked) {
     settingsModeButton.disabled = locked;
-    settingsRulesButton.disabled = locked;
+    settingsMoveHintsButton.disabled = locked;
     settingsMatchButton.disabled = locked;
     settingsBotLevelButton.disabled = locked || !vsComputer;
     settingsAdaptSpeedButton.disabled = locked || !vsComputer || botType !== "adaptive";
-    [settingsModeButton, settingsRulesButton, settingsMatchButton, settingsBotLevelButton, settingsAdaptSpeedButton]
+    [settingsModeButton, settingsMoveHintsButton, settingsMatchButton, settingsBotLevelButton, settingsAdaptSpeedButton]
         .forEach(button => button.classList.toggle("button-disabled", button.disabled));
 };
 
@@ -118,12 +118,13 @@ settingsModeButton.addEventListener("click", () => {
     vsComputer = !vsComputer;
     settingsModeButton.textContent = vsComputer ? "1 Spieler" : "2 Spieler";
     updateBotLevelUI();
+    updateScoreLabels();
 });
-settingsRulesButton.addEventListener("click", () => {
+settingsMoveHintsButton.addEventListener("click", () => {
     if (gameStarted && !gameOver) return;
     window.AndisSound?.playUiClick?.(0.22);
-    ruleMode = ruleMode === "standard" ? "tournament" : "standard";
-    settingsRulesButton.textContent = ruleMode === "standard" ? "Standard" : "Turnier";
+    showMoveHints = !showMoveHints;
+    settingsMoveHintsButton.textContent = showMoveHints ? "Ein" : "Aus";
 });
 settingsMatchButton.addEventListener("click", () => {
     if (gameStarted && !gameOver) return;
@@ -150,7 +151,7 @@ updateMatchModeUI();
 
 const startBtn = document.getElementById("startBtn");
 const modeBtn = document.getElementById("modeBtn");
-const rulesBtn = document.getElementById("rulesBtn");
+const moveHintsBtn = document.getElementById("moveHintsBtn");
 const botLevelBtn = document.getElementById("botLevelBtn");
 const adaptSpeedBtn = document.getElementById("adaptSpeedBtn");
 const settingsPanel = document.getElementById("settingsPanel");
@@ -188,13 +189,25 @@ function getBotColor() {
     return otherColor(playerOneColor);
 }
 
+function getPlayerLabel(color) {
+    if (color === playerOneColor) return "Spieler 1";
+    return vsComputer ? "Bot" : "Spieler 2";
+}
+
+function getColorLabel(color) {
+    return color === "black" ? "Schwarz" : "Weiß";
+}
+
+function updateTurnStatus(color = currentPlayer) {
+    statusEl.textContent = `${getColorLabel(color)} am Zug – ${getPlayerLabel(color)}`;
+}
+
 function updateMatchInfo() {
     if (getMatchMode() === 0) {
-        matchLineEl.textContent = "Einzelrunde - Offizielle Regeln";
+        matchLineEl.textContent = "Einzelrunde";
         return;
     }
-    const matchStartMode = getMatchMode() === 1 ? "Abwechselnd" : "Verlierer beginnt";
-    matchLineEl.textContent = `${matchStartMode} - Runde ${matchRound} - Match ${matchWins.playerOne}:${matchWins.playerTwo}`;
+    matchLineEl.textContent = `Abwechselnd - Runde ${matchRound} - Match ${matchWins.playerOne}:${matchWins.playerTwo}`;
 }
 
 let board = [];
@@ -248,10 +261,10 @@ function initGame() {
     boardEl.tabIndex = 0;
     // settingsPanel.classList.add("disabled"); // NICHT sperren wegen Abbrechen
 modeBtn.classList.add("disabled"); // nur Modus sperren
-rulesBtn.classList.add("disabled"); // nur Regeln sperren
+moveHintsBtn.classList.add("disabled"); // nur Zughilfe sperren
     renderBoard();
     updateScore();
-    statusEl.textContent = "Schwarz am Zug";
+    updateTurnStatus();
     startBtn.textContent = getMatchMode() > 0 ? "Match beenden" : "Spiel abbrechen";
     lastMoveWasPressure = false;
 
@@ -260,7 +273,19 @@ rulesBtn.classList.add("disabled"); // nur Regeln sperren
     if (typeof window.setOthelloMatchSettingsLocked === "function") {
         window.setOthelloMatchSettingsLocked(true);
     }
-    if(vsComputer && currentPlayer === getBotColor()) botMove(token); // Sofort Bot wenn er anfängt
+    if (vsComputer && currentPlayer === getBotColor()) {
+        const openingThinkTime = botType === "adaptive" && typeof getAdaptiveBotThinkTime === "function"
+            ? getAdaptiveBotThinkTime()
+            : typeof getOthelloBotThinkTime === "function"
+            ? getOthelloBotThinkTime(botLevelIndex + 1, currentPlayer)
+            : 300;
+        const openingDelay = window.getBotMoveDelay(openingThinkTime, true);
+        botMoveTimer = setTimeout(() => {
+            botMoveTimer = null;
+            if (token !== gameToken || !gameStarted || gameOver) return;
+            botMove(token);
+        }, openingDelay);
+    }
 }
 
 function cancelPendingTurnTimers() {
@@ -303,7 +328,8 @@ function resetGame() {
     boardEl.classList.add("disabled");
     boardEl.tabIndex = -1;
 modeBtn.classList.remove("disabled"); // nur Modus wieder frei
-rulesBtn.classList.remove("disabled"); // nur Regeln wieder frei
+moveHintsBtn.classList.remove("disabled"); // nur Zughilfe wieder frei
+    playerOneColor = "black";
     renderBoard();
     updateScore();
     statusEl.textContent = "Klick 'Jetzt spielen' um zu starten";
@@ -312,7 +338,6 @@ rulesBtn.classList.remove("disabled"); // nur Regeln wieder frei
     matchInProgress = false;
     matchRound = 1;
     matchWins = { playerOne: 0, playerTwo: 0 };
-    playerOneColor = "black";
     updateMatchInfo();
     updateBotLevelUI();
     if (typeof window.setOthelloMatchSettingsLocked === "function") {
@@ -340,10 +365,8 @@ mobileGameAction?.addEventListener("click", () => {
 
 function renderBoard() {
     boardEl.innerHTML = "";
-    // Gültige Züge sind in beiden Regelmodi identisch. Der Turniermodus
-    // verändert nur die Wertung der verbliebenen leeren Felder.
     const humanMayMove = isHumanTurn() && !turnTransitionActive;
-    const validMoves = (gameStarted && !gameOver && ruleMode !== "tournament" && humanMayMove)
+    const validMoves = (gameStarted && !gameOver && humanMayMove)
         ? getAllValidMoves(currentPlayer)
         : [];
 
@@ -362,7 +385,7 @@ function renderBoard() {
                 const piece = document.createElement("div");
                 piece.className = `piece ${board[r][c]}`;
                 cell.appendChild(piece);
-            } else if(validMoves.some(m => m.r === r && m.c === c)) {
+            } else if(showMoveHints && validMoves.some(m => m.r === r && m.c === c)) {
                 cell.classList.add("valid");
             }
             boardEl.appendChild(cell);
@@ -455,6 +478,12 @@ function updateScore() {
     });
     scoreBlackEl.textContent = black;
     scoreWhiteEl.textContent = white;
+    updateScoreLabels();
+}
+
+function updateScoreLabels() {
+    document.getElementById("scoreBlackLabel").textContent = getPlayerLabel("black");
+    document.getElementById("scoreWhiteLabel").textContent = getPlayerLabel("white");
 }
 
 function nextTurn() { // NEU: Zentrale Funktion für Spielerwechsel + Bot
@@ -474,7 +503,7 @@ function nextTurn() { // NEU: Zentrale Funktion für Spielerwechsel + Bot
             return;
         }
 
-        passMessage = `${passedPlayer === "black"? "Schwarz" : "Weiß"} muss aussetzen`;
+        passMessage = `${getColorLabel(passedPlayer)} (${getPlayerLabel(passedPlayer)}) muss aussetzen`;
         currentPlayer = otherPlayer;
     }
 
@@ -482,7 +511,7 @@ function nextTurn() { // NEU: Zentrale Funktion für Spielerwechsel + Bot
         passTimer = null;
         if (gameOver || !gameStarted) return;
 
-        statusEl.textContent = `${currentPlayer === "black"? "Schwarz" : "Weiß"} am Zug`;
+        updateTurnStatus();
         renderBoard();
 
         // Wenn Bot dran ist und Spiel läuft: nach seiner Denkzeit ziehen.
@@ -574,17 +603,11 @@ function endGame() {
     boardEl.classList.add("disabled");
     settingsPanel.classList.remove("disabled"); // WICHTIG: wieder freigeben
     modeBtn.classList.remove("disabled");
-    rulesBtn.classList.remove("disabled");
+    moveHintsBtn.classList.remove("disabled");
     startBtn.textContent = "Jetzt spielen";
 
     let black = parseInt(scoreBlackEl.textContent);
     let white = parseInt(scoreWhiteEl.textContent);
-
-    if(ruleMode === "tournament") {
-        let empty = 64 - black - white;
-        if(black > white) black += empty;
-        else if(white > black) white += empty;
-    }
 
     let winner = black > white? "Schwarz gewinnt!" : white > black? "Weiß gewinnt!" : "Unentschieden!";
     scoreBlackEl.parentElement.classList.toggle("winner", black > white);
@@ -600,11 +623,7 @@ function endGame() {
         const winnerKey = roundWinnerColor === playerOneColor ? "playerOne" : "playerTwo";
         if (roundWinnerColor) matchWins[winnerKey] += 1;
 
-        if (getMatchMode() === 1 || roundWinnerColor === null) {
-            playerOneColor = otherColor(playerOneColor);
-        } else {
-            playerOneColor = otherColor(roundWinnerColor);
-        }
+        playerOneColor = otherColor(playerOneColor);
         matchRound += 1;
         updateMatchInfo();
         statusEl.textContent = `Runde beendet: ${winner} - Nächste Runde starten`;
@@ -623,7 +642,7 @@ function endGame() {
 boardEl.addEventListener("pointerdown", (e) => {
     const cell = e.target.closest(".cell");
     if (!cell) return;
-    const invalid = gameOver || !gameStarted || (vsComputer && currentPlayer !== playerOneColor) || !cell.classList.contains("valid");
+    const invalid = gameOver || !gameStarted || (vsComputer && currentPlayer !== playerOneColor);
     if (!invalid) return;
     e.preventDefault();
     cell.blur();
@@ -638,6 +657,11 @@ boardEl.addEventListener("click", (e) => {
     if(!cell) return;
     const r = parseInt(cell.dataset.r);
     const c = parseInt(cell.dataset.c);
+
+    if (!isValidMove(r, c, currentPlayer)) {
+        playSound(soundError, 0.22);
+        return;
+    }
 
     const learningBoard = board.map(row => row.slice());
     const learningPlayerMoves = getAllValidMoves(currentPlayer);

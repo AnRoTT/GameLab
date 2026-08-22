@@ -7,6 +7,8 @@
     const matchLineElement = document.getElementById("matchLine");
     const scorePlayer1Element = document.getElementById("scorePlayer1");
     const scorePlayer2Element = document.getElementById("scorePlayer2");
+    const scorePlayer1Label = scorePlayer1Element.parentElement.querySelector(".score-label");
+    const scorePlayer2Label = scorePlayer2Element.parentElement.querySelector(".score-label");
     const modeButton = document.getElementById("modeButton");
     const matchButton = document.getElementById("matchButton");
     const botLevelButton = document.getElementById("botLevelButton");
@@ -83,7 +85,7 @@
         sound.preload = "auto";
     });
 
-    const MATCH_OPTIONS = ["Einzelrunde", "Abwechselnd", "Verlierer beginnt"];
+    const MATCH_OPTIONS = ["Einzelrunde", "Abwechselnd"];
     let onePlayer = true;
     let board = Array(16).fill(null);
     let remainingPieces = Array.from({ length: 16 }, (_, index) => index);
@@ -100,7 +102,7 @@
     const playerProfile = QuartoAICore.createPlayerProfile();
     window.quartoPlayerProfile = playerProfile;
 
-    function playerName(player) { return player === 0 ? "Spieler 1" : "Spieler 2"; }
+    function playerName(player) { return player === 0 ? "Spieler 1" : (onePlayer ? "Bot" : "Spieler 2"); }
     function isBot(player) { return onePlayer && player === 1; }
     function isAdaptiveBot() { return onePlayer && botLevelIndex === 4; }
     function adaptiveSpeed() { return ADAPT_SPEEDS[adaptSpeedIndex].key; }
@@ -258,8 +260,10 @@
         startButton.disabled = false;
         startButton.classList.toggle("button-disabled", startButton.disabled);
         matchLineElement.textContent = matchModeIndex === 0
-            ? "Einzelrunde - Offizielle Regeln"
-            : `${matchModeIndex === 1 ? "Abwechselnd" : "Verlierer beginnt"} - Match ${scores[0]}:${scores[1]}`;
+            ? "Einzelrunde"
+            : "Abwechselnd";
+        scorePlayer1Label.textContent = "Spieler 1";
+        scorePlayer2Label.textContent = onePlayer ? "Bot" : "Spieler 2";
         updateAdaptiveUI();
     }
 
@@ -338,10 +342,14 @@
         if (isBot(chooser)) scheduleBotMove();
     }
 
-    function scheduleBotMove() {
+    function scheduleBotMove(isOpeningMove = false) {
         window.clearTimeout(botTimer);
         setStatus(isAdaptiveBot() ? "Adaptiver Bot denkt ..." : "Bot denkt ...");
         render();
+        const normalThinkTime = isAdaptiveBot()
+            ? QuartoAdaptiveBot.getThinkTime()
+            : QuartoManualBot.getThinkTime(botLevelIndex + 1);
+        const delay = window.getBotMoveDelay(normalThinkTime, isOpeningMove);
         botTimer = window.setTimeout(() => {
             if (gameOver || !gameStarted || !isBot(chooser) && selectedPiece === null || !isBot(1 - chooser) && selectedPiece !== null) return;
             const state = QuartoAICore.createInitialState(board, remainingPieces, chooser, selectedPiece);
@@ -356,9 +364,7 @@
                     : QuartoManualBot.chooseCell(state, QUARTO_BOT_PLAYER, botLevelIndex + 1);
                 placeSelectedPiece(cell, true);
             }
-        }, isAdaptiveBot()
-            ? QuartoAdaptiveBot.getThinkTime()
-            : QuartoManualBot.getThinkTime(botLevelIndex + 1));
+        }, delay);
     }
 
     function finish(message, winningLine = [], winner = null) {
@@ -367,8 +373,8 @@
             QuartoAdaptiveBot.recordRoundResult(winner === 0 ? "playerWin" : winner === 1 ? "botWin" : "draw");
         }
         setStatus(message);
-        if (message.includes("Spieler 1 gewinnt")) scores[0] += 1;
-        if (message.includes("Spieler 2 gewinnt")) scores[1] += 1;
+        if (winner === 0) scores[0] += 1;
+        if (winner === 1) scores[1] += 1;
         renderScores();
         clearWinnerScore();
         if (winner === 0) scorePlayer1Element.parentElement.classList.add("winner");
@@ -378,9 +384,9 @@
         if (matchModeIndex === 0) {
             matchInProgress = false;
         } else {
-            startingChooser = winner === null
-                ? 1 - startingChooser
-                : matchModeIndex === 2 ? 1 - winner : 1 - startingChooser;
+            // Keep the match active so the next round preserves the score.
+            matchInProgress = true;
+            startingChooser = 1 - startingChooser;
         }
         render();
         [...boardElement.children].forEach((cell) => {
@@ -441,7 +447,7 @@
         render();
         stabilizeLandscapeBoard();
         focusFirstAvailable(poolElement);
-        if (isBot(chooser)) scheduleBotMove();
+        if (isBot(chooser)) scheduleBotMove(true);
     }
 
     modeButton.addEventListener("click", () => {

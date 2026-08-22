@@ -67,7 +67,6 @@ const adaptSpeedButton = document.getElementById("adaptSpeedButton");
 const winnerBannerEl = document.getElementById("winner-banner");
 const winnerTextEl = document.getElementById("winner-text");
 const nextRoundBtnEl = document.getElementById("next-round-btn");
-const endMatchButton = document.getElementById("endMatchButton");
 const setupScreen = document.getElementById("setupScreen");
 const gameScreen = document.getElementById("gameScreen");
 const mobileGameAction = document.getElementById("mobileGameAction");
@@ -117,7 +116,7 @@ function stabilizeConnectFourBoard() {
 window.AndisBoardLayout?.bindResponsiveBoardLayout(stabilizeConnectFourBoard);
 
 const MODE_OPTIONS = ["2 Spieler", "1 Spieler"];
-const MATCH_OPTIONS = ["Einzelrunde", "Abwechselnd", "Verlierer beginnt"];
+const MATCH_OPTIONS = ["Einzelrunde", "Abwechselnd"];
 const BOT_LEVELS = ["Anfänger", "Hobbyspieler", "Vereinsspieler", "Meister", "Adaptiv"];
 const BOT_LEVEL_KEYS = ["anfänger", "hobby", "verein", "meister", "adaptiv"];
 const ADAPT_SPEED_OPTIONS = ["Langsam", "Normal", "Schnell"];
@@ -127,7 +126,6 @@ let botLevelIndex = 0;
 let adaptSpeedIndex = 1;
 window.currentAdaptSpeedFactor = ADAPT_SPEED_FACTORS[adaptSpeedIndex];
 let modeIndex = 1;
-let startRuleIndex = 1;
 let matchModeIndex = 0;
 const RESET_BUTTON_STATES = ["Neues Spiel", "Neues Spiel"];
 let resetButtonIndex = 0;
@@ -236,7 +234,6 @@ settingsMatchButton.addEventListener("click", () => {
     if (settingsMatchButton.disabled || matchActive) return;
     window.AndisSound?.playUiClick?.(0.22);
     matchModeIndex = (matchModeIndex + 1) % MATCH_OPTIONS.length;
-    startRuleIndex = matchModeIndex === 2 ? 0 : 1;
     settingsMatchButton.textContent = MATCH_OPTIONS[matchModeIndex];
     setNextRoundButtonState(matchModeIndex > 0, false);
     updateUIStatus();
@@ -528,8 +525,8 @@ function playerName(player) {
 
 function updateUIStatus(message, keepLine2 = false) {
     matchLineEl.textContent = matchModeIndex === 0
-        ? "Einzelrunde - Offizielle Regeln"
-        : `${matchModeIndex === 1 ? "Abwechselnd" : "Verlierer beginnt"} - Match ${scores[PLAYER_RED]}:${scores[PLAYER_YELLOW]}`;
+        ? "Einzelrunde"
+        : "Abwechselnd";
     // A completed round owns the status line. No later refresh may make it
     // look like the next turn has already started.
     if (gameOver || roundResultProcessed) {
@@ -588,7 +585,7 @@ function startNewRound() {
     setMatchInProgressLocked(true);
     setResetButtonForRound(true);
     setNextRoundButtonState(matchModeIndex > 0, false);
-    maybeBotMove();
+    maybeBotMove(true);
     } finally {
         roundStartInProgress = false;
     }
@@ -667,7 +664,7 @@ function isBotTurn() {
     return modeIndex === 1 && currentPlayer === PLAYER_YELLOW; // <-- muss 1 sein
 }
 
-function maybeBotMove() {
+function maybeBotMove(isOpeningMove = false) {
     cancelPendingBotMove();
     if (!matchActive) return;
     if (modeIndex !== 1) return;
@@ -690,6 +687,7 @@ function maybeBotMove() {
     }
 
     baseTime = baseTime + Math.random() * 400 - 200;
+    baseTime = window.getBotMoveDelay(baseTime, isOpeningMove);
     // Wait slightly longer than the player chip animation, then use one
     // direct timer instead of recursively polling chipDropActive.
     baseTime = Math.max(CHIP_DROP_DURATION + 40, baseTime);
@@ -901,8 +899,6 @@ function onWin(player) {
     if (matchModeIndex === 0) {
         matchActive = false;
         setResetButtonForRound(false, true);
-    } else if (startRuleIndex === 0) {
-        startingPlayer = player === PLAYER_RED ? PLAYER_YELLOW : PLAYER_RED;
     } else {
         startingPlayer = startingPlayer === PLAYER_RED ? PLAYER_YELLOW : PLAYER_RED;
     }
@@ -945,7 +941,6 @@ function resetMatchOnly() {
     setNextRoundButtonState(matchModeIndex > 0, false);
     winnerBannerEl.classList.add("hidden");
     nextRoundBtnEl.hidden = true;
-    if (endMatchButton) endMatchButton.hidden = true;
 }
 
 function resetFullGame() {
@@ -969,8 +964,6 @@ function onDraw() {
         matchActive = false;
         setResetButtonForRound(false, true);
         setMatchInProgressLocked(false);
-    } else if (startRuleIndex === 0) {
-        startingPlayer = startingPlayer === PLAYER_RED ? PLAYER_YELLOW : PLAYER_RED;
     } else {
         startingPlayer = startingPlayer === PLAYER_RED ? PLAYER_YELLOW : PLAYER_RED;
     }
@@ -995,6 +988,5 @@ function hideWinner() {
     nextRoundBtnEl.hidden = true;
     boardEl.style.pointerEvents = "auto"; // Klicks wieder erlauben
     setNextRoundButtonState(matchModeIndex > 0, false);
-    if (endMatchButton) endMatchButton.hidden = true;
 }
 
