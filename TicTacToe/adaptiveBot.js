@@ -38,8 +38,13 @@
                 state.adaptiveAI = { ...state.adaptiveAI, ...stored.adaptiveAI };
             }
             if (stored.playerProfile && typeof stored.playerProfile === "object") {
-                state.playerProfile = stored.playerProfile;
-                window.ticTacToePlayerProfile = state.playerProfile;
+                const centralMoves = Number(state.playerProfile?.totalMoves) || 0;
+                const adaptiveMoves = Number(stored.playerProfile.totalMoves) || 0;
+                if (adaptiveMoves >= centralMoves) {
+                    state.playerProfile = stored.playerProfile;
+                    window.ticTacToePlayerProfile = state.playerProfile;
+                    TicTacToeAdaptiveCore.savePlayerProfile?.(state.playerProfile);
+                }
             }
         } catch (_) {
             // Beschädigte oder blockierte Daten werden ignoriert.
@@ -68,7 +73,7 @@
     }
 
     function adaptiveCurve() {
-        return TicTacToeAdaptiveCore.getDifficultyProfile(getAdaptiveSkillValue()).challenge;
+        return TicTacToeAdaptiveCore.getDifficultyProfile(state.adaptiveSkill * 100).challenge;
     }
 
     function getReferenceBlendWeight(skillValue) {
@@ -89,7 +94,7 @@
     function pickReferenceMove(board) {
         const referenceMoves = TicTacToeAdaptiveCore.getBestMoves(board, "O");
         if (!referenceMoves.length) return null;
-        const blend = getReferenceBlendWeight(getAdaptiveSkillValue());
+        const blend = getReferenceBlendWeight(state.adaptiveSkill * 100);
         if (blend <= 0) return null;
         if (Math.random() < blend) {
             return referenceMoves[0];
@@ -183,8 +188,12 @@
     }
 
     function registerAdaptiveForkSignals(move, stateBeforeMove) {
+        const freeCells = TicTacToeAdaptiveCore.getFreeCells(stateBeforeMove);
+        const forkAvailable = freeCells.some(cell => TicTacToeAdaptiveCore.wouldFork(stateBeforeMove, "X", cell));
         if (TicTacToeAdaptiveCore.wouldFork(stateBeforeMove, "X", move)) {
             state.playerProfile.forksSeen += 1;
+        } else if (forkAvailable) {
+            state.playerProfile.forksMissed += 1;
         }
     }
 
@@ -199,63 +208,39 @@
 
     function adaptiveChooseFromCandidates(candidates) {
         if (!candidates.length) return null;
-        const sorted = candidates
-            .map(index => ({ index, score: getAdaptiveHabitScore(index) }))
-            .sort((a, b) => b.score - a.score);
-        const creativity = state.adaptiveAI.creativity;
-        const limit = Math.max(1, Math.min(sorted.length, Math.ceil(sorted.length * (0.35 + creativity * 0.35))));
-        const pool = sorted.slice(0, limit);
-        return pool[Math.floor(Math.random() * pool.length)].index;
+        const scored = candidates.map(index => ({ index, score: getAdaptiveHabitScore(index) }));
+        const difficulty = adaptiveCurve();
+        return window.SharedDifficulty.selectSoftCandidate(scored, difficulty.curve, true)?.index ?? candidates[0];
     }
 
     function getAdaptiveBestMove() {
         const cells = getAdaptiveCells();
         const free = TicTacToeAdaptiveCore.getFreeCells(cells);
         const curve = adaptiveCurve();
-        const win = TicTacToeAdaptiveCore.findCritical("O", cells);
-        if (win !== null) return win;
-        const block = TicTacToeAdaptiveCore.findCritical("X", cells);
-        if (block !== null) return block;
-
-        const tacticsRoll = Math.random();
-        const tacticChance = state.adaptiveAI.tactics * (0.12 + curve * 0.88);
-        if (tacticsRoll < tacticChance) {
-            const fork = free.find(i => TicTacToeAdaptiveCore.wouldFork(cells, "O", i));
-            if (fork !== undefined) return fork;
-            const antiFork = free.find(i => TicTacToeAdaptiveCore.wouldFork(cells, "X", i));
-            if (antiFork !== undefined) return antiFork;
-        }
-
-        const habitRoll = Math.random();
-        const habitChance = state.adaptiveAI.habitUsage * (0.06 + curve * 0.72);
-        if (habitRoll < habitChance) {
-            const habitMove = adaptiveChooseFromCandidates(free);
-            if (habitMove !== null) return habitMove;
-        }
-
-        const opening = cells[4] === null
-            ? 4
-            : [0, 2, 6, 8].filter(index => cells[index] === null)[0] ?? null;
-        const openingChance = (0.12 + curve * 0.48) * (0.55 + curve * 0.45);
-        if (cells.filter(v => v !== null).length < 2 && opening !== null && Math.random() < openingChance) {
-            return opening;
-        }
-
-        const bestMoves = TicTacToeAdaptiveCore.getBestMoves(cells, "O");
-        if (!bestMoves.length) return free[0] ?? null;
+        const scoredMoves = TicTacToeAdaptiveCore.getScoredMoves(cells, "O", curve.depth);
+        if (!scoredMoves.length) return free[0] ?? null;
 
         const accuracyChance = state.adaptiveAI.accuracy * (0.08 + curve * 0.84);
         if (Math.random() < accuracyChance) {
-            const sorted = bestMoves
-                .map(index => ({ index, habit: getAdaptiveHabitScore(index) }))
-                .sort((a, b) => b.habit - a.habit);
-            const windowSize = Math.max(1, Math.ceil(sorted.length * (0.25 + state.adaptiveAI.creativity * 0.35)));
-            return sorted[Math.floor(Math.random() * windowSize)].index;
+            const scored = scoredMoves.map(item => ({
+                index: item.index,
+                score: item.score + getAdaptiveHabitScore(item.index) * curve
+            }));
+            return window.SharedDifficulty.selectSoftCandidate(scored, curve, true)?.index ?? scored[0].index;
         }
 
-        const imperfectPool = free.filter(i => !bestMoves.includes(i));
-        if (imperfectPool.length) return imperfectPool[Math.floor(Math.random() * imperfectPool.length)];
-        return bestMoves[Math.floor(Math.random() * bestMoves.length)];
+        const imperfect = scoredMoves.map(item => ({
+            index: item.index,
+            score: item.score * (0.45 + state.adaptiveAI.creativity * 0.35)
+        }));
+        imperfect.forEach(item => {
+            const next = cells.slice();
+            next[item.index] = "O";
+            const opponentForks = TicTacToeAdaptiveCore.getFreeCells(next)
+                .filter(cell => TicTacToeAdaptiveCore.wouldFork(next, "X", cell)).length;
+            item.score -= opponentForks * 1200 * curve;
+        });
+        return window.SharedDifficulty.selectSoftCandidate(imperfect, curve, true)?.index ?? imperfect[0].index;
     }
 
     function getBotMove() {
@@ -312,30 +297,21 @@
                 : 0
         );
 
-        let delta = 0;
-        const lowerSlopeWeight = getLowerSlopeWeight(getAdaptiveSkillValue());
-        // X = Spieler gewinnt -> der Bot soll stärker werden.
-        if (winner === "X") {
-            state.drawStreak = 0;
-            delta += 0.035;
-        // O = Bot gewinnt -> der Bot soll schwächer werden.
-        } else if (winner === "O") {
-            state.drawStreak = 0;
-            delta -= 0.03 * (0.7 + lowerSlopeWeight * 0.3);
-        } else {
-            state.drawStreak += 1;
-            // Remis bleiben fast neutral. Nur eine lange Serie darf
-            // vorsichtig nach oben korrigieren: beim 5. und danach jedem 3. Remis.
-            if (state.drawStreak >= 5 && (state.drawStreak === 5 || (state.drawStreak - 5) % 3 === 0)) {
-                delta += 0.008 * (0.75 + lowerSlopeWeight * 0.25);
-            }
-        }
-
-        delta += Math.max(-0.012, Math.min(0.012, (roundGood - roundBad) * 0.002)) * (0.75 + lowerSlopeWeight * 0.25);
-        delta += Math.max(-0.01, Math.min(0.01, -roundRisk * 0.001)) * (0.75 + lowerSlopeWeight * 0.25);
-        delta *= rate;
-
-        state.adaptiveSkill = adaptiveClamp(state.adaptiveSkill + delta);
+        const speed = typeof activeMatch !== "undefined" ? activeMatch?.adaptSpeed : "normal";
+        const speedFactor = speed === "slow" ? 0.5 : speed === "fast" ? 1.5 : 1;
+        const skillBefore = getAdaptiveSkillValue();
+        const result = winner === "X" ? "playerWin" : winner === "O" ? "botWin" : "draw";
+        const performance = Math.max(0, Math.min(100,
+            50 + (roundGood - roundBad) * 6 - roundRisk * 5
+        ));
+        const skillUpdate = window.SharedDifficulty.applyAdaptiveResult(
+            skillBefore,
+            result,
+            { performance, drawStreak: state.drawStreak, speedFactor }
+        );
+        state.drawStreak = skillUpdate.drawStreak;
+        state.adaptiveSkill = skillUpdate.skill / 100;
+        const delta = skillUpdate.baseDelta / 100;
         state.adaptiveAI.accuracy = adaptiveClamp(state.adaptiveAI.accuracy + delta * 0.25);
         if (profileReady) {
             state.adaptiveAI.tactics = adaptiveClamp(state.adaptiveAI.tactics + (state.playerProfile.forksMissed * -0.001 + state.playerProfile.forksSeen * 0.0005) * rate);
@@ -366,7 +342,7 @@
             mistakeChance: 0.12,
             creativity: 0.50
         };
-        state.playerProfile = TicTacToeAdaptiveCore.createPlayerProfile();
+        state.playerProfile = TicTacToeAdaptiveCore.createPlayerProfile(false);
         state.adaptiveRoundSnapshot = null;
         state.labCells = null;
         state.drawStreak = 0;
@@ -380,6 +356,7 @@
         } catch (_) {
             // Der Reset funktioniert auch ohne LocalStorage.
         }
+        TicTacToeAdaptiveCore.clearPlayerProfile?.(window.ticTacToePlayerProfile);
         resetForLab(initialSkill);
     }
 
@@ -406,9 +383,6 @@
             state.playerProfile.mistakes += 1;
         } else {
             state.playerProfile.tacticalGood += 1;
-        }
-        if (missedWin || missedBlock) {
-            state.playerProfile.forksMissed += 1;
         }
         savePersistentState();
     }

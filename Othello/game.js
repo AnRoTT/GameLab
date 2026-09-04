@@ -94,6 +94,7 @@ function updateMatchModeUI() {
 }
 
 window.setOthelloMatchSettingsLocked = function (locked) {
+    settingsPanel.classList.toggle("disabled", locked);
     settingsModeButton.disabled = locked;
     settingsMoveHintsButton.disabled = locked;
     settingsMatchButton.disabled = locked;
@@ -157,6 +158,7 @@ const adaptSpeedBtn = document.getElementById("adaptSpeedBtn");
 const settingsPanel = document.getElementById("settingsPanel");
 const scoreBlackEl = document.getElementById("scoreBlack");
 const scoreWhiteEl = document.getElementById("scoreWhite");
+const matchScoreEl = document.getElementById("matchScore");
 const statusEl = document.getElementById("status");
 const matchLineEl = document.getElementById("matchLine");
 const adaptiveStrengthPanel = document.getElementById("adaptiveStrengthPanel");
@@ -205,8 +207,11 @@ function updateTurnStatus(color = currentPlayer) {
 function updateMatchInfo() {
     if (getMatchMode() === 0) {
         matchLineEl.textContent = "Einzelrunde";
+        matchScoreEl.hidden = true;
         return;
     }
+    matchScoreEl.textContent = `${matchWins.playerOne}:${matchWins.playerTwo}`;
+    matchScoreEl.hidden = false;
     matchLineEl.textContent = `Abwechselnd - Runde ${matchRound} - Match ${matchWins.playerOne}:${matchWins.playerTwo}`;
 }
 
@@ -266,6 +271,7 @@ moveHintsBtn.classList.add("disabled"); // nur Zughilfe sperren
     updateScore();
     updateTurnStatus();
     startBtn.textContent = getMatchMode() > 0 ? "Match beenden" : "Spiel abbrechen";
+    if (mobileGameAction) mobileGameAction.textContent = "Spiel abbrechen";
     lastMoveWasPressure = false;
 
     updateBotLevelUI();
@@ -334,6 +340,7 @@ moveHintsBtn.classList.remove("disabled"); // nur Zughilfe wieder frei
     updateScore();
     statusEl.textContent = "Klick 'Jetzt spielen' um zu starten";
     startBtn.textContent = "Jetzt spielen";
+    if (mobileGameAction) mobileGameAction.textContent = "Spiel abbrechen";
     lastMoveWasPressure = false;
     matchInProgress = false;
     matchRound = 1;
@@ -359,8 +366,16 @@ function showGameScreen() {
 
 mobileGameAction?.addEventListener("click", () => {
     window.AndisSound?.playUiClick?.(0.22);
-    resetGame();
-    showSetupScreen();
+    if (gameStarted && !gameOver) {
+        resetGame();
+        showSetupScreen();
+        return;
+    }
+    // Nach einer beendeten Einzelrunde oder Matchrunde direkt neu starten.
+    // Die Spieleinstellungen bleiben dabei unveraendert und koennen ueber
+    // den separaten Zurueck-Button wieder geoeffnet werden.
+    initGame();
+    showGameScreen();
 });
 
 function renderBoard() {
@@ -628,12 +643,15 @@ function endGame() {
         updateMatchInfo();
         statusEl.textContent = `Runde beendet: ${winner} - Nächste Runde starten`;
         startBtn.textContent = "Nächste Runde";
+        if (mobileGameAction) mobileGameAction.textContent = "Nächste Runde";
         if (typeof window.setOthelloMatchSettingsLocked === "function") {
             window.setOthelloMatchSettingsLocked(true);
         }
         return;
     }
     statusEl.textContent = `Spiel vorbei! ${winner} ${black}:${white}`;
+    startBtn.textContent = "Neues Spiel";
+    if (mobileGameAction) mobileGameAction.textContent = "Neues Spiel";
     if (typeof window.setOthelloMatchSettingsLocked === "function") {
         window.setOthelloMatchSettingsLocked(false);
     }

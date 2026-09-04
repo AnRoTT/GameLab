@@ -242,15 +242,41 @@ function othelloScoreMove(state, move, player, profile = null, weights = {}) {
     const mobilityWeight = weights.mobility ?? 6;
     const piecesWeight = weights.pieces ?? 1;
     let score = OTHELLO_POSITION_MATRIX[move.r][move.c] * positionWeight;
-    const nearCorner = (
-        (move.r <= 1 && move.c <= 1) ||
-        (move.r <= 1 && move.c >= 6) ||
-        (move.r >= 6 && move.c <= 1) ||
-        (move.r >= 6 && move.c >= 6)
-    );
-    if (nearCorner && !othelloIsCornerMove(move)) score -= 90;
+    if (othelloIsEdgeMove(move) && !othelloIsCornerMove(move)) {
+        let corner = null;
+        if (move.r === 0) corner = state[0][move.c < 4 ? 0 : 7];
+        else if (move.r === 7) corner = state[7][move.c < 4 ? 0 : 7];
+        else if (move.c === 0) corner = state[move.r < 4 ? 0 : 7][0];
+        else if (move.c === 7) corner = state[move.r < 4 ? 0 : 7][7];
+        const distance = (move.r === 0 || move.r === 7)
+            ? Math.min(move.c, 7 - move.c)
+            : Math.min(move.r, 7 - move.r);
+        if (!corner) score -= distance === 1 ? 82 : distance === 2 ? 28 : 8;
+        else if (corner === player) score += 28;
+    }
+    if ((move.r === 1 || move.r === 6) && (move.c === 1 || move.c === 6)) {
+        const corner = state[move.r === 1 ? 0 : 7][move.c === 1 ? 0 : 7];
+        if (!corner) score -= 105;
+        else if (corner === player) score += 18;
+    }
     score -= opponentMoves.length * mobilityWeight;
     score += (player === "black" ? pieces.black - pieces.white : pieces.white - pieces.black) * piecesWeight;
+    const frontier = (colour) => {
+        let count = 0;
+        for (let r = 0; r < 8; r += 1) for (let c = 0; c < 8; c += 1) {
+            if (nextState[r][c] !== colour) continue;
+            if (OTHELLO_DIRECTIONS.some(([dr, dc]) => {
+                const nr = r + dr, nc = c + dc;
+                return nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && !nextState[nr][nc];
+            })) count += 1;
+        }
+        return count;
+    };
+    const ownColour = player;
+    const enemyColour = player === "black" ? "white" : "black";
+    score += (frontier(enemyColour) - frontier(ownColour)) * (weights.frontier ?? 3);
+    score += (othelloStableCount(nextState, player) - othelloStableCount(nextState, opponent))
+        * (weights.stability ?? 10);
     if (profile) {
         const index = move.r * 8 + move.c;
         score += profile.positions.favorites[index] * 0.15;
@@ -260,7 +286,77 @@ function othelloScoreMove(state, move, player, profile = null, weights = {}) {
     return score;
 }
 
-function othelloEvaluateState(state, player, weights = {}) {
+function othelloStableEdgeCount(state, player) {
+    const edges = [
+        [[0,0],[0,1],[0,2],[0,3],[0,4],[0,5],[0,6],[0,7]],
+        [[7,0],[7,1],[7,2],[7,3],[7,4],[7,5],[7,6],[7,7]],
+        [[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0]],
+        [[0,7],[1,7],[2,7],[3,7],[4,7],[5,7],[6,7],[7,7]]
+    ];
+    const stableCells = new Set();
+    for (const edge of edges) {
+        if (state[edge[0][0]][edge[0][1]] !== player) continue;
+        for (const [r, c] of edge) { if (state[r][c] !== player) break; stableCells.add(`${r},${c}`); }
+        for (const [r, c] of edge.slice().reverse()) { if (state[r][c] !== player) break; stableCells.add(`${r},${c}`); }
+    }
+    return stableCells.size;
+}
+
+// Konservative Stabilitaetsberechnung: Ein Stein wird nur dann als stabil
+// gewertet, wenn er in jeder Achse von einer Brettkante oder bereits
+// bestaetigten eigenen stabilen Steinen abgesichert ist. Dadurch werden auch
+// vorbereitende Zuege erkannt, ohne unsichere Innensteine zu ueberbewerten.
+function othelloStableCount(state, player) {
+    const stable = new Set();
+    const key = (r, c) => `${r},${c}`;
+    const corners = [[0, 0], [0, 7], [7, 0], [7, 7]];
+    corners.forEach(([r, c]) => {
+        if (state[r][c] === player) stable.add(key(r, c));
+    });
+    const axes = [[0, 1], [1, 0], [1, 1], [1, -1]];
+    const closedTowards = (r, c, dr, dc) => {
+        let nr = r + dr;
+        let nc = c + dc;
+        while (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+            if (state[nr][nc] !== player) return false;
+            if (stable.has(key(nr, nc))) return true;
+            nr += dr;
+            nc += dc;
+        }
+        return true;
+    };
+    let changed = true;
+    while (changed) {
+        changed = false;
+        for (let r = 0; r < 8; r += 1) for (let c = 0; c < 8; c += 1) {
+            const cellKey = key(r, c);
+            if (state[r][c] !== player || stable.has(cellKey)) continue;
+            const isStable = axes.every(([dr, dc]) =>
+                closedTowards(r, c, dr, dc) || closedTowards(r, c, -dr, -dc)
+            );
+            if (isStable) {
+                stable.add(cellKey);
+                changed = true;
+            }
+        }
+    }
+    return stable.size;
+}
+
+function othelloPotentialMobility(state, player) {
+    const opponent = player === "black" ? "white" : "black";
+    let count = 0;
+    for (let r = 0; r < 8; r += 1) for (let c = 0; c < 8; c += 1) {
+        if (state[r][c]) continue;
+        if (OTHELLO_DIRECTIONS.some(([dr, dc]) => {
+            const nr = r + dr, nc = c + dc;
+            return nr >= 0 && nr < 8 && nc >= 0 && nc < 8 && state[nr][nc] === opponent;
+        })) count += 1;
+    }
+    return count;
+}
+
+function othelloEvaluateState(state, player, weights = {}, turn = null) {
     const opponent = player === "black" ? "white" : "black";
     const pieces = othelloCountPieces(state);
     const own = player === "black" ? pieces.black : pieces.white;
@@ -271,6 +367,15 @@ function othelloEvaluateState(state, player, weights = {}) {
     const piecesWeight = weights.pieces ?? 2;
     const positionWeight = weights.position ?? 1;
     let score = (own - enemy) * piecesWeight + (ownMoves - enemyMoves) * mobilityWeight;
+    score += (othelloStableCount(state, player) - othelloStableCount(state, opponent)) * (weights.stability ?? 10);
+    // Eigene potentielle Zugfelder sind gut, gegnerische potentielle Zugfelder
+    // erhoehen dagegen den kuenftigen Druck auf die Stellung.
+    score += (othelloPotentialMobility(state, player) - othelloPotentialMobility(state, opponent)) * (weights.potentialMobility ?? 3);
+    const emptyCount = state.flat().filter(cell => !cell).length;
+    if (emptyCount <= 12 && turn) {
+        const playerGetsLastMove = emptyCount % 2 === 1 ? turn === player : turn !== player;
+        score += (playerGetsLastMove ? 1 : -1) * (weights.parity ?? 8);
+    }
     for (let r = 0; r < 8; r++) {
         for (let c = 0; c < 8; c++) {
             if (state[r][c] === player) score += OTHELLO_POSITION_MATRIX[r][c] * positionWeight;
@@ -285,49 +390,139 @@ function othelloEvaluateState(state, player, weights = {}) {
     return score;
 }
 
-function othelloChooseMinimaxMove(state, player, depth = 3, randomness = 0, weights = {}) {
+function othelloChooseMinimaxMove(state, player, depth = 3, randomness = 0, weights = {}, selectionCurve = null, selectionMode = "soft") {
     const opponent = player === "black" ? "white" : "black";
     const rootMoves = getAllValidMovesForState(player, state);
     if (!rootMoves.length) return null;
+    const transpositionTable = new Map();
+    const legalMovesCache = new Map();
+    const evaluationCache = new Map();
+    const nextStateCache = new Map();
+
+    const boardKey = (currentState) => currentState.map(row => row.map(cell => cell === "black" ? "b" : cell === "white" ? "w" : ".").join("")).join("");
+    const tableKey = (currentState, turn, remainingDepth, passed) =>
+        `${boardKey(currentState)}|${turn}|${remainingDepth}|${passed ? 1 : 0}`;
+    const getCachedMoves = (currentState, turn) => {
+        const key = `${boardKey(currentState)}|${turn}`;
+        if (!legalMovesCache.has(key)) legalMovesCache.set(key, getAllValidMovesForState(turn, currentState));
+        return legalMovesCache.get(key);
+    };
+    const getCachedNextState = (currentState, move, turn) => {
+        const key = `${boardKey(currentState)}|${turn}|${move.r},${move.c}`;
+        if (!nextStateCache.has(key)) nextStateCache.set(key, othelloApplyMoveToState(currentState, move, turn));
+        return nextStateCache.get(key);
+    };
+    const getCachedEvaluation = (currentState, turn) => {
+        const key = `${boardKey(currentState)}|${turn}`;
+        if (!evaluationCache.has(key)) evaluationCache.set(key, othelloEvaluateState(currentState, player, weights, turn));
+        return evaluationCache.get(key);
+    };
+    const getMoveOrderScore = (move, turn) => {
+        const positional = OTHELLO_POSITION_MATRIX[move.r][move.c];
+        const edgeBonus = move.r === 0 || move.r === 7 || move.c === 0 || move.c === 7 ? 12 : 0;
+        const rootPerspective = turn === player ? 1 : -1;
+        return rootPerspective * (positional + edgeBonus);
+    };
+
+    const terminalScore = (currentState) => {
+        const pieces = othelloCountPieces(currentState);
+        const own = player === "black" ? pieces.black : pieces.white;
+        const enemy = player === "black" ? pieces.white : pieces.black;
+        const difference = own - enemy;
+        if (difference === 0) return 0;
+        return Math.sign(difference) * 100000 + difference * 100;
+    };
 
     function search(currentState, turn, remainingDepth, alpha, beta, passed) {
-        const moves = getAllValidMovesForState(turn, currentState);
-        const other = turn === "black" ? "white" : "black";
-        if (remainingDepth <= 0 || (passed && !moves.length)) {
-            return othelloEvaluateState(currentState, player, weights);
+        const alphaOriginal = alpha;
+        const betaOriginal = beta;
+        const key = tableKey(currentState, turn, remainingDepth, passed);
+        const cached = transpositionTable.get(key);
+        if (cached) {
+            if (cached.flag === "exact") return cached.score;
+            if (cached.flag === "lower") alpha = Math.max(alpha, cached.score);
+            if (cached.flag === "upper") beta = Math.min(beta, cached.score);
+            if (alpha >= beta) return cached.score;
         }
-        if (!moves.length) return search(currentState, other, remainingDepth - 1, alpha, beta, true);
 
+        const moves = getCachedMoves(currentState, turn);
+        const other = turn === "black" ? "white" : "black";
+        if (passed && !moves.length) {
+            const score = terminalScore(currentState);
+            transpositionTable.set(key, { score, flag: "exact" });
+            return score;
+        }
+        if (remainingDepth <= 0) {
+            const score = getCachedEvaluation(currentState, turn);
+            transpositionTable.set(key, { score, flag: "exact" });
+            return score;
+        }
+        if (!moves.length) {
+            // Ein Pass ist keine gespielte Aktion und darf daher keine
+            // zusätzliche Minimax-Tiefe verbrauchen.
+            return search(currentState, other, remainingDepth, alpha, beta, true);
+        }
+        const fractionalScore = window.SharedDifficulty.resolveFractionalDepth(
+            remainingDepth,
+            () => getCachedEvaluation(currentState, turn),
+            () => {
+                const maximizing = turn === player;
+                return moves.reduce((best, move) => {
+                    const value = getCachedEvaluation(getCachedNextState(currentState, move, turn), other);
+                    return maximizing ? Math.max(best, value) : Math.min(best, value);
+                }, maximizing ? -Infinity : Infinity);
+            }
+        );
+        if (fractionalScore !== null) {
+            transpositionTable.set(key, { score: fractionalScore, flag: "exact" });
+            return fractionalScore;
+        }
         const maximizing = turn === player;
+        // Examine strategically promising moves first so alpha-beta can prune
+        // more branches without changing the resulting minimax value.
+        const orderedMoves = moves
+            .map(move => ({ move, score: getMoveOrderScore(move, turn) }))
+            .sort((a, b) => maximizing ? b.score - a.score : a.score - b.score)
+            .map(entry => entry.move);
         let best = maximizing ? -Infinity : Infinity;
-        for (const move of moves) {
-            const next = othelloApplyMoveToState(currentState, move, turn);
+        for (const move of orderedMoves) {
+            const next = getCachedNextState(currentState, move, turn);
             const value = search(next, other, remainingDepth - 1, alpha, beta, false);
             best = maximizing ? Math.max(best, value) : Math.min(best, value);
             if (maximizing) alpha = Math.max(alpha, best);
             else beta = Math.min(beta, best);
             if (beta <= alpha) break;
         }
+        const flag = best <= alphaOriginal ? "upper" : best >= betaOriginal ? "lower" : "exact";
+        transpositionTable.set(key, { score: best, flag });
         return best;
     }
 
     const scored = rootMoves.map(move => ({
         move,
-        score: search(othelloApplyMoveToState(state, move, player), opponent, depth - 1, -Infinity, Infinity, false)
+        score: search(getCachedNextState(state, move, player), opponent, depth - 1, -Infinity, Infinity, false)
     })).sort((a, b) => b.score - a.score);
 
+    // Der adaptive Bot behält die zentrale Auswahl. Manuelle Othello-Bots
+    // nutzen dagegen eine rangbasierte, strikt begrenzte Auswahl, damit ein
+    // schwächeres Profil keine beliebig schlechte strategische Variante
+    // wählen und dadurch gegen den R-Bot zufällig besser abschneiden kann.
+    if (selectionMode !== "ranked" && selectionCurve !== null && selectionCurve !== undefined) {
+        return window.SharedDifficulty.selectSoftCandidate(scored, selectionCurve, true)?.move || scored[0].move;
+    }
     const bestScore = scored[0].score;
-    const candidates = scored.filter(item => item.score >= bestScore - randomness);
-    return candidates[Math.floor(Math.random() * candidates.length)].move;
+    const curve = Math.max(0, Math.min(1, Number(selectionCurve) || 0));
+    const deviationChance = Math.min(0.08, (1 - curve) * 0.35);
+    if (Math.random() >= deviationChance) return scored[0].move;
+
+    const nearBest = scored
+        .filter(item => bestScore - item.score <= 1.0)
+        .slice(0, 3);
+    if (nearBest.length < 2) return scored[0].move;
+    return nearBest[1 + Math.floor(Math.random() * (nearBest.length - 1))].move;
 }
 
-const OTHELLO_MANUAL_PROFILES = Object.freeze({
-    1: { strength: 0.51 },
-    2: { strength: 0.65 },
-    3: { strength: 0.70 },
-    4: { strength: 0.88 },
-    reference: { strength: 1.0 }
-});
+const OTHELLO_MANUAL_PROFILES = window.OthelloSettings.manualStrengths;
 const othelloManualOverrides = Object.create(null);
 try {
     const storedOthelloProfiles = JSON.parse(localStorage.getItem("gamelab-othello-manual-profiles") || "{}");
@@ -346,37 +541,42 @@ function getOthelloManualProfile(level = 1) {
         ? "reference"
         : (Number.isInteger(numericLevel) && OTHELLO_MANUAL_PROFILES[numericLevel] ? numericLevel : 1);
     const base = OTHELLO_MANUAL_PROFILES[profileKey];
-    const strength = profileKey === "reference" ? base.strength : othelloManualOverrides[profileKey] ?? base.strength;
+    const baseStrength = typeof base === "number" ? base : base?.strength;
+    const strength = profileKey === "reference" ? 1 : othelloManualOverrides[profileKey] ?? baseStrength;
     const scale = Math.max(0, Math.min(1, Number(strength) || 0));
     const difficulty = window.SharedDifficulty.createProfile({
         mode: "manual",
         strength: scale,
-        minSearchChance: 0.08,
-        maxSearchChance: 1.0,
-        minRandomness: 0,
-        maxRandomness: 0.88,
-        minErrorRate: 0,
-        maxErrorRate: 0.34,
-        searchConfig: {
-            supportsMinimax: true,
-            minDepth: 0,
-            maxDepth: 4,
-            fixedDepth: null
-        },
-        habitInfluence: 0.5
+        ...window.OthelloSettings.difficulty,
+        habitInfluence: window.OthelloSettings.manualHabitInfluence,
+        searchConfig: window.OthelloSettings.searchConfig
     });
     const curve = difficulty.curve;
+    // Tiefe und weiche Auswahl kommen direkt aus der gemeinsamen Difficulty.
+    // Es gibt keine zusätzliche Othello-spezifische Hochstufen-Kurve.
+    const depth = difficulty.depth;
+    const lowDepth = difficulty.lowDepth;
+    const highDepth = difficulty.highDepth;
+    const selectionCurve = curve;
     const weights = {
         position: curve,
         mobility: curve * 12,
-        pieces: curve * 2
+        pieces: curve * 2,
+        stability: curve * 10,
+        potentialMobility: curve * 3
     };
     return {
-        ...base,
+        ...(typeof base === "object" && base ? base : {}),
         level: profileKey,
         ...difficulty,
         strength: scale,
         curve,
+        depth,
+        lowDepth,
+        highDepth,
+        highDepthChance: difficulty.highDepthChance,
+        fraction: difficulty.fraction,
+        selectionCurve,
         learnedUsage: difficulty.habitInfluence,
         cornerChance: difficulty.tacticalAccuracy * curve,
         edgeChance: 0.25 + difficulty.tacticalAccuracy * curve * 0.45,
@@ -405,6 +605,9 @@ window.OthelloAICore = {
     othelloApplyMoveToState,
     applyMove: othelloApplyMove,
     othelloScoreMove,
+    othelloStableEdgeCount,
+    othelloStableCount,
+    othelloPotentialMobility,
     OTHELLO_POSITION_MATRIX,
     othelloEvaluateState,
     othelloChooseMinimaxMove,

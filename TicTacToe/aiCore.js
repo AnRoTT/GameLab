@@ -43,16 +43,31 @@ function wouldTicTacToeFork(board, player, move) {
     return winningMoves >= 2;
 }
 
-function ticTacToeMinimax(board, player) {
+function ticTacToeMinimax(board, player, depth = 9) {
     const freeCells = getTicTacToeFreeCells(board);
     if (checkTicTacToeWin("X", board)) return { score: -10 };
     if (checkTicTacToeWin("O", board)) return { score: 10 };
-    if (!freeCells.length) return { score: 0 };
+    if (!freeCells.length || depth <= 0) return { score: 0 };
+
+    const fractionalScore = window.SharedDifficulty.resolveFractionalDepth(
+        depth,
+        () => 0,
+        () => {
+            const opponent = player === "O" ? "X" : "O";
+            const values = freeCells.map(index => {
+                const nextBoard = cloneTicTacToeBoard(board);
+                nextBoard[index] = player;
+                return ticTacToeMinimax(nextBoard, opponent, 0).score;
+            });
+            return player === "O" ? Math.max(...values) : Math.min(...values);
+        }
+    );
+    if (fractionalScore !== null) return { score: fractionalScore };
 
     const moves = freeCells.map(index => {
         const nextBoard = cloneTicTacToeBoard(board);
         nextBoard[index] = player;
-        const result = ticTacToeMinimax(nextBoard, player === "O" ? "X" : "O");
+        const result = ticTacToeMinimax(nextBoard, player === "O" ? "X" : "O", depth - 1);
         return { index, score: result.score };
     });
 
@@ -61,15 +76,22 @@ function ticTacToeMinimax(board, player) {
         : moves.reduce((best, move) => move.score < best.score ? move : best);
 }
 
-function getTicTacToeBestMoves(board, player) {
-    let bestScore = -Infinity;
-    let bestMoves = [];
-
+function getTicTacToeScoredMoves(board, player, depth = 9) {
+    const scored = [];
     for (const index of getTicTacToeFreeCells(board)) {
         const nextBoard = cloneTicTacToeBoard(board);
         nextBoard[index] = player;
-        const result = ticTacToeMinimax(nextBoard, player === "O" ? "X" : "O");
-        const score = player === "O" ? result.score : -result.score;
+        const result = ticTacToeMinimax(nextBoard, player === "O" ? "X" : "O", Math.max(0, depth - 1));
+        scored.push({ index, score: player === "O" ? result.score : -result.score });
+    }
+    return scored;
+}
+
+function getTicTacToeBestMoves(board, player, depth = 9) {
+    let bestScore = -Infinity;
+    let bestMoves = [];
+
+    for (const { index, score } of getTicTacToeScoredMoves(board, player, depth)) {
 
         if (score > bestScore) {
             bestScore = score;
@@ -87,15 +109,7 @@ function getTicTacToeReferenceMove(board, player) {
     return getTicTacToeBestMoves(board, player)[0] ?? null;
 }
 
-const TICTACTOE_MANUAL_STRENGTHS = {
-    // Level 1 bis 3 wurden nach der Referenzmessung etwas angehoben,
-    // damit sie näher an die Zielkorridore herankommen.
-    1: 0.36,
-    2: 0.52,
-    3: 0.61,
-    // Level 4 bleibt am Referenzanker ausgerichtet.
-    4: 0.71
-};
+const TICTACTOE_MANUAL_STRENGTHS = window.TicTacToeSettings.manualStrengths;
 const ticTacToeManualOverrides = Object.create(null);
 try {
     const storedProfiles = JSON.parse(localStorage.getItem("gamelab-tictactoe-manual-profiles") || "{}");
@@ -118,19 +132,9 @@ function getTicTacToeManualProfile(levelOrStrength = 1) {
     const difficulty = window.SharedDifficulty.createProfile({
         mode: "manual",
         strength,
-        minSearchChance: 0.08,
-        maxSearchChance: 1.0,
-        minRandomness: 0,
-        maxRandomness: 0.92,
-        minErrorRate: 0,
-        maxErrorRate: 0.36,
-        habitInfluence: 0.60,
-        searchConfig: {
-            supportsMinimax: true,
-            minDepth: 0,
-            maxDepth: 9,
-            fixedDepth: null
-        }
+        ...window.TicTacToeSettings.difficulty,
+        habitInfluence: window.TicTacToeSettings.manualHabitInfluence,
+        searchConfig: window.TicTacToeSettings.searchConfig
     });
 
     return {
@@ -173,19 +177,9 @@ function getTicTacToeDifficultyProfile(skill) {
     const difficulty = window.SharedDifficulty.createProfile({
         mode: "adaptive",
         skill,
-        minSearchChance: 0.08,
-        maxSearchChance: 1.0,
-        minRandomness: 0.02,
-        maxRandomness: 0.44,
-        minErrorRate: 0.02,
-        maxErrorRate: 0.36,
-        habitInfluence: 0.60,
-        searchConfig: {
-            supportsMinimax: true,
-            minDepth: 0,
-            maxDepth: 9,
-            fixedDepth: null
-        }
+        ...window.TicTacToeSettings.difficulty,
+        habitInfluence: window.TicTacToeSettings.adaptiveHabitInfluence,
+        searchConfig: window.TicTacToeSettings.searchConfig
     });
 
     return {
@@ -197,8 +191,10 @@ function getTicTacToeDifficultyProfile(skill) {
     };
 }
 
-function createTicTacToePlayerProfile() {
-    return {
+const TICTACTOE_PLAYER_PROFILE_KEY = "andis-game-foundry-tictactoe-player-profile";
+
+function createTicTacToePlayerProfile(loadStored = true) {
+    const profile = {
         totalMoves: 0,
         gamesAgainstBot: 0,
         favoriteCells: Array(9).fill(0),
@@ -215,6 +211,38 @@ function createTicTacToePlayerProfile() {
         tacticalGood: 0,
         tacticalBad: 0
     };
+    if (!loadStored) return profile;
+    try {
+        const stored = JSON.parse(localStorage.getItem(TICTACTOE_PLAYER_PROFILE_KEY) || "null");
+        if (!stored || typeof stored !== "object") return profile;
+        for (const key of ["totalMoves", "gamesAgainstBot", "mistakes", "missedBlocks", "missedWins", "forksSeen", "forksMissed", "tacticalGood", "tacticalBad"]) {
+            if (Number.isFinite(Number(stored[key]))) profile[key] = Number(stored[key]);
+        }
+        for (const key of ["favoriteCells", "openingCells", "rowPreference", "colPreference"]) {
+            if (Array.isArray(stored[key]) && stored[key].length === profile[key].length) profile[key] = stored[key].map(value => Number(value) || 0);
+        }
+        for (const key of ["positionPreference", "style"]) {
+            if (stored[key] && typeof stored[key] === "object") {
+                Object.keys(profile[key]).forEach(child => {
+                    if (Number.isFinite(Number(stored[key][child]))) profile[key][child] = Number(stored[key][child]);
+                });
+            }
+        }
+    } catch (_) {}
+    return profile;
+}
+
+function saveTicTacToePlayerProfile(profile) {
+    if (!profile) return;
+    try { localStorage.setItem(TICTACTOE_PLAYER_PROFILE_KEY, JSON.stringify(profile)); } catch (_) {}
+}
+
+function clearTicTacToePlayerProfile(profile) {
+    try { localStorage.removeItem(TICTACTOE_PLAYER_PROFILE_KEY); } catch (_) {}
+    if (!profile) return;
+    const fresh = createTicTacToePlayerProfile(false);
+    Object.keys(profile).forEach(key => { delete profile[key]; });
+    Object.assign(profile, fresh);
 }
 
 function getTicTacToePositionType(move) {
@@ -235,6 +263,7 @@ function trackTicTacToePlayerMove(profile, move, boardBefore, player = "X") {
         if (move === 4) profile.style.defensive += 0.3;
         if ([0, 2, 6, 8].includes(move)) profile.style.aggressive += 0.2;
     }
+    saveTicTacToePlayerProfile(profile);
 }
 
 function recordTicTacToePlayerEvent(profile, event) {
@@ -244,6 +273,7 @@ function recordTicTacToePlayerEvent(profile, event) {
     if (event === "fork") profile.forksSeen++;
     if (event === "missedFork") { profile.forksMissed++; profile.tacticalBad++; }
     if (event === "tacticalGood") profile.tacticalGood++;
+    saveTicTacToePlayerProfile(profile);
 }
 
 window.TicTacToeAICore = {
@@ -255,12 +285,15 @@ window.TicTacToeAICore = {
     wouldFork: wouldTicTacToeFork,
     minimax: ticTacToeMinimax,
     getBestMoves: getTicTacToeBestMoves,
+    getScoredMoves: getTicTacToeScoredMoves,
     getReferenceMove: getTicTacToeReferenceMove,
     getManualProfile: getTicTacToeManualProfile,
     getProfilePreferredMove: getTicTacToeProfilePreferredMove,
     getDifficultyProfile: getTicTacToeDifficultyProfile,
     setManualProfileStrength: setTicTacToeManualProfileStrength,
     createPlayerProfile: createTicTacToePlayerProfile,
+    savePlayerProfile: saveTicTacToePlayerProfile,
+    clearPlayerProfile: clearTicTacToePlayerProfile,
     getPositionType: getTicTacToePositionType,
     trackPlayerMove: trackTicTacToePlayerMove,
     recordPlayerEvent: recordTicTacToePlayerEvent

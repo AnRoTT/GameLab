@@ -1,0 +1,353 @@
+
+.point-button.player-one,.point-button.player-two{width:clamp(36px,5vw,48px)}
+@media (max-width:700px){.point-button.player-one,.point-button.player-two{width:clamp(34px,10vw,42px)}}
+.game-side-panel{width:min(100%,560px);min-height:72px;margin:0 auto 14px;padding:12px 16px;border:1px solid #262a3a;border-radius:var(--radius-lg);background:rgba(16,18,26,.92);box-shadow:var(--shadow-soft);text-align:center}
+.game-info{min-height:24px;color:var(--text-main);font-size:.95rem;font-weight:600}
+.phase-badge{min-height:1.1em;color:var(--text-muted);font-size:.78rem}
+.action-hint{color:var(--text-main);font-size:.85rem}
+.scoreboard{margin-top:8px;gap:10px}
+.scoreboard>div{min-width:88px;padding:5px 10px;border:1px solid #30364c;border-radius:var(--radius-md);background:#141726}
+.scoreboard>div:first-child{border-color:rgba(79,140,255,.55)}
+.scoreboard>div:last-child{border-color:rgba(213,169,94,.55)}
+.scoreboard .score-label{display:block;color:var(--text-muted);font-size:.72rem;font-weight:400}
+.scoreboard .score-value{display:block;color:var(--text-main);font-size:.95rem;font-weight:700}
+.scoreboard .match-score{display:none;min-width:auto;padding:0 2px;color:var(--text-main);font-size:.95rem;font-weight:700;font-variant-numeric:tabular-nums}
+.scoreboard .match-score:not([hidden]){display:inline-block}
+.scoreboard{align-items:center}
+.scoreboard .match-score{align-self:center;line-height:1}
+.scoreboard{gap:15px}
+.game-side-panel .game-info{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:.95rem;font-weight:600;line-height:normal;letter-spacing:normal}
+.game-side-panel .phase-badge{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:.78rem;font-weight:400;line-height:normal;letter-spacing:normal;color:var(--text-muted)}
+.game-side-panel .action-hint{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:.78rem;font-weight:400;line-height:normal;letter-spacing:normal;color:var(--text-muted)}
+.game-side-panel .game-info{display:none}.phase-action-line{grid-column:1/-1;display:flex;align-items:baseline;justify-content:center;gap:3px;min-height:1.1em;margin:0}.phase-separator{color:var(--text-muted);font-size:.78rem}.phase-action-line .action-hint{min-height:0}
+.game-side-panel .score-label{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:.72rem;font-weight:400;line-height:normal;letter-spacing:normal}
+.game-side-panel .score-value{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:.95rem;font-weight:700;line-height:normal;letter-spacing:normal}
+.game-side-panel{width:min(100%,380px);padding:10px 12px;gap:6px}.scoreboard>div{min-width:126px;padding:7px 10px;gap:8px}.adaptive-panel{grid-column:1/-1;display:flex;flex-direction:column;justify-content:center;gap:7px;min-height:54px;margin-top:4px;visibility:hidden}.adaptive-panel.active{visibility:visible}.adaptive-strength-row{display:flex;align-items:center;justify-content:center;gap:9px;color:var(--text-muted);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:.76rem;line-height:normal}.adaptive-strength-track{flex:0 1 220px;width:min(100%,220px);height:8px;overflow:hidden;border:1px solid #3b4357;border-radius:999px;background:#10131e}.adaptive-strength-fill{display:block;width:35%;height:100%;border-radius:inherit;background:linear-gradient(90deg,#4f8cff,#8b5cf6);transition:width .25s ease}.adaptive-strength-row strong{min-width:38px;color:var(--text-main);font-size:.78rem;text-align:right}.board-wrapper{width:min(72vw,calc(72vh - 24px),680px)}
+.scoreboard>div:first-child{border-color:rgba(79,140,255,.55)}.scoreboard>div:last-child{border-color:rgba(213,169,94,.55)}.scoreboard>div:first-child.winner{border-color:var(--accent);box-shadow:0 0 0 2px rgba(79,140,255,.22),0 0 20px rgba(79,140,255,.72)}.scoreboard>div:last-child.winner{border-color:var(--quarto-gold);box-shadow:0 0 0 2px rgba(213,169,94,.22),0 0 20px rgba(213,169,94,.78)}
+.scoreboard>div:not(.match-score-box){min-width:100px}.match-score-box{display:none!important;align-items:center;justify-content:center;gap:5px;min-width:54px!important;padding:7px 8px!important;border-color:#3b4357!important;background:#141726!important}.match-score-box.active{display:flex!important}.match-score-label{color:var(--text-muted);font-size:.68rem;font-weight:400}.match-score-box strong{color:var(--text-main);font-size:.86rem;font-weight:700}
+.point-button.player-one,.point-button.player-two{width:clamp(42px,6vw,56px)}
+@media (max-width:700px){.point-button.player-one,.point-button.player-two{width:clamp(38px,11vw,48px)}}
+/* Mühle-spezifisch: Brett, Steine und spielbezogene Anordnung. */
+.landscape-setup-tools,.setup-extra-settings-button{display:none !important}
+.game-screen-header,.mobile-game-actions{display:none}
+.muehle-layout{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;min-width:0}.game-side-panel{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;width:min(100%,560px);min-width:0}.game-info{grid-column:1/-1;text-align:center;font-size:1.05rem;font-weight:700}.phase-badge{text-align:center;color:#5a431e}.action-hint{grid-column:1/-1;min-height:1.4em;margin:0;text-align:center}.scoreboard{grid-column:1/-1;display:flex;justify-content:center;gap:8px}.scoreboard>div{display:flex;justify-content:space-between;gap:16px;min-width:150px;padding:9px 12px;border:1px solid rgba(47,37,22,.35);border-radius:10px;background:rgba(255,249,210,.14)}.scoreboard span{font-variant-numeric:tabular-nums}.board-wrapper{width:min(72vw,72vh,680px);aspect-ratio:1;display:grid;place-items:center}.muehle-board{position:relative;width:100%;height:100%;border:10px solid #d7bf68;border-radius:18px;background:#f5f0bd;box-shadow:0 14px 32px rgba(0,0,0,.42),inset 0 0 0 2px rgba(110,78,20,.35);outline:none}.mill-line{position:absolute;background:#28251d;transform-origin:0 50%;height:3px;pointer-events:none}.point-button{position:absolute;width:clamp(22px,3.5vw,32px);aspect-ratio:1;border:0;border-radius:50%;background:#302d25;transform:translate(-50%,-50%);padding:0;z-index:2;cursor:pointer;touch-action:manipulation}.point-button::after{content:"";display:block;width:46%;height:46%;margin:27% auto;border-radius:50%;border:1px solid transparent}.point-button.player-one{background:#fffdf0;border:3px solid #51401c;box-shadow:inset 0 0 0 3px #e1c65b,0 2px 4px rgba(0,0,0,.48)}.point-button.player-two{background:#28251d;border:3px solid #11100d;box-shadow:0 2px 4px rgba(0,0,0,.35)}.point-button.player-one::after{border-color:#a88420}.point-button.player-two::after{border-color:#6f6548}.point-button.valid-target{box-shadow:0 0 0 5px #4b8c58}.point-button.available-source{box-shadow:0 0 0 4px #bd8b20}.point-button.selected-source{box-shadow:0 0 0 5px #bd8b20}.point-button.removal-target{box-shadow:0 0 0 5px #a83f35}.point-button.keyboard-focus{outline:4px solid #356bc1;outline-offset:4px}.point-button:focus{outline:none}.muehle-board.keyboard-active .point-button.keyboard-focus{outline:4px solid #356bc1;outline-offset:4px}.board-disabled{opacity:.65;pointer-events:none}@media (max-width:850px){.muehle-layout{gap:12px}.game-side-panel{width:min(100%,560px)}.scoreboard>div{min-width:130px}.board-wrapper{width:min(68vw,68vh,560px)}}@media (max-width:700px){.muehle-layout{gap:8px}.game-side-panel{width:min(92vw,560px);grid-template-columns:1fr auto;align-items:center;gap:7px}.game-side-panel .scoreboard,.game-side-panel .action-hint{grid-column:1/-1}.board-wrapper{width:min(92vw,calc(100dvh - 210px),560px)}.point-button{width:clamp(22px,7vw,30px)}}@media (max-height:520px) and (orientation:landscape){.muehle-layout{flex-direction:row;align-items:center}.board-wrapper{width:min(70vh,58vw,520px)}.game-side-panel{width:180px;grid-template-columns:1fr}.game-screen{padding-bottom:4px}}
+.game-side-panel{width:min(100%,380px)}
+@media (max-width:700px){.game-side-panel{width:min(92vw,380px)}}
+
+/* Mobile: während eines laufenden Spiels die Abbruchaktion außerhalb des Info-Badges anzeigen. */
+@media (max-width:700px) {
+    .mobile-prototype.game-active .game-screen .mobile-game-actions {
+        display: flex !important;
+        justify-content: center;
+        align-items: center;
+        flex: 0 0 auto;
+        width: 100%;
+        margin: 8px 0 0;
+    }
+
+    .mobile-prototype.game-active .game-screen .mobile-game-actions .primary-button {
+        width: max-content;
+        min-width: 170px;
+        min-height: 42px;
+    }
+}
+
+@media (orientation: portrait) and (max-width:700px) {
+    .mobile-prototype.game-active .muehle-layout { gap: 0; }
+    .mobile-prototype.game-active .game-side-panel { margin-bottom: 12px; }
+    .mobile-prototype.game-active .mobile-game-actions { margin: 0; }
+    .mobile-prototype.game-active .board-wrapper { margin-top: 12px; }
+}
+
+/* Punkt- und Steingrößen kommen aus der tatsächlich berechneten Brettbreite.
+   Die !important-Regeln schützen diese Geometrie vor älteren vw-Regeln. */
+.point-button {
+    display: block;
+    -webkit-appearance: none;
+    appearance: none;
+    box-sizing: border-box;
+    min-width: 0;
+    min-height: 0;
+    width: var(--muehle-point-size, clamp(22px, 3.5vw, 32px)) !important;
+    height: var(--muehle-point-size, clamp(22px, 3.5vw, 32px)) !important;
+    aspect-ratio: 1 / 1;
+}
+.muehle-side-column { display: contents; }
+.point-button.player-one,
+.point-button.player-two {
+    width: var(--muehle-stone-size, clamp(42px, 6vw, 56px)) !important;
+    height: var(--muehle-stone-size, clamp(42px, 6vw, 56px)) !important;
+    aspect-ratio: 1 / 1;
+}
+
+/* Lokale, quadratische Brettgrundlage wie bei den Referenzspielen. */
+.muehle-board {
+    width: 100%;
+    height: auto;
+    min-width: 0;
+    min-height: 0;
+    aspect-ratio: 1 / 1;
+    box-sizing: border-box;
+    /* Außen- und Innenfläche werden getrennt gezeichnet. Das vermeidet in
+       Edge Android die fehlerhafte Antialiasing-Kante der dicken Border. */
+    border: 0;
+    padding: 10px;
+    background: #d7bf68;
+    overflow: hidden;
+    box-shadow: 0 14px 32px rgba(0,0,0,.42);
+}
+
+.muehle-board::before {
+    content: "";
+    position: absolute;
+    inset: 10px;
+    z-index: 0;
+    border-radius: 8px;
+    background: #f5f0bd;
+    box-shadow: inset 0 0 0 2px rgba(110,78,20,.35);
+    pointer-events: none;
+}
+
+.muehle-board .mill-line { z-index: 1; }
+
+.muehle-point-layer {
+    position: absolute;
+    left: 4%;
+    top: 4%;
+    width: 92%;
+    height: auto;
+    aspect-ratio: 1 / 1;
+    box-sizing: border-box;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: 12fr 12fr 12fr 20fr 12fr 12fr 12fr;
+    grid-template-rows: 12fr 12fr 12fr 20fr 12fr 12fr 12fr;
+}
+
+.muehle-point-layer .point-button {
+    position: relative;
+    left: auto !important;
+    top: auto !important;
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0;
+    transform: none;
+}
+
+/* Edge-robuste Trennung: Der Button ist die Trefferfläche, der sichtbare
+   Spielstein ist ein eigenes quadratisches Element wie bei Othello. */
+.point-button {
+    display: grid;
+    place-items: center;
+    background: #302d25;
+    border: 0;
+    box-shadow: none;
+}
+
+.point-button::after { display: none; }
+
+.muehle-stone {
+    display: none;
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    aspect-ratio: 1 / 1;
+    border-radius: 50%;
+    pointer-events: none;
+    box-sizing: border-box;
+}
+
+.point-button.player-one,
+.point-button.player-two {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+}
+
+.point-button.player-one .muehle-stone,
+.point-button.player-two .muehle-stone { display: block; }
+
+.point-button.player-one .muehle-stone {
+    background: #fffdf0;
+    border: 3px solid #51401c;
+    /* Kein inset-box-shadow: Edge Android schneidet die Ecke sonst beim
+       Compositing des runden Steins ab. Der Innenring kommt aus ::after. */
+    box-shadow: 0 2px 4px rgba(0,0,0,.48);
+}
+
+.point-button.player-two .muehle-stone {
+    background: #28251d;
+    border: 3px solid #11100d;
+    box-shadow: 0 2px 4px rgba(0,0,0,.35);
+}
+
+.muehle-stone::after {
+    content: "";
+    position: absolute;
+    inset: 27%;
+    border: 1px solid transparent;
+    border-radius: 50%;
+}
+
+.point-button.player-one .muehle-stone::after { border-color: #a88420; }
+.point-button.player-two .muehle-stone::after { border-color: #6f6548; }
+
+.point-button.valid-target { box-shadow: 0 0 0 5px #4b8c58; }
+.point-button.available-source { box-shadow: 0 0 0 4px #bd8b20; }
+.point-button.selected-source { box-shadow: 0 0 0 5px #bd8b20; }
+.point-button.removal-target { box-shadow: 0 0 0 5px #a83f35; }
+
+/* Alle Positionen sind gleich große quadratische Zellen. Der sichtbare
+   Punkt bzw. Stein füllt diese Zelle prozentual wie bei Othello/4 Gewinnt. */
+.point-button,
+.point-button.player-one,
+.point-button.player-two {
+    width: var(--muehle-cell-size, 12%) !important;
+    height: var(--muehle-cell-size, 12%) !important;
+    display: grid;
+    place-items: center;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+}
+
+.muehle-point {
+    display: block;
+    width: var(--muehle-marker-size, 28px);
+    height: 34%;
+    aspect-ratio: 1 / 1;
+    border-radius: 50%;
+    background: #302d25;
+    box-sizing: border-box;
+    pointer-events: none;
+}
+
+.muehle-stone {
+    display: block !important;
+    width: var(--muehle-stone-visual-size, 62px);
+    height: auto !important;
+    aspect-ratio: 1 / 1;
+}
+
+/* Die sichtbaren Punkte und Steine erhalten explizite quadratische Pixelmaße.
+   Prozent- oder Auto-Höhen werden von Edge Android in den ungleich großen
+   Grid-Tracks teilweise als Ellipse berechnet. */
+.muehle-point,
+.muehle-stone {
+    height: var(--muehle-marker-size, 28px) !important;
+    aspect-ratio: 1 / 1;
+}
+
+.muehle-stone {
+    height: var(--muehle-stone-visual-size, 62px) !important;
+}
+
+.point-button.keyboard-focus .muehle-point,
+.point-button.keyboard-focus .muehle-stone {
+    outline: 4px solid #356bc1;
+    outline-offset: 4px;
+}
+
+.point-button.valid-target .muehle-point,
+.point-button.valid-target .muehle-stone { box-shadow: 0 0 0 5px #4b8c58; }
+.point-button.available-source .muehle-point,
+.point-button.available-source .muehle-stone { box-shadow: 0 0 0 4px #bd8b20; }
+.point-button.selected-source .muehle-point,
+.point-button.selected-source .muehle-stone { box-shadow: 0 0 0 5px #bd8b20; }
+.point-button.removal-target .muehle-point,
+.point-button.removal-target .muehle-stone { box-shadow: 0 0 0 5px #a83f35; }
+
+/* Mobile Landscape: Brett links, InfoBadge und Spielaktion rechts. */
+@media (orientation: landscape) and (max-height: 700px) {
+    .mobile-prototype.game-active .muehle-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(220px, 320px);
+        grid-template-rows: auto;
+        align-items: start;
+        align-content: start;
+        column-gap: clamp(16px, 4vw, 42px);
+        row-gap: 0;
+        width: min(100%, 900px);
+        margin: 0 auto;
+    }
+
+    .mobile-prototype.game-active .muehle-layout .board-wrapper {
+        grid-column: 1;
+        grid-row: 1;
+        width: min(84vh, 62vw, 600px);
+        max-width: none;
+        margin: 0;
+        justify-self: center;
+    }
+
+    .mobile-prototype.game-active .muehle-side-column {
+        grid-column: 2;
+        grid-row: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        align-self: start;
+        gap: 12px;
+        width: 100%;
+    }
+
+    .mobile-prototype.game-active .muehle-side-column .game-side-panel {
+        width: 100%;
+        margin: 0;
+    }
+
+    .mobile-prototype.game-active .muehle-side-column .mobile-game-actions {
+        display: flex !important;
+        justify-content: center;
+        width: 100%;
+        margin: 0 !important;
+    }
+}
+
+/* Edge Android: Die Punktzelle wird ohne transform zentriert. Der sichtbare
+   Stein bleibt damit in einer normalen, quadratischen Trefferfläche wie bei
+   Othello, Quarto und 4 Gewinnt. */
+.point-button {
+    transform: none;
+    margin-left: calc(0px - var(--muehle-half-cell, 6%));
+    margin-top: calc(0px - var(--muehle-half-cell, 6%));
+}
+
+.muehle-point-layer .point-button {
+    margin: 0;
+    width: 100% !important;
+    height: 100% !important;
+    position: relative;
+    left: auto !important;
+    top: auto !important;
+    transform: none;
+    box-shadow: none !important;
+}
+
+/* Die Grid-Trefferfläche kann in den mittleren Tracks rechteckig sein.
+   Deshalb darf der Tastaturfokus niemals am Button selbst als Kreis-Outline
+   erscheinen; sonst wird der Fokus in diesen Tracks als Oval dargestellt. */
+.muehle-point-layer .point-button.keyboard-focus,
+.muehle-point-layer .point-button.keyboard-focus:focus,
+.muehle-point-layer .point-button.keyboard-focus:focus-visible {
+    outline: none !important;
+    border-radius: 0;
+}
+
+.muehle-point-layer .point-button:focus,
+.muehle-point-layer .point-button:focus-visible {
+    outline: none !important;
+}
+
+.muehle-point-layer .point-button:focus-visible .muehle-point,
+.muehle-point-layer .point-button:focus-visible .muehle-stone {
+    outline: 4px solid #356bc1;
+    outline-offset: 4px;
+}
+
+/* Das beendete Brett bleibt sichtbar, Eingaben bleiben gesperrt. */
+.board-disabled {
+    opacity: 1;
+}

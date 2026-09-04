@@ -199,28 +199,39 @@
         return 1;
     }
 
-    function countWinningPieces(state) {
-        return state.remainingPieces.reduce((count, piece) =>
-            count + (countWinningPlacements(state, piece) > 0 ? 1 : 0), 0
+    function countWinningPlacementsCached(state, piece, cache) {
+        if (!cache) return countWinningPlacements(state, piece);
+        const key = `${stateKey(state)}|${piece}`;
+        if (!cache.winningPlacements.has(key)) cache.winningPlacements.set(key, countWinningPlacements(state, piece));
+        return cache.winningPlacements.get(key);
+    }
+
+    function countWinningPieces(state, cache = null) {
+        const cacheKey = cache ? stateKey(state) : null;
+        if (cache && cache.winningPieces.has(cacheKey)) return cache.winningPieces.get(cacheKey);
+        const result = state.remainingPieces.reduce((count, piece) =>
+            count + (countWinningPlacementsCached(state, piece, cache) > 0 ? 1 : 0), 0
         );
+        if (cache) cache.winningPieces.set(cacheKey, result);
+        return result;
     }
 
     function hasConflictingAttribute(pieces) {
-        return [0, 1, 2, 3].some((bit) => {
+        return [0, 1, 2, 3].every((bit) => {
             const values = new Set(pieces.map((piece) => (piece >> bit) & 1));
             return values.size === 2;
         });
     }
 
-    function evaluateState(state, botPlayer) {
+    function evaluateState(state, botPlayer, cache = null) {
         if (state.winner !== null) return state.winner === botPlayer ? WIN_SCORE : -WIN_SCORE;
         if (state.selectedPiece === null && state.remainingPieces.length === 0) return 0;
 
         const nextPlayer = 1 - state.chooser;
         const perspective = nextPlayer === botPlayer ? 1 : -1;
         const immediateWins = state.selectedPiece === null
-            ? countWinningPieces(state)
-            : countWinningPlacements(state, state.selectedPiece);
+            ? countWinningPieces(state, cache)
+            : countWinningPlacementsCached(state, state.selectedPiece, cache);
         const multipleThreatBonus = immediateWins >= 2 ? 900 : 0;
         const tacticalScore = perspective * (immediateWins * 2600 + multipleThreatBonus);
         const lineScore = perspective * countOpenLinePotential(state.board) * 8;
@@ -232,23 +243,106 @@
         return tacticalScore + lineScore + safetyScore + lastMoveScore;
     }
 
-    function search(state, botPlayer, depth, alpha, beta) {
-        if (isTerminal(state) || depth <= 0) return { score: evaluateState(state, botPlayer), action: null };
+    function stateKey(state) {
+        return `${state.board.map(piece => piece === null ? "." : piece.toString(16)).join("")}|${state.remainingPieces.map(piece => piece.toString(16)).join("")}|${state.chooser}|${state.selectedPiece ?? "."}|${state.winner ?? "."}|${state.lastCell ?? "."}|${state.lastPlacer ?? "."}`;
+    }
+
+    function canonicalBoardKey(board) {
+        const transforms = [
+            (r, c) => [r, c], (r, c) => [c, 3 - r],
+            (r, c) => [3 - r, 3 - c], (r, c) => [3 - c, r],
+            (r, c) => [r, 3 - c], (r, c) => [3 - r, c],
+            (r, c) => [c, r], (r, c) => [3 - c, 3 - r]
+        ];
+        const keys = transforms.map(transform => {
+            const cells = Array(16).fill(".");
+            board.forEach((piece, index) => {
+                const row = Math.floor(index / 4);
+                const col = index % 4;
+                const [nextRow, nextCol] = transform(row, col);
+                cells[nextRow * 4 + nextCol] = piece === null ? "." : piece.toString(16);
+            });
+            return cells.join("");
+        });
+        return keys.sort()[0];
+    }
+
+    function evaluationStateKey(state, botPlayer) {
+        return `${canonicalBoardKey(state.board)}|${state.remainingPieces.map(piece => piece.toString(16)).join("")}|${state.chooser}|${state.selectedPiece ?? "."}|${state.winner ?? "."}|${state.lastPlacer ?? "."}|${botPlayer}`;
+    }
+
+    function createSearchCache() {
+        return { search: new Map(), evaluation: new Map(), next: new Map(), winningPieces: new Map(), winningPlacements: new Map(), history: new Map() };
+    }
+
+    // Quarto besteht aus zwei technischen Aktionen, aber die Platzierung und
+    // die anschließende Steinwahl gehören zum selben vollständigen Zug des
+    // Spielers. Tiefe wird deshalb nur beim tatsächlichen Spielerwechsel
+    // reduziert.
+    function actingPlayer(state) {
+        return state.selectedPiece === null ? state.chooser : 1 - state.chooser;
+    }
+
+    function nextSearchDepth(state, next, depth) {
+        return actingPlayer(state) === actingPlayer(next) ? depth : depth - 1;
+    }
+
+    function search(state, botPlayer, depth, alpha, beta, cache = createSearchCache()) {
+        const baseKey = stateKey(state);
+        const evaluationKey = evaluationStateKey(state, botPlayer);
+        const evaluate = () => {
+            if (!cache.evaluation.has(evaluationKey)) cache.evaluation.set(evaluationKey, evaluateState(state, botPlayer, cache));
+            return cache.evaluation.get(evaluationKey);
+        };
+        // Suchergebnisse behalten die konkrete Brettausrichtung und dürfen
+        // deshalb nicht den symmetrie-reduzierten Bewertungsschlüssel nutzen.
+        const searchKey = `${baseKey}|${botPlayer}|${depth}`;
+        const alphaOriginal = alpha;
+        const betaOriginal = beta;
+        const cached = cache.search.get(searchKey);
+        if (cached) {
+            if (cached.flag === "exact") return cached.value;
+            if (cached.flag === "lower") alpha = Math.max(alpha, cached.value.score);
+            if (cached.flag === "upper") beta = Math.min(beta, cached.value.score);
+            if (alpha >= beta) return cached.value;
+        }
+        if (isTerminal(state) || depth <= 0) {
+            const value = { score: evaluate(), action: null };
+            cache.search.set(searchKey, { value, flag: "exact" });
+            return value;
+        }
 
         const actions = getLegalActions(state);
-        if (!actions.length) return { score: evaluateState(state, botPlayer), action: null };
+        if (!actions.length) return { score: evaluate(), action: null };
 
-        const actingPlayer = state.selectedPiece === null ? state.chooser : 1 - state.chooser;
-        const maximizing = actingPlayer === botPlayer;
-        let best = { score: maximizing ? -Infinity : Infinity, action: actions[0] };
+        const currentActor = actingPlayer(state);
+        const maximizing = currentActor === botPlayer;
+        const prepared = actions.map(action => {
+            const nextKey = `${baseKey}|${action}`;
+            if (!cache.next.has(nextKey)) {
+                cache.next.set(nextKey, state.selectedPiece === null ? selectPiece(state, action) : placePiece(state, action));
+            }
+            const next = cache.next.get(nextKey);
+            const historyKey = `${baseKey}|${action}|${depth}`;
+            const historyBonus = cache.history.get(historyKey) || 0;
+            return { action, next, order: (next ? evaluateState(next, botPlayer, cache) : (maximizing ? -Infinity : Infinity)) + historyBonus };
+        }).filter(item => item.next).sort((a, b) => maximizing ? b.order - a.order : a.order - b.order);
 
-        for (const action of actions) {
-            const next = state.selectedPiece === null
-                ? selectPiece(state, action)
-                : placePiece(state, action);
-            if (!next) continue;
+        const fractionalScore = window.SharedDifficulty.resolveFractionalDepth(
+            depth,
+            evaluate,
+            () => prepared.reduce((best, item) => maximizing ? Math.max(best, item.order) : Math.min(best, item.order), maximizing ? -Infinity : Infinity)
+        );
+        if (fractionalScore !== null) {
+            const value = { score: fractionalScore, action: null };
+            cache.search.set(searchKey, { value, flag: "exact" });
+            return value;
+        }
 
-            const candidate = search(next, botPlayer, depth - 1, alpha, beta);
+        let best = { score: maximizing ? -Infinity : Infinity, action: prepared[0].action };
+
+        for (const { action, next } of prepared) {
+            const candidate = search(next, botPlayer, nextSearchDepth(state, next, depth), alpha, beta, cache);
             if (maximizing && candidate.score > best.score) {
                 best = { score: candidate.score, action };
             } else if (!maximizing && candidate.score < best.score) {
@@ -257,8 +351,14 @@
 
             if (maximizing) alpha = Math.max(alpha, best.score);
             else beta = Math.min(beta, best.score);
-            if (beta <= alpha) break;
+            if (beta <= alpha) {
+                const historyKey = `${baseKey}|${action}|${depth}`;
+                cache.history.set(historyKey, Math.min(100000, (cache.history.get(historyKey) || 0) + Math.max(1, depth * depth)));
+                break;
+            }
         }
+        const flag = best.score <= alphaOriginal ? "upper" : best.score >= betaOriginal ? "lower" : "exact";
+        cache.search.set(searchKey, { value: best, flag });
         return best;
     }
 
@@ -274,25 +374,28 @@
         };
     }
 
-    function choosePiece(state, botPlayer, depth = 4) {
+    function choosePiece(state, botPlayer, depth = 4, cache = null) {
         if (state.selectedPiece !== null) return null;
-        const result = search(state, botPlayer, Math.max(1, depth), -Infinity, Infinity);
+        const result = search(state, botPlayer, Math.max(0, depth), -Infinity, Infinity, cache || createSearchCache());
         return result.action;
     }
 
-    function chooseCell(state, botPlayer, depth = 4) {
+    function getScoredActions(state, botPlayer, depth = 4, cache = null) {
+        const searchCache = cache || createSearchCache();
+        return getLegalActions(state).map(action => {
+            const next = state.selectedPiece === null ? selectPiece(state, action) : placePiece(state, action);
+            const result = next ? search(next, botPlayer, Math.max(0, nextSearchDepth(state, next, depth)), -Infinity, Infinity, searchCache) : { score: -Infinity };
+            return { action, score: result.score };
+        });
+    }
+
+    function chooseCell(state, botPlayer, depth = 4, cache = null) {
         if (state.selectedPiece === null) return null;
-        const result = search(state, botPlayer, Math.max(1, depth), -Infinity, Infinity);
+        const result = search(state, botPlayer, Math.max(0, depth), -Infinity, Infinity, cache || createSearchCache());
         return result.action;
     }
 
-    const MANUAL_PROFILES = Object.freeze({
-        1: { strength: 0.30 },
-        2: { strength: 0.48 },
-        3: { strength: 0.68 },
-        4: { strength: 0.85 },
-        reference: { strength: 1.0 }
-    });
+    const MANUAL_PROFILES = window.QuartoSettings.manualStrengths;
     const manualOverrides = Object.create(null);
     try {
         const storedProfiles = JSON.parse(localStorage.getItem("gamelab-quarto-manual-profiles") || "{}");
@@ -304,26 +407,19 @@
     function getManualProfile(level = 1) {
         const base = MANUAL_PROFILES[level] || MANUAL_PROFILES[1];
         const isReference = String(level) === "reference";
-        const strength = isReference ? 1 : (manualOverrides[level] ?? base.strength);
+        const baseStrength = typeof base === "number" ? base : base?.strength;
+        const strength = isReference ? 1 : (manualOverrides[level] ?? baseStrength);
         const difficulty = window.SharedDifficulty.createProfile({
             mode: "manual",
             strength,
-            minSearchChance: 0.08,
-            maxSearchChance: 1.0,
-            minRandomness: 0.02,
-            maxRandomness: 0.88,
-            minErrorRate: 0.02,
-            maxErrorRate: 0.34,
-            habitInfluence: 0.60,
-            searchConfig: {
-                supportsMinimax: true,
-                minDepth: 0,
-                maxDepth: 4,
-                fixedDepth: null
-            }
+            ...window.QuartoSettings.difficulty,
+            habitInfluence: window.QuartoSettings.manualHabitInfluence,
+            minRandomness: isReference ? 0 : window.QuartoSettings.difficulty.minRandomness,
+            minErrorRate: isReference ? 0 : window.QuartoSettings.difficulty.minErrorRate,
+            searchConfig: window.QuartoSettings.searchConfig
         });
         return {
-            ...base,
+            ...(typeof base === "object" && base ? base : {}),
             level: isReference ? "reference" : Number(level),
             strength: difficulty.strength,
             curve: difficulty.curve,
@@ -366,9 +462,11 @@
         trackPlayerPlacement,
         getCommonAttributes,
         evaluateState,
+        createSearchCache,
         search,
         choosePiece,
         chooseCell,
+        getScoredActions,
         getManualProfile,
         getManualReferenceProfile: () => getManualProfile("reference"),
         setManualProfileStrength

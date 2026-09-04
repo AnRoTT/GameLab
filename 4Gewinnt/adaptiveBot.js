@@ -51,12 +51,23 @@ function loadAdaptivePersistentState() {
     try {
         const stored = JSON.parse(localStorage.getItem(ADAPTIVE_STORAGE_KEY) || "null");
         if (!stored) return;
-        if (Number.isFinite(stored.adaptiveSkill)) adaptiveSkill = Math.max(1, Math.min(100, stored.adaptiveSkill));
+        if (Number.isFinite(stored.adaptiveSkill)) adaptiveSkill = Math.max(10, Math.min(100, stored.adaptiveSkill));
         if (Number.isFinite(stored.adaptiveMomentum)) adaptiveMomentum = stored.adaptiveMomentum;
         if (Number.isFinite(stored.adaptiveMoveCounter)) adaptiveMoveCounter = stored.adaptiveMoveCounter;
         if (Number.isFinite(stored.adaptiveRoundDelta)) adaptiveRoundDelta = stored.adaptiveRoundDelta;
-        if (stored.adaptiveLearn && typeof stored.adaptiveLearn === "object") adaptiveLearn = stored.adaptiveLearn;
-        if (stored.adaptiveAI && typeof stored.adaptiveAI === "object") adaptiveAI = stored.adaptiveAI;
+        if (stored.adaptiveLearn && typeof stored.adaptiveLearn === "object") {
+            adaptiveLearn = {
+                ...adaptiveLearn,
+                ...stored.adaptiveLearn,
+                memory: { ...adaptiveLearn.memory, ...(stored.adaptiveLearn.memory || {}) },
+                resultHistory: Array.isArray(stored.adaptiveLearn.resultHistory)
+                    ? stored.adaptiveLearn.resultHistory
+                    : adaptiveLearn.resultHistory
+            };
+        }
+        if (stored.adaptiveAI && typeof stored.adaptiveAI === "object") {
+            adaptiveAI = { ...adaptiveAI, ...stored.adaptiveAI };
+        }
     } catch (_) {}
 }
 loadAdaptivePersistentState();
@@ -214,16 +225,10 @@ function getAdaptiveLearningStage() {
 
 function getAdaptiveThinkTime() {
     const stage = getAdaptiveLearningStage();
-    const skillBand = getAdaptiveBotSkillBand();
-    const skillValue = getAdaptiveBotSkillValue();
+    const skillValue = adaptiveSkill;
     const curve = adaptiveCurve(skillValue);
 
-    let baseTime;
-    if (skillBand === "low") baseTime = 260;
-    else if (skillBand === "mid") baseTime = 400;
-    else if (skillBand === "adapted") baseTime = 450 + curve.thinkTimeWeight * 120;
-    else if (skillBand === "strong") baseTime = 820 + curve.thinkTimeWeight * 120;
-    else baseTime = 1150 + curve.thinkTimeWeight * 100;
+    const baseTime = 260 + curve.smooth * 990;
 
     if (stage === "observe") baseTime *= 0.78;
     else if (stage === "learn") baseTime *= 0.95;
@@ -237,7 +242,7 @@ function getAdaptiveThinkTime() {
 }
 
 function getAdaptiveSearchDepth() {
-    const skillValue = getAdaptiveBotSkillValue();
+    const skillValue = adaptiveSkill;
     const curve = adaptiveCurve(skillValue);
     return curve.depth;
 }
@@ -251,7 +256,7 @@ function getContinuousStrengthFactor(skillValue, exponent = 1) {
 }
 
 function getAdaptiveStochasticity(skillBand, stage) {
-    const skillValue = getAdaptiveBotSkillValue();
+    const skillValue = adaptiveSkill;
     const curve = adaptiveCurve(skillValue);
     return curve.randomChance;
 }
@@ -548,76 +553,42 @@ function getAdaptiveBotMove() {
     const board = getAdaptiveBoard();
     const stage = getAdaptiveLearningStage();
     const skillBand = getAdaptiveBotSkillBand();
-    const skillValue = getAdaptiveBotSkillValue();
+    const skillValue = adaptiveSkill;
     const curve = adaptiveCurve(skillValue);
     const learnedStrength = getAdaptiveSkillFromProfile();
     const favoriteCol = getFavoritePlayerColumn();
     const depth = getAdaptiveSearchDepth();
     const applyFactor = stage === "observe" ? 0.10 : stage === "learn" ? 0.26 : 0.58;
     const stochasticity = getAdaptiveStochasticity(skillBand, stage);
-    const weakPhase = skillValue < 60;
+    const strengthBlend = curve.smooth;
     const learningGate = getContinuousStrengthFactor(skillValue, 1.0);
     const earlyMistakeChance = Math.max(0.02, Math.min(0.58,
         curve.errorRate * (stage === "observe" ? 1.25 : stage === "learn" ? 1.05 : 0.9)
     ));
 
-    const dumbMode = skillValue <= 18 || adaptiveLearn.lossStreak >= 8 || adaptiveSkill <= 12;
-    if (dumbMode) {
-        const randomCol = adaptiveRandomMove();
-        if (randomCol !== -1) {
-            adaptiveMoveCounter++;
-            adaptiveRoundDelta -= 2;
-            adaptiveLearn.lastBotCol = randomCol;
-        }
-        return randomCol;
-    }
-
     if (Math.random() < earlyMistakeChance) {
         const randomCol = adaptiveRandomMove();
         if (randomCol !== -1) {
             adaptiveMoveCounter++;
-            adaptiveRoundDelta -= weakPhase ? 1 : 0;
+            adaptiveRoundDelta -= adaptiveLerp(1, 0, strengthBlend);
             adaptiveLearn.lastBotCol = randomCol;
         }
         return randomCol;
     }
 
-    if (skillValue < 25) {
-        const randomCol = adaptiveRandomMove();
-        if (randomCol !== -1) {
-            adaptiveMoveCounter++;
-            adaptiveRoundDelta -= 1;
-            adaptiveLearn.lastBotCol = randomCol;
-        }
-        return randomCol;
+    const directWin = window.ConnectFourAICore.findImmediateWinningMove(board, ADAPTIVE_PLAYER_YELLOW);
+    if (directWin !== -1) {
+        adaptiveMoveCounter++;
+        adaptiveRoundDelta += stage === "observe" ? 2 : 4;
+        adaptiveLearn.lastBotCol = directWin;
+        return directWin;
     }
-
-    for (let c = 0; c < ADAPTIVE_COLS; c++) {
-        const r = adaptiveFreeRow(c);
-        if (r === -1) continue;
-        board[r][c] = ADAPTIVE_PLAYER_YELLOW;
-        if (adaptiveHasWinner(ADAPTIVE_PLAYER_YELLOW)) {
-            board[r][c] = 0;
-            adaptiveMoveCounter++;
-            adaptiveRoundDelta += stage === "observe" ? 2 : 4;
-            adaptiveLearn.lastBotCol = c;
-            return c;
-        }
-        board[r][c] = 0;
-    }
-
-    for (let c = 0; c < ADAPTIVE_COLS; c++) {
-        const r = adaptiveFreeRow(c);
-        if (r === -1) continue;
-        board[r][c] = ADAPTIVE_PLAYER_RED;
-        if (adaptiveHasWinner(ADAPTIVE_PLAYER_RED)) {
-            board[r][c] = 0;
-            adaptiveMoveCounter++;
-            adaptiveRoundDelta -= skillBand === "low" ? 1 : 3;
-            adaptiveLearn.lastBotCol = c;
-            return c;
-        }
-        board[r][c] = 0;
+    const directBlock = window.ConnectFourAICore.findImmediateWinningMove(board, ADAPTIVE_PLAYER_RED);
+    if (directBlock !== -1) {
+        adaptiveMoveCounter++;
+        adaptiveRoundDelta -= adaptiveLerp(3, 1, strengthBlend);
+        adaptiveLearn.lastBotCol = directBlock;
+        return directBlock;
     }
 
     let tacticalBest = adaptiveMinimaxMove(depth);
@@ -627,15 +598,6 @@ function getAdaptiveBotMove() {
     // Im oberen Bereich muss die Staerke auch spielerisch sichtbar werden:
     // Der Suchzug wird zunehmend verbindlich, damit die Heuristik nicht bei
     // Skill 100 trotzdem einen schwachen Alternativzug auswaehlt.
-    if (tacticalBest !== -1) {
-        if (Math.random() < curve.searchChance) {
-            adaptiveMoveCounter++;
-            adaptiveRoundDelta += adaptiveLerp(1, 2, curve.smooth);
-            adaptiveLearn.lastBotCol = tacticalBest;
-            return tacticalBest;
-        }
-    }
-
     const candidates = [];
     for (let c = 0; c < ADAPTIVE_COLS; c++) {
         const r = adaptiveFreeRow(c);
@@ -646,29 +608,19 @@ function getAdaptiveBotMove() {
         const redWins = window.ConnectFourAICore.countWinningMoves(board, ADAPTIVE_PLAYER_RED);
 
         if (stage === "apply") {
-            if (c === 3) score += weakPhase ? 0.12 : 0.8;
-            if (c === 2 || c === 4) score += weakPhase ? 0.06 : 0.55;
-            if (c === 1 || c === 5) score += weakPhase ? 0.03 : 0.22;
+            if (c === 3) score += adaptiveLerp(0.12, 0.8, strengthBlend);
+            if (c === 2 || c === 4) score += adaptiveLerp(0.06, 0.55, strengthBlend);
+            if (c === 1 || c === 5) score += adaptiveLerp(0.03, 0.22, strengthBlend);
         } else if (stage === "learn") {
-            if (c === 3) score += weakPhase ? 0.08 : 0.35;
-            if (c === 2 || c === 4) score += weakPhase ? 0.04 : 0.22;
+            if (c === 3) score += adaptiveLerp(0.08, 0.35, strengthBlend);
+            if (c === 2 || c === 4) score += adaptiveLerp(0.04, 0.22, strengthBlend);
         } else {
-            if (c === 3) score += weakPhase ? 0.02 : 0.12;
+            if (c === 3) score += adaptiveLerp(0.02, 0.12, strengthBlend);
         }
 
-        if (skillBand === "low") {
-            score += c === 3 ? 0.02 : 0;
-        } else if (skillBand === "mid") {
-            score += (c === 3 ? 0.05 : 0);
-        } else if (skillBand === "adapted") {
-            const adaptedCenter = weakPhase ? adaptiveLerp(0.05, 0.18, curve.smooth) : adaptiveLerp(0.18, 0.55, curve.smooth);
-            const adaptedSide = weakPhase ? adaptiveLerp(0.05, 0.08, curve.smooth) : adaptiveLerp(0.12, 0.08, curve.smooth);
-            score += (c === 3 || c === 2 || c === 4 ? adaptedCenter : adaptedSide);
-        } else if (skillBand === "strong") {
-            score += (c === 3 || c === 2 || c === 4 ? 0.9 : 0.5);
-        } else {
-            score += (c === 3 || c === 2 || c === 4 ? 1.5 : 0.7);
-        }
+        const centerBias = adaptiveLerp(0.02, 1.5, strengthBlend);
+        const sideBias = adaptiveLerp(0, 0.7, strengthBlend);
+        score += (c === 3 || c === 2 || c === 4) ? centerBias : sideBias;
 
         if (favoriteCol !== null) {
             const favoriteFactor = adaptiveLerp(2.0, 4.0, curve.smooth) * learningGate;
@@ -677,15 +629,11 @@ function getAdaptiveBotMove() {
             if (Math.abs(c - favoriteCol) === 1) score += adaptiveAI.habitUsage * nearFactor * applyFactor;
         }
 
-        const learningFactor = weakPhase ? adaptiveLerp(0.01, 0.05, curve.smooth) : adaptiveLerp(0.08, 0.20, curve.smooth);
-        const accuracyFactor = weakPhase ? adaptiveLerp(0.6, 1.4, curve.smooth) : adaptiveLerp(3.8, 5.5, curve.smooth);
-        const tacticsFactor = weakPhase ? adaptiveLerp(0.8, 1.8, curve.smooth) : adaptiveLerp(4.2, 6.2, curve.smooth);
-        const creativityFactor = weakPhase
-            ? adaptiveLerp(0.15, 0.35, curve.smooth) * (Math.random() < 0.5 ? 1 : 0.35)
-            : adaptiveLerp(0.7, 1.1, curve.smooth) * (Math.random() < 0.5 ? 1 : 0.45);
-        const mistakeFactor = weakPhase
-            ? adaptiveLerp(2.6, 4.0, curve.smooth) * (Math.random() + 0.9)
-            : adaptiveLerp(2.4, 3.4, curve.smooth) * (Math.random() + 0.65);
+        const learningFactor = adaptiveLerp(0.01, 0.20, strengthBlend);
+        const accuracyFactor = adaptiveLerp(0.6, 5.5, strengthBlend);
+        const tacticsFactor = adaptiveLerp(0.8, 6.2, strengthBlend);
+        const creativityFactor = adaptiveLerp(0.15, 1.1, strengthBlend) * (Math.random() < 0.5 ? 1 : 0.4);
+        const mistakeFactor = adaptiveLerp(2.6, 3.4, strengthBlend) * (Math.random() + adaptiveLerp(0.9, 0.65, strengthBlend));
 
         score += learnedStrength * learningFactor * applyFactor * learningGate;
         score += adaptiveAI.accuracy * accuracyFactor * applyFactor * learningGate;
@@ -693,12 +641,12 @@ function getAdaptiveBotMove() {
         score += adaptiveAI.creativity * creativityFactor * applyFactor * learningGate;
         score -= adaptiveAI.mistakeChance * mistakeFactor * applyFactor;
 
-        if (!weakPhase) {
-            if (redWins >= 2) score += skillBand === "ruthless" ? 55 : adaptiveLerp(12, 24, curve.smooth);
-            else if (redWins >= 1) score += skillBand === "ruthless" ? 22 : adaptiveLerp(6, 12, curve.smooth);
+        if (strengthBlend > 0) {
+            if (redWins >= 2) score += adaptiveLerp(12, 55, strengthBlend);
+            else if (redWins >= 1) score += adaptiveLerp(6, 22, strengthBlend);
         }
 
-        if (adaptiveLearn.lastBotCol === c) score -= weakPhase ? 6 : 4;
+        if (adaptiveLearn.lastBotCol === c) score -= adaptiveLerp(6, 4, strengthBlend);
         if (adaptiveLearn.lastBotCol !== -1 && Math.abs(adaptiveLearn.lastBotCol - c) === 1) score += 0.5;
         if (c === tacticalBest) score += adaptiveLerp(0.8, 7, learningGate) * learningGate;
 
@@ -708,23 +656,11 @@ function getAdaptiveBotMove() {
 
     if (candidates.length === 0) return tacticalBest;
 
-    candidates.sort((a, b) => b.score - a.score);
-    const topScore = candidates[0].score;
-    const threshold = adaptiveLerp(
-        stage === "observe" ? 5 : stage === "learn" ? 3.5 : 2.0,
-        stage === "observe" ? 4 : stage === "learn" ? 3.0 : 1.5,
-        curve.smooth
-    );
-    const pool = candidates.filter(k => topScore - k.score <= threshold);
-    let choice = pool[Math.floor(Math.random() * pool.length)] || candidates[0];
-
-    if (Math.random() < learningGate) {
-        choice = candidates[0];
-    } else if (stage === "apply" && choice.col !== tacticalBest && Math.random() < learningGate * (1 - stochasticity)) {
-        choice = candidates.find(k => k.col === tacticalBest) || choice;
-    } else if (choice.col !== tacticalBest && Math.random() < learningGate * 0.35) {
-        choice = candidates.find(k => k.col === tacticalBest) || choice;
-    }
+    let choice = window.SharedDifficulty.selectSoftCandidate(
+        candidates,
+        curve.curve ?? curve.smooth,
+        true
+    ) || candidates[0];
 
     adaptiveMoveCounter++;
     adaptiveRoundDelta += stage === "observe"
@@ -740,65 +676,24 @@ function finalizeAdaptiveRound(resultSign) {
     updateAdaptiveAfterMatch(resultSign);
     adaptiveLearn.resultHistory.push(resultSign);
     if (adaptiveLearn.resultHistory.length > 5) adaptiveLearn.resultHistory.shift();
-    adaptiveLearn.drawStreak = resultSign === 0 ? adaptiveLearn.drawStreak + 1 : 0;
-    // Use a short result window so one unusually short or lucky game does not
-    // move the adaptive strength by the full amount.
-    const smoothedResult = adaptiveLearn.resultHistory.reduce((sum, value) => sum + value, 0)
-        / adaptiveLearn.resultHistory.length;
-    const targetSkill = getAdaptiveTargetSkill();
-    // Evaluate each completed round directly. The continuous learning rate
-    // below keeps the reaction soft without delaying a visible response for
-    // five rounds.
-    // Use a stronger but symmetric round signal. Player and bot results must
-    // move the skill by the same base amount; profile data only fine-tunes it.
-    const drawBonus = resultSign === 0
-        ? adaptiveLearn.drawStreak === 2 ? 1 : adaptiveLearn.drawStreak >= 3 ? 2 : 0
-        : 0;
-    const resultDelta = resultSign * 5 + drawBonus;
     const playerSkill = getAdaptivePlayerSkillEstimate();
-    const qualityDelta = resultSign === 0
-        ? 0
-        : Math.max(-0.75, Math.min(0.75, resultSign * (playerSkill - 50) * 0.015));
-    const streakCount = resultSign > 0 ? adaptiveLearn.winStreak : adaptiveLearn.lossStreak;
-    const streakDelta = resultSign === 0
-        ? 0
-        : resultSign * Math.min(0.5, Math.max(0, streakCount - 1) * 0.25);
-    const profileDelta = Math.max(-0.75, Math.min(0.75, (targetSkill - adaptiveSkill) * 0.06));
-    const styleDelta = Math.max(-0.5, Math.min(0.5, adaptiveRoundDelta * 0.12));
     const learningStage = getAdaptiveLearningStage();
     // Gegen starke Gegner soll der Bot die hohe Suchlogik frueher erreichen.
     // Die Anpassung bleibt ergebnisbasiert und wird nicht ueber die Grenzen
     // hinaus verstaerkt.
     const stageRate = learningStage === "observe" ? 0.65 : learningStage === "learn" ? 0.9 : 1;
     const speedRate = Number(window.currentAdaptSpeedFactor) || 1;
-    // Three continuously blended learning zones: fast below 50 %, balanced
-    // in the middle, and deliberately slower near reference strength.
-    const lowerProgress = adaptiveClamp(adaptiveSkill / 50);
-    const middleProgress = adaptiveClamp((adaptiveSkill - 35) / 45);
-    const upperProgress = adaptiveClamp((adaptiveSkill - 65) / 35);
-    const lowerResponse = adaptiveLerp(1.55, 1.12, lowerProgress);
-    const middleResponse = adaptiveLerp(1.12, 0.92, middleProgress);
-    const upperResponse = adaptiveLerp(0.92, 0.42, upperProgress);
-    const zoneBlend = adaptiveClamp((adaptiveSkill - 50) / 30);
-    const blendedResponse = adaptiveLerp(
-        lowerProgress < 0.7 ? lowerResponse : middleResponse,
-        upperResponse,
-        zoneBlend
+    const skillUpdate = window.SharedDifficulty.applyAdaptiveResult(
+        adaptiveSkill,
+        resultSign > 0 ? "playerWin" : resultSign < 0 ? "botWin" : "draw",
+        {
+            performance: playerSkill,
+            drawStreak: adaptiveLearn.drawStreak,
+            speedFactor: stageRate * speedRate
+        }
     );
-    const learningRate = stageRate * speedRate * blendedResponse;
-    // Das Spielergebnis gibt immer die Richtung der Anpassung vor:
-    // Spielergewinn staerkt den Bot, Botgewinn schwaecht ihn. Profil-,
-    // Qualitaets- und Trendwerte duerfen diese Richtung nur feinjustieren.
-    const secondaryDelta = Math.max(-1.25, Math.min(1.25,
-        qualityDelta + streakDelta + profileDelta + styleDelta
-    ));
-    let totalDelta = Math.max(-4, Math.min(4,
-        (resultDelta + secondaryDelta) * learningRate
-    ));
-    if (resultSign > 0) totalDelta = Math.max(0, totalDelta);
-    if (resultSign < 0) totalDelta = Math.min(0, totalDelta);
-
-    adaptiveSkill = Math.max(1, Math.min(100, adaptiveSkill + totalDelta));
+    adaptiveLearn.drawStreak = skillUpdate.drawStreak;
+    adaptiveSkill = skillUpdate.skill;
     adaptiveLearn.skill = adaptiveSkill;
     if (typeof updateAdaptiveStrengthUI === "function") updateAdaptiveStrengthUI();
     adaptiveMoveCounter = 0;
@@ -808,7 +703,7 @@ function finalizeAdaptiveRound(resultSign) {
 
 function resetAdaptiveForLab(initialSkill = 35) {
     resetAdaptiveState();
-    adaptiveSkill = Math.max(1, Math.min(100, Number(initialSkill) || 35));
+    adaptiveSkill = Math.max(10, Math.min(100, Number(initialSkill) || 35));
     adaptiveLearn.skill = adaptiveSkill;
     saveAdaptivePersistentState();
 }
@@ -848,4 +743,3 @@ window.getAdaptiveBotMove = getAdaptiveBotMove;
 window.resetAdaptiveState = resetAdaptiveState;
 window.finalizeAdaptiveRound = finalizeAdaptiveRound;
 })();
-

@@ -1,20 +1,20 @@
 (function (root) {
     "use strict";
-    root.TicTacToeSettings = Object.freeze({
+    root.ConnectFourSettings = Object.freeze({
         manualStrengths: Object.freeze({
-            1: 0.60,
-            2: 0.72,
-            3: 0.79,
-            4: 0.86,
-            reference: 1.00
+            anfanger: 0.24,
+            hobby: 0.59,
+            verein: 0.78,
+            meister: 0.90,
+            referenz: 1.00
         }),
         difficulty: Object.freeze({
-            minSearchChance: 0.08,
+            minSearchChance: 0.06,
             maxSearchChance: 1.00,
             minRandomness: 0.00,
-            maxRandomness: 0.44,
+            maxRandomness: 0.42,
             minErrorRate: 0.00,
-            maxErrorRate: 0.36,
+            maxErrorRate: 0.34,
             habitInfluence: 0.60
         }),
         adaptiveHabitInfluence: 0.60,
@@ -22,7 +22,7 @@
         searchConfig: Object.freeze({
             supportsMinimax: true,
             minDepth: 0,
-            maxDepth: 9,
+            maxDepth: 3,
             fixedDepth: null
         })
     });

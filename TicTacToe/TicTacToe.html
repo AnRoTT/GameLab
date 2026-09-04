@@ -75,8 +75,9 @@
     <div class="game-side-panel">
     <div class="game-info">
         <div class="score-header">
-            <span id="scoreX">X: 0</span>
-            <span id="scoreO">O: 0</span>
+            <span id="scoreX" class="player-score">X</span>
+            <span id="matchScore" class="match-score" hidden>0:0</span>
+            <span id="scoreO" class="player-score">O</span>
         </div>
         <div id="winnerBanner"></div>
         <div id="status"></div>
@@ -102,15 +103,16 @@
     <footer class="footer">Andis Game Foundry | TicTacToe | by Andreas Rollinger | 2026.08.22</footer>
 
     <script src="../Shared/soundManager.js"></script>
-    <script src="../Shared/difficultyCore.js"></script>
-    <script src="aiCore.js"></script>
-    <script src="manuellBot.js"></script>
-    <script src="adaptiveBot.js"></script>
+    <script src="../Shared/difficultyCore.js?v=20260902-4"></script>
+    <script src="settings.js"></script>
+    <script src="aiCore.js?v=20260902-8"></script>
+    <script src="manuellBot.js?v=20260904-3"></script>
+    <script src="adaptiveBot.js?v=20260902-8"></script>
     <script src="../Shared/botTiming.js"></script>
 <script src="../Shared/mobileLayout.js"></script>
 <script src="../Shared/navigationGuard.js"></script>
 <script src="../Shared/boardLayout.js"></script>
-<script src="game.js"></script>
+<script src="game.js?v=20260902-8"></script>
     <script src="../Shared/matchConfirm.js"></script>
     <script src="../Shared/settingsMenu.js"></script>
     <script src="../Shared/buttonOverflow.js"></script>

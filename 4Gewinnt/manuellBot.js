@@ -52,30 +52,39 @@ function getManualConnectFourMinimaxMove(board, config, player, opponent) {
     if (!ranked.length) return -1;
 
     // Die Kandidatenbreite kommt ausschließlich aus dem Difficulty-Core.
-    const poolSize = Math.min(ranked.length, config.candidatePoolSize ?? ranked.length);
-    const pool = ranked.slice(0, poolSize);
-    const index = Math.floor(Math.random() * pool.length);
-    return pool[index]?.col ?? -1;
+    const tactical = ranked.map(item => {
+        const win = findImmediateConnectFourMove(board, player) === item.col;
+        const block = findImmediateConnectFourMove(board, opponent) === item.col;
+        const next = ConnectFourManualCore.applyMove(board, item.col, player);
+        const forks = next ? ConnectFourManualCore.countWinningMoves(next.board, player) : 0;
+        return {
+            ...item,
+            score: item.score
+                + (win ? 10000 : 0) * config.curve
+                + (block ? 7000 : 0) * config.curve
+                + Math.max(0, forks - 1) * 900 * config.curve
+        };
+    });
+    const selected = window.SharedDifficulty.selectSoftCandidate(tactical, config.curve, true);
+    return selected?.col ?? -1;
 }
 
 function getManualConnectFourMoveForLevel(board, level, player, opponent) {
     const config = getManualConnectFourLevelProfile(level);
-
-    if (Math.random() < config.tacticalChance) {
-        const tacticalMove = getTacticalConnectFourMove(board, player, opponent);
-        if (tacticalMove !== -1) return tacticalMove;
+    if (Math.random() < config.tacticalAccuracy) {
+        const tactical = getTacticalConnectFourMove(board, player, opponent);
+        if (tactical !== -1) return tactical;
     }
 
-    if (Math.random() < config.randomChance) {
-        return getManualConnectFourRandomMove(board);
-    }
-
-    // Minimax bleibt in jedem Level Teil des Profils; die Chance steigt mit
-    // der Staerke und wird nicht mehr durch einen ungenutzten Profilwert ersetzt.
-    const minimaxMove = Math.random() < config.minimaxChance
+    const minimaxMove = Math.random() >= (config.errorRate || 0) && Math.random() < (config.searchChance ?? config.minimaxChance ?? 0)
         ? getManualConnectFourMinimaxMove(board, config, player, opponent)
         : -1;
-    return minimaxMove !== -1 ? minimaxMove : getManualConnectFourRandomMove(board);
+    if (minimaxMove !== -1) return minimaxMove;
+    const fallback = ConnectFourManualCore.getAvailableColumns(board).map(col => ({
+        col,
+        score: (3 - Math.abs(3 - col)) * config.curve + Math.random() * config.randomChance
+    }));
+    return window.SharedDifficulty.selectSoftCandidate(fallback, config.curve, true)?.col ?? -1;
 }
 
 function getManualConnectFourBeginnerMove(board, player, opponent) {

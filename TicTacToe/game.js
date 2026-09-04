@@ -36,18 +36,25 @@ function updateSettingsUI() {
     window.currentMode = ['short', 'full', 'tournament'][modeIdx];
     window.currentDifficulty = diffIdx + 1;
     window.currentAdapt = ['slow', 'normal', 'fast'][adaptIdx];
+    document.querySelector('.score-header')?.classList.toggle('match-active', roundsOptions[roundsIdx] > 1);
+    document.getElementById('matchScore').hidden = roundsOptions[roundsIdx] === 1;
     updateSettingAvailability();
     if (typeof window.updateTicTacToeAdaptiveStrengthUI === 'function') window.updateTicTacToeAdaptiveStrengthUI();
 }
 function cycleSetting(values, index) { return (index + 1) % values.length; }
 document.getElementById('btnPlayers').onclick = () => { playersIdx = cycleSetting(playersOptions, playersIdx); updateSettingsUI(); };
-document.getElementById('btnRounds').onclick = () => { roundsIdx = cycleSetting(roundsOptions, roundsIdx); updateSettingsUI(); };
+document.getElementById('btnRounds').onclick = () => {
+    roundsIdx = cycleSetting(roundsOptions, roundsIdx);
+    updateSettingsUI();
+    document.getElementById('matchScore').hidden = roundsOptions[roundsIdx] === 1;
+};
 document.getElementById('btnMode').onclick = () => { modeIdx = cycleSetting(modeOptions, modeIdx); updateSettingsUI(); };
 document.getElementById('btnDifficulty').onclick = () => { diffIdx = cycleSetting(difficultyOptions, diffIdx); updateSettingsUI(); };
 document.getElementById('btnAdapt').onclick = () => { adaptIdx = cycleSetting(adaptOptions, adaptIdx); updateSettingsUI(); };
 window.updateScore = function (x, draw, o) {
-    document.getElementById('scoreX').textContent = `X: ${x}`;
-    document.getElementById('scoreO').textContent = `O: ${o}`;
+    const matchActive = Number(window.currentRounds || 1) > 1;
+    document.getElementById('matchScore').textContent = `${x}:${o}`;
+    document.getElementById('matchScore').hidden = !matchActive;
 };
 updateSettingsUI();
 
@@ -392,6 +399,7 @@ function endRound(winner, winRow = null) {
     roundsPlayed++;
     if (activeMatch.mode === "bot") {
         window.ticTacToePlayerProfile.gamesAgainstBot++;
+        TicTacToeAICore.savePlayerProfile(window.ticTacToePlayerProfile);
     }
     updateScore(scoreX, scoreDraw, scoreO);
     document.getElementById("scoreX").classList.toggle("winner", winner === "X");
@@ -668,7 +676,3 @@ const browserBackGuard = window.AndisNavigation?.bindBrowserBack?.({
         showSetupScreen();
     }
 });
-
-
-
-

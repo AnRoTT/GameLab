@@ -7,8 +7,9 @@
     const matchLineElement = document.getElementById("matchLine");
     const scorePlayer1Element = document.getElementById("scorePlayer1");
     const scorePlayer2Element = document.getElementById("scorePlayer2");
-    const scorePlayer1Label = scorePlayer1Element.parentElement.querySelector(".score-label");
-    const scorePlayer2Label = scorePlayer2Element.parentElement.querySelector(".score-label");
+    const matchScoreElement = document.getElementById("matchScore");
+    const scorePlayer1Label = document.getElementById("scorePlayer1Label");
+    const scorePlayer2Label = document.getElementById("scorePlayer2Label");
     const modeButton = document.getElementById("modeButton");
     const matchButton = document.getElementById("matchButton");
     const botLevelButton = document.getElementById("botLevelButton");
@@ -97,6 +98,7 @@
     let gameStarted = false;
     let gameOver = false;
     let botTimer = null;
+    let botSearchCache = null;
     let keyboardMode = false;
     const scores = [0, 0];
     const playerProfile = QuartoAICore.createPlayerProfile();
@@ -199,6 +201,7 @@
     }
 
     function render() {
+        boardElement.classList.toggle("board-disabled", !gameStarted || gameOver);
         boardElement.innerHTML = "";
         board.forEach((piece, index) => {
             const cell = document.createElement("button");
@@ -208,7 +211,12 @@
             cell.dataset.index = index;
             cell.setAttribute("role", "gridcell");
             cell.setAttribute("aria-label", piece === null ? `Freies Feld ${index + 1}` : `Feld ${index + 1}, belegt`);
-            cell.disabled = piece !== null || selectedPiece === null || gameOver || isBot(1 - chooser);
+            const unavailable = piece !== null || selectedPiece === null || gameOver || isBot(1 - chooser);
+            // Nicht nutzbare Felder bleiben semantisch deaktiviert, werden
+            // aber nicht als natives disabled-Button-Element dargestellt.
+            // So greift der globale not-allowed-Cursor auf Desktop nicht.
+            cell.setAttribute("aria-disabled", String(unavailable));
+            cell.tabIndex = unavailable ? -1 : 0;
             cell.innerHTML = piece === null ? "" : pieceMarkup(piece);
             cell.addEventListener("click", () => placeSelectedPiece(index));
             cell.addEventListener("keydown", (event) => handleGridKeydown(
@@ -284,7 +292,7 @@
     boardElement.addEventListener("pointerdown", (event) => {
         const cell = event.target.closest(".board-cell");
         if (!cell) return;
-        const invalid = selectedPiece === null || cell.disabled || gameOver || !gameStarted;
+        const invalid = selectedPiece === null || cell.getAttribute("aria-disabled") === "true" || gameOver || !gameStarted;
         if (invalid) {
             event.preventDefault();
             cell.blur();
@@ -295,11 +303,12 @@
     function renderScores() {
         scorePlayer1Element.textContent = scores[0];
         scorePlayer2Element.textContent = scores[1];
+        matchScoreElement.hidden = matchModeIndex === 0;
     }
 
     function clearWinnerScore() {
-        scorePlayer1Element.parentElement.classList.remove("winner");
-        scorePlayer2Element.parentElement.classList.remove("winner");
+        scorePlayer1Label.parentElement.classList.remove("winner");
+        scorePlayer2Label.parentElement.classList.remove("winner");
     }
 
     function choosePiece(piece, fromBot = false) {
@@ -355,13 +364,13 @@
             const state = QuartoAICore.createInitialState(board, remainingPieces, chooser, selectedPiece);
             if (selectedPiece === null) {
                 const piece = isAdaptiveBot()
-                    ? QuartoAdaptiveBot.choosePiece(state)
-                    : QuartoManualBot.choosePiece(state, QUARTO_BOT_PLAYER, botLevelIndex + 1);
+                    ? QuartoAdaptiveBot.choosePiece(state, botSearchCache)
+                    : QuartoManualBot.choosePiece(state, QUARTO_BOT_PLAYER, botLevelIndex + 1, botSearchCache);
                 choosePiece(piece, true);
             } else {
                 const cell = isAdaptiveBot()
-                    ? QuartoAdaptiveBot.chooseCell(state)
-                    : QuartoManualBot.chooseCell(state, QUARTO_BOT_PLAYER, botLevelIndex + 1);
+                    ? QuartoAdaptiveBot.chooseCell(state, botSearchCache)
+                    : QuartoManualBot.chooseCell(state, QUARTO_BOT_PLAYER, botLevelIndex + 1, botSearchCache);
                 placeSelectedPiece(cell, true);
             }
         }, delay);
@@ -377,8 +386,8 @@
         if (winner === 1) scores[1] += 1;
         renderScores();
         clearWinnerScore();
-        if (winner === 0) scorePlayer1Element.parentElement.classList.add("winner");
-        if (winner === 1) scorePlayer2Element.parentElement.classList.add("winner");
+        if (winner === 0) scorePlayer1Label.parentElement.classList.add("winner");
+        if (winner === 1) scorePlayer2Label.parentElement.classList.add("winner");
         startButton.textContent = matchModeIndex === 0 ? "Jetzt spielen" : "Nächste Runde";
         updateMobileGameAction(matchModeIndex === 0 ? "Neues Spiel" : "Neue Runde");
         if (matchModeIndex === 0) {
@@ -400,6 +409,7 @@
         QuartoAdaptiveBot.cancelRound();
         board = Array(16).fill(null);
         remainingPieces = Array.from({ length: 16 }, (_, index) => index);
+        botSearchCache = null;
         selectedPiece = null;
         chooser = 0;
         startingChooser = 0;
@@ -430,6 +440,7 @@
         }
         board = Array(16).fill(null);
         remainingPieces = Array.from({ length: 16 }, (_, index) => index);
+        botSearchCache = QuartoAICore.createSearchCache();
         selectedPiece = null;
         chooser = matchModeIndex === 0 ? 0 : startingChooser;
         clearWinnerScore();
@@ -475,6 +486,7 @@
         matchModeIndex = (matchModeIndex + 1) % MATCH_OPTIONS.length;
         matchButton.textContent = MATCH_OPTIONS[matchModeIndex];
         render();
+        matchScoreElement.hidden = matchModeIndex === 0;
         setStatus("Spiel starten");
     });
     startButton.addEventListener("click", () => {

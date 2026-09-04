@@ -156,21 +156,46 @@ main { padding: 12px 0 18px; }
 .piece-button.selection-player-1.keyboard-focus, .board-cell.place-player-1.keyboard-focus { outline-color: var(--accent); }
 .piece-button.selection-player-2.keyboard-focus, .board-cell.place-player-2.keyboard-focus { outline-color: var(--quarto-gold); }
 .board-cell.win { box-shadow: 0 0 16px rgba(213,169,94,.8); border-color: var(--quarto-gold); }
+.board.board-disabled { pointer-events: none; }
 .board-cell .piece-shape { width: 58%; height: auto; }
 .board-cell .piece-shape.short { width: 55%; height: auto; }
 .board-cell .piece-shape.tall { width: 72%; height: auto; }
 
 @media (min-width: 701px) {
+    /* DEV/theme.css wird nach dieser Datei geladen und setzt global
+       .game-page button:disabled auf not-allowed. Für Quarto-Felder soll
+       dieses rote Verbotssymbol auf Desktop nicht erscheinen. */
+    body.game-page.game-quarto:not(.mobile-prototype) button:disabled,
+    body.game-page.game-quarto:not(.mobile-prototype) .board-cell[aria-disabled="true"] {
+        cursor: default !important;
+    }
+
     body.game-page:not(.mobile-prototype) .board {
         width: min(92vw, 440px, max(240px, calc(100dvh - 280px)));
         max-width: none;
     }
+
+    /* Nicht nutzbare Felder bleiben technisch deaktiviert, zeigen aber auf
+       Desktop keinen roten Nicht-erlaubt-Cursor mehr. */
+    body.game-page:not(.mobile-prototype) .board-cell[aria-disabled="true"] {
+        cursor: default !important;
+        pointer-events: none;
+    }
+
+    body.game-page:not(.mobile-prototype) .board-cell[aria-disabled="true"] *,
+    body.game-page:not(.mobile-prototype) .board-cell[aria-disabled="true"]::before,
+    body.game-page:not(.mobile-prototype) .board-cell[aria-disabled="true"]::after {
+        cursor: default !important;
+    }
 }
 
-.scoreboard { display: flex; justify-content: center; gap: 10px; width: 100%; margin-top: 8px; }
+.scoreboard { display: flex; justify-content: center; gap: 15px; width: 100%; margin-top: 8px; }
 .score { min-width: 88px; padding: 5px 10px; border: 1px solid #30364c; border-radius: var(--radius-md); background: #141726; }
 .score-label { display: block; color: var(--text-muted); font-size: .72rem; }
 .score-value { display: block; color: var(--text-main); font-size: .95rem; font-weight: 700; }
+.scoreboard:not(.match-active) .score-value { display: none; }
+.scoreboard .match-score { display: none; min-width: auto; padding: 0 2px; color: var(--text-main); font-size: .95rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.scoreboard .match-score:not([hidden]) { display: inline-flex; align-items: center; }
 .score:first-child { border-color: rgba(79, 140, 255, .55); }
 .score:last-child { border-color: rgba(213, 169, 94, .55); }
 .score.winner { border-color: var(--accent); box-shadow: 0 0 10px rgba(79, 140, 255, .48); }
@@ -370,6 +395,10 @@ main { padding: 12px 0 18px; }
     }
 }
 
+@media (orientation: landscape) and (max-height: 700px) {
+    .mobile-prototype.game-active .mobile-game-actions { margin-top: 4px; }
+}
+
 @media (max-width: 700px) and (orientation: portrait) {
     .mobile-prototype.game-active .game-screen-header {
         display: flex;
@@ -444,4 +473,8 @@ main { padding: 12px 0 18px; }
         width: 100%;
         gap: 12px;
     }
+
+    .mobile-prototype.game-active .status-panel { margin-bottom: 12px !important; }
+    .mobile-prototype.game-active .mobile-game-actions { margin: 0; }
+    .mobile-prototype.game-active .game-area { margin-top: 12px; }
 }
