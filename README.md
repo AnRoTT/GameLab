@@ -14,6 +14,7 @@ Die Spiele können direkt über GitHub Pages gespielt werden:
 - 4 Gewinnt
 - Othello
 - Quarto
+- Mühle
 
 Weitere Spiele können später ergänzt werden.
 
