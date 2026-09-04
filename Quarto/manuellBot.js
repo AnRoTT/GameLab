@@ -23,29 +23,42 @@
     }
 
     function getThinkTime(level = 1) {
-        const base = [350, 550, 800, 1100][Math.max(0, Math.min(3, Number(level) - 1))] || 350;
+        const config = configFor(level);
+        const base = 350 + config.curve * 750;
         const variation = base * 0.18;
         return Math.max(280, Math.round(base - variation + Math.random() * variation * 2));
     }
 
-    function chooseAction(state, botPlayer, level) {
+    function chooseAction(state, botPlayer, level, searchCache = null) {
         const actions = core.getLegalActions(state);
         if (!actions.length) return null;
 
         const config = configFor(level);
-        if (Math.random() < config.randomChance) return randomItem(actions);
-
+        const searchDepth = config.depth;
+        const isReference = String(level).toLowerCase() === "reference" || String(level).toLowerCase() === "referenz";
+        if (isReference) {
+            const referenceAction = state.selectedPiece === null
+                ? core.choosePiece(state, botPlayer, searchDepth, searchCache)
+                : core.chooseCell(state, botPlayer, searchDepth, searchCache);
+            return actions.includes(referenceAction) ? referenceAction : actions[0];
+        }
         const habitChance = (name) => Math.random() < (config[name] || 0);
         const scored = actions.map((action) => {
             let score = 0;
             if (state.selectedPiece === null) {
                 const danger = core.countWinningPlacements(state, action);
-                if (habitChance("safeGiftChance")) score -= danger * 1200;
+                score -= danger * 1200 * config.curve;
+                if (danger >= 2) score -= (danger - 1) * 1800 * config.curve;
             } else {
                 const next = core.placePiece(state, action);
-                if (next && habitChance("immediateWinChance") && next.winner === botPlayer) score += 100000;
-                if (next && habitChance("lineChance")) score += core.evaluateState(next, botPlayer);
-                if (habitChance("positionChance")) {
+                // Sofortgewinne bleiben stark priorisiert, sind bei niedrigen
+                // Levels aber nicht mehr unabhängig von der zentralen
+                // taktischen Genauigkeit garantiert.
+                if (next && next.winner === botPlayer) {
+                    score += 100000 * (config.tacticalAccuracy ?? config.curve);
+                }
+                if (next) score += core.evaluateState(next, botPlayer) * config.curve;
+                if (Math.random() < config.positionChance) {
                     const row = Math.floor(action / 4);
                     const col = action % 4;
                     score += (row >= 1 && row <= 2 && col >= 1 && col <= 2) ? 4 :
@@ -54,18 +67,16 @@
             }
             return { action, score };
         }).sort((a, b) => b.score - a.score);
-        if (scored.length && scored[0].score !== 0 && Math.random() < config.minimaxChance) {
-            return scored[0].action;
-        }
-
-        // Die Suche ist in jedem Level Bestandteil des Profils; die Staerke
-        // steuert nur, wie oft sie gegen einen Zufallszug gewinnt.
-        if (Math.random() >= config.minimaxChance) return randomItem(actions);
-
-        const action = state.selectedPiece === null
-            ? core.choosePiece(state, botPlayer, config.depth)
-            : core.chooseCell(state, botPlayer, config.depth);
-        return actions.includes(action) ? action : randomItem(actions);
+        const searched = searchDepth > 0 && Math.random() >= config.errorRate && Math.random() < config.searchChance
+            ? core.getScoredActions(state, botPlayer, searchDepth, searchCache)
+            : [];
+        const combined = actions.map(action => ({
+            action,
+            score: (searched.find(item => item.action === action)?.score || 0)
+                + (scored.find(item => item.action === action)?.score || 0)
+                + Math.random() * config.randomChance * 10
+        }));
+        return window.SharedDifficulty.selectSoftCandidate(combined, config.curve, true)?.action ?? actions[0];
     }
 
     window.QuartoRandomBot = {
@@ -76,13 +87,13 @@
     window.QuartoManualBot = {
         LEVELS,
         getThinkTime,
-        choosePiece(state, botPlayer = 1, level = 1) {
+        choosePiece(state, botPlayer = 1, level = 1, searchCache = null) {
             if (state.selectedPiece !== null) return null;
-            return chooseAction(state, botPlayer, level);
+            return chooseAction(state, botPlayer, level, searchCache);
         },
-        chooseCell(state, botPlayer = 1, level = 1) {
+        chooseCell(state, botPlayer = 1, level = 1, searchCache = null) {
             if (state.selectedPiece === null) return null;
-            return chooseAction(state, botPlayer, level);
+            return chooseAction(state, botPlayer, level, searchCache);
         }
     };
 })();

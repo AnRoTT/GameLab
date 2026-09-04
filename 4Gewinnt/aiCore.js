@@ -83,15 +83,20 @@ function isConnectFourBoardFull(board) {
     return getConnectFourAvailableColumns(board).length === 0;
 }
 
-function scoreConnectFourWindow(window, player, opponent) {
-    const own = window.filter(cell => cell === player).length;
-    const enemy = window.filter(cell => cell === opponent).length;
-    const empty = window.filter(cell => cell === CONNECT_FOUR_EMPTY).length;
+function scoreConnectFourWindow(board, cells, player, opponent) {
+    const values = cells.map(({ row, col }) => board[row][col]);
+    const own = values.filter(cell => cell === player).length;
+    const enemy = values.filter(cell => cell === opponent).length;
+    const empty = values.filter(cell => cell === CONNECT_FOUR_EMPTY).length;
+    const emptyCell = empty === 1 ? cells.find(({ row, col }) => board[row][col] === CONNECT_FOUR_EMPTY) : null;
+    const emptyIsPlayable = !emptyCell
+        || emptyCell.row === CONNECT_FOUR_ROWS - 1
+        || board[emptyCell.row + 1][emptyCell.col] !== CONNECT_FOUR_EMPTY;
     if (own === 4) return 100000;
     if (enemy === 4) return -100000;
-    if (own === 3 && empty === 1) return 80;
+    if (own === 3 && empty === 1) return emptyIsPlayable ? 80 : 18;
     if (own === 2 && empty === 2) return 12;
-    if (enemy === 3 && empty === 1) return -95;
+    if (enemy === 3 && empty === 1) return emptyIsPlayable ? -95 : -24;
     if (enemy === 2 && empty === 2) return -15;
     return 0;
 }
@@ -100,73 +105,101 @@ function evaluateConnectFourBoard(board, player, opponent) {
     let score = 0;
     const center = board.map(row => row[3]).filter(cell => cell === player).length;
     score += center * 6;
+    score += countConnectFourWinningMoves(board, player) * 180;
+    score -= countConnectFourWinningMoves(board, opponent) * 220;
 
     for (let row = 0; row < CONNECT_FOUR_ROWS; row++) {
         for (let col = 0; col <= CONNECT_FOUR_COLS - 4; col++) {
-            score += scoreConnectFourWindow(board[row].slice(col, col + 4), player, opponent);
+            score += scoreConnectFourWindow(board, [0, 1, 2, 3].map(offset => ({ row, col: col + offset })), player, opponent);
         }
     }
     for (let col = 0; col < CONNECT_FOUR_COLS; col++) {
         for (let row = 0; row <= CONNECT_FOUR_ROWS - 4; row++) {
-            score += scoreConnectFourWindow(
-                [board[row][col], board[row + 1][col], board[row + 2][col], board[row + 3][col]],
-                player,
-                opponent
-            );
+            score += scoreConnectFourWindow(board, [0, 1, 2, 3].map(offset => ({ row: row + offset, col })), player, opponent);
         }
     }
     for (let row = 0; row <= CONNECT_FOUR_ROWS - 4; row++) {
         for (let col = 0; col <= CONNECT_FOUR_COLS - 4; col++) {
-            score += scoreConnectFourWindow(
-                [board[row][col], board[row + 1][col + 1], board[row + 2][col + 2], board[row + 3][col + 3]],
-                player,
-                opponent
-            );
+            score += scoreConnectFourWindow(board, [0, 1, 2, 3].map(offset => ({ row: row + offset, col: col + offset })), player, opponent);
         }
     }
     for (let row = 0; row <= CONNECT_FOUR_ROWS - 4; row++) {
         for (let col = 3; col < CONNECT_FOUR_COLS; col++) {
-            score += scoreConnectFourWindow(
-                [board[row][col], board[row + 1][col - 1], board[row + 2][col - 2], board[row + 3][col - 3]],
-                player,
-                opponent
-            );
+            score += scoreConnectFourWindow(board, [0, 1, 2, 3].map(offset => ({ row: row + offset, col: col - offset })), player, opponent);
         }
     }
     return score;
 }
 
-function connectFourMinimax(board, depth, maximizing, player, opponent, alpha = -Infinity, beta = Infinity) {
-    const columns = getConnectFourAvailableColumns(board);
+const CONNECT_FOUR_SEARCH_ORDER = [3, 2, 4, 1, 5, 0, 6];
+
+function connectFourMinimax(board, depth, maximizing, player, opponent, alpha = -Infinity, beta = Infinity, cache = new Map()) {
+    const columns = CONNECT_FOUR_SEARCH_ORDER.filter(col => board[0][col] === CONNECT_FOUR_EMPTY);
+    const alphaOriginal = alpha;
+    const betaOriginal = beta;
+    const key = `${board.map(row => row.join("")).join("")}|${depth}|${maximizing ? 1 : 0}|${player}|${opponent}`;
+    const cached = cache.get(key);
+    if (cached) {
+        if (cached.flag === "exact") return cached.value;
+        if (cached.flag === "lower") alpha = Math.max(alpha, cached.value.score);
+        if (cached.flag === "upper") beta = Math.min(beta, cached.value.score);
+        if (alpha >= beta) return cached.value;
+    }
     if (depth <= 0 || !columns.length || connectFourHasWinner(board, player) || connectFourHasWinner(board, opponent)) {
-        return { score: evaluateConnectFourBoard(board, player, opponent), col: null };
+        const value = { score: evaluateConnectFourBoard(board, player, opponent), col: null };
+        cache.set(key, { value, flag: "exact" });
+        return value;
+    }
+
+    const onePly = columns.map(col => {
+        const result = applyConnectFourMove(board, col, maximizing ? player : opponent);
+        return { col, board: result.board, score: evaluateConnectFourBoard(result.board, player, opponent) };
+    });
+    const fractionalScore = window.SharedDifficulty.resolveFractionalDepth(
+        depth,
+        () => evaluateConnectFourBoard(board, player, opponent),
+        () => maximizing ? Math.max(...onePly.map(item => item.score)) : Math.min(...onePly.map(item => item.score))
+    );
+    if (fractionalScore !== null) {
+        const best = onePly.reduce((current, candidate) =>
+            (maximizing ? candidate.score > current.score : candidate.score < current.score)
+                ? candidate : current
+        );
+        const value = { score: fractionalScore, col: best.col };
+        cache.set(key, { value, flag: "exact" });
+        return value;
     }
 
     if (maximizing) {
         let best = { score: -Infinity, col: columns[0] };
         for (const col of columns) {
             const result = applyConnectFourMove(board, col, player);
-            const candidate = connectFourMinimax(result.board, depth - 1, false, player, opponent, alpha, beta);
+            const candidate = connectFourMinimax(result.board, depth - 1, false, player, opponent, alpha, beta, cache);
             if (candidate.score > best.score) best = { score: candidate.score, col };
             alpha = Math.max(alpha, best.score);
             if (beta <= alpha) break;
         }
+        const flag = best.score <= alphaOriginal ? "upper" : best.score >= betaOriginal ? "lower" : "exact";
+        cache.set(key, { value: best, flag });
         return best;
     }
 
     let best = { score: Infinity, col: columns[0] };
     for (const col of columns) {
         const result = applyConnectFourMove(board, col, opponent);
-        const candidate = connectFourMinimax(result.board, depth - 1, true, player, opponent, alpha, beta);
+        const candidate = connectFourMinimax(result.board, depth - 1, true, player, opponent, alpha, beta, cache);
         if (candidate.score < best.score) best = { score: candidate.score, col };
         beta = Math.min(beta, best.score);
         if (beta <= alpha) break;
     }
+    const flag = best.score <= alphaOriginal ? "upper" : best.score >= betaOriginal ? "lower" : "exact";
+    cache.set(key, { value: best, flag });
     return best;
 }
 
 function getConnectFourRankedMoves(board, depth, player, opponent) {
     const columns = getConnectFourAvailableColumns(board);
+    const cache = new Map();
     return columns.map(col => {
         const result = applyConnectFourMove(board, col, player);
         const evaluated = connectFourMinimax(
@@ -174,7 +207,10 @@ function getConnectFourRankedMoves(board, depth, player, opponent) {
             Math.max(0, depth - 1),
             false,
             player,
-            opponent
+            opponent,
+            -Infinity,
+            Infinity,
+            cache
         );
         return { col, score: evaluated.score };
     }).sort((a, b) => b.score - a.score);
@@ -191,7 +227,10 @@ function mergeConnectFourProfile(target, source) {
     });
 }
 function saveConnectFourPlayerProfile(profile) { try { localStorage.setItem(CONNECT_FOUR_PLAYER_PROFILE_KEY, JSON.stringify(profile)); } catch (_) {} }
-function clearConnectFourPlayerProfile(profile) { resetConnectFourPlayerProfile(profile); try { localStorage.removeItem(CONNECT_FOUR_PLAYER_PROFILE_KEY); } catch (_) {} }
+function clearConnectFourPlayerProfile(profile) {
+    try { localStorage.removeItem(CONNECT_FOUR_PLAYER_PROFILE_KEY); } catch (_) {}
+    resetConnectFourPlayerProfile(profile);
+}
 function loadConnectFourPlayerProfile(profile) { try { mergeConnectFourProfile(profile, JSON.parse(localStorage.getItem(CONNECT_FOUR_PLAYER_PROFILE_KEY) || "null")); } catch (_) {} return profile; }
 
 function createConnectFourPlayerProfile() {
@@ -307,19 +346,9 @@ function getConnectFourDifficultyProfile(skill) {
     const difficulty = window.SharedDifficulty.createProfile({
         mode: "adaptive",
         skill,
-        minSearchChance: 0.06,
-        maxSearchChance: 1.0,
-        minRandomness: 0.03,
-        maxRandomness: 0.42,
-        minErrorRate: 0.02,
-        maxErrorRate: 0.34,
-        habitInfluence: 0.60,
-        searchConfig: {
-            supportsMinimax: true,
-            minDepth: 0,
-            maxDepth: 3,
-            fixedDepth: 3
-        }
+        ...window.ConnectFourSettings.difficulty,
+        habitInfluence: window.ConnectFourSettings.adaptiveHabitInfluence,
+        searchConfig: window.ConnectFourSettings.searchConfig
     });
 
     return {
@@ -337,13 +366,7 @@ function getConnectFourDifficultyProfile(skill) {
     };
 }
 //Anpassung der manuellen Bots//
-const CONNECT_FOUR_MANUAL_STRENGTHS = Object.freeze({ 
-      anfanger: 0.26, 
-	  hobby: 0.48, 
-	  verein: 0.63, 
-	  meister: 0.67, 
-	  referenz: 1.0 
-});
+const CONNECT_FOUR_MANUAL_STRENGTHS = window.ConnectFourSettings.manualStrengths;
 const connectFourManualOverrides = Object.create(null);
 try {
     const stored = JSON.parse(localStorage.getItem("gamelab-4gewinnt-manual-profiles") || "{}");
@@ -376,20 +399,16 @@ function getConnectFourManualProfile(level = "anfanger") {
     const difficulty = window.SharedDifficulty.createProfile({
         mode: "manual",
         strength,
-        minSearchChance: 0.06,
-        maxSearchChance: 1.0,
-        minRandomness: 0.03,
-        maxRandomness: 0.42,
-        minErrorRate: 0.02,
-        maxErrorRate: 0.34,
-        habitInfluence: 0.60,
-        searchConfig: {
-            supportsMinimax: true,
-            minDepth: 0,
-            maxDepth: 3,
-            fixedDepth: 3
-        }
+        ...window.ConnectFourSettings.difficulty,
+        habitInfluence: window.ConnectFourSettings.manualHabitInfluence,
+        minRandomness: key === "referenz" ? 0 : window.ConnectFourSettings.difficulty.minRandomness,
+        minErrorRate: key === "referenz" ? 0 : window.ConnectFourSettings.difficulty.minErrorRate,
+        searchConfig: window.ConnectFourSettings.searchConfig
     });
+    const rawCandidatePoolSize = 1 + 6 * (1 - difficulty.searchChance);
+    const candidatePoolLowSize = Math.max(1, Math.floor(rawCandidatePoolSize));
+    const candidatePoolHighSize = Math.max(candidatePoolLowSize, Math.ceil(rawCandidatePoolSize));
+    const candidatePoolHighChance = rawCandidatePoolSize - candidatePoolLowSize;
     return {
         level: key,
         strength,
@@ -397,7 +416,12 @@ function getConnectFourManualProfile(level = "anfanger") {
         randomChance: difficulty.randomChance,
         tacticalChance: difficulty.tacticalAccuracy,
         minimaxChance: difficulty.searchChance,
-        candidatePoolSize: Math.max(1, Math.ceil(7 * (1 - difficulty.searchChance))),
+        searchChance: difficulty.searchChance,
+        errorRate: difficulty.errorRate,
+        candidatePoolLowSize,
+        candidatePoolHighSize,
+        candidatePoolHighChance,
+        candidatePoolSize: candidatePoolLowSize,
         depth: difficulty.depth,
         thinkTime: 260 + difficulty.curve * 1020
     };
@@ -431,6 +455,13 @@ window.ConnectFourAICore = {
     recordPlayerEvent: recordConnectFourPlayerEvent,
     evaluatePlayerMove: evaluateConnectFourPlayerMove,
     countWinningMoves: countConnectFourWinningMoves,
+    findImmediateWinningMove: (board, player) => {
+        for (const col of getConnectFourAvailableColumns(board)) {
+            const result = applyConnectFourMove(board, col, player);
+            if (result && connectFourHasWinner(result.board, player)) return col;
+        }
+        return -1;
+    },
     hasMissedWin: hasMissedConnectFourWin,
     getDifficultyProfile: getConnectFourDifficultyProfile,
     getManualProfile: getConnectFourManualProfile,

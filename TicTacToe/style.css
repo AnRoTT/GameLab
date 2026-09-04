@@ -63,7 +63,7 @@ body {
     width: 100%;
     max-width: none;
     margin: 0;
-    gap: 8px;
+    gap: 15px;
     justify-content: center;
     text-shadow: none;
 }
@@ -95,8 +95,18 @@ body {
 }
 
 .score-header > span.winner {
-    box-shadow: 0 0 10px rgba(79, 140, 255, 0.45);
+    box-shadow: 0 0 0 2px rgba(79, 140, 255, 0.22), 0 0 20px rgba(79, 140, 255, 0.72);
     border-color: var(--accent);
+}
+
+.score-header > span:first-child.winner {
+    border-color: #78a5ff;
+    box-shadow: 0 0 0 2px rgba(79, 140, 255, 0.28), 0 0 22px rgba(79, 140, 255, 0.82);
+}
+
+.score-header > span:last-child.winner {
+    border-color: #ff9b9b;
+    box-shadow: 0 0 0 2px rgba(228, 30, 38, 0.28), 0 0 22px rgba(228, 30, 38, 0.82);
 }
 
 /* Gemeinsames Einstellungsraster wird zentral in theme.css geregelt. */
@@ -353,7 +363,6 @@ body {
 /* Board gesperrt */
 .board.locked {
     pointer-events: none !important;
-    opacity: 0.5;
 }
 .board.locked .cell {
     pointer-events: none !important;
@@ -388,6 +397,10 @@ body {
     font-size: 0.82rem;
     font-weight: 600;
 }
+.score-header .score-value { display: none; margin-left: 8px; color: inherit; font-size: .95rem; }
+.score-header.match-active .score-value { display: inline; }
+.score-header > .match-score { display: none; min-width: auto; padding: 0 2px; border: 0; border-radius: 0; background: transparent; color: var(--text-main); font-size: .95rem; font-weight: 700; font-variant-numeric: tabular-nums; text-shadow: none; }
+.score-header > .match-score:not([hidden]) { display: inline-block; flex: 0 0 auto; }
 
 .adaptive-strength-label {
     white-space: nowrap;
@@ -945,4 +958,12 @@ body {
     .mobile-prototype .game-screen .footer {
         order: 4;
     }
+
+    .mobile-prototype .game-screen .game-info { margin-bottom: 12px !important; }
+    .mobile-prototype .mobile-game-actions { margin: 0 !important; }
+    .mobile-prototype .game-screen .board { margin-top: 12px; }
+}
+
+@media (orientation: landscape) and (max-height: 700px) {
+    .mobile-prototype.game-active .game-screen .game-side-panel { gap: 12px; }
 }

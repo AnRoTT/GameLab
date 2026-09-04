@@ -532,8 +532,6 @@ main {
 
 .board.disabled {
     pointer-events: none;
-    opacity: 0.35;
-    filter: grayscale(60%);
 }
 .button-disabled {
     pointer-events: none;
@@ -954,7 +952,7 @@ body:not(.mobile-prototype) .game-screen { display: contents; }
         align-self: stretch;
     }
 
-    .mobile-prototype .mobile-game-actions button {
+.mobile-prototype .mobile-game-actions button {
         flex-basis: 100%;
     }
 
@@ -964,6 +962,17 @@ body:not(.mobile-prototype) .game-screen { display: contents; }
         width: 100%;
     }
 
+}
+
+@media (orientation: portrait) and (max-width: 700px) {
+    .mobile-prototype .game-screen .status-panel { margin-bottom: 12px !important; }
+    .mobile-prototype .mobile-game-actions { margin: 0 !important; }
+    .mobile-prototype .game-screen .board-wrapper { margin-top: 12px; }
+}
+
+@media (orientation: landscape) and (max-height: 700px) {
+    .mobile-prototype.game-active .game-screen .game-side-panel { gap: 0; }
+    .mobile-prototype.game-active .mobile-game-actions { margin: 12px 0 0 !important; }
 }
 
 @media (orientation: landscape) and (min-width: 701px) {
@@ -1073,7 +1082,7 @@ body:not(.mobile-prototype) .game-screen { display: contents; }
     flex-direction: row;
     align-items: center;
     justify-content: center;
-    gap: 24px;
+    gap: 15px;
     flex-wrap: nowrap;
 }
 
@@ -1100,6 +1109,10 @@ body:not(.mobile-prototype) .game-screen { display: contents; }
     margin: 0;
     padding: 0;
 }
+.game-connect-four .scoreboard:not(.match-active) .score-value { display: none; }
+.game-connect-four .scoreboard:not(.match-active) .score-label::after { content: none; }
+.game-connect-four .scoreboard .match-score { display: none; min-width: auto; padding: 0 2px; color: var(--text-main); font-size: .95rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.game-connect-four .scoreboard .match-score:not([hidden]) { display: inline-flex; align-items: center; }
 
 .game-connect-four .scoreboard .score.winner {
     box-shadow: 0 0 10px rgba(79, 140, 255, 0.45);
@@ -1113,6 +1126,16 @@ body:not(.mobile-prototype) .game-screen { display: contents; }
 .game-connect-four .scoreboard .score:last-child {
     border-color: rgba(255, 215, 0, 0.45);
     box-shadow: 0 0 10px rgba(255, 215, 0, 0.18);
+}
+
+.game-connect-four .scoreboard .score:first-child.winner {
+    border-color: #e41e26;
+    box-shadow: 0 0 0 2px rgba(228, 30, 38, 0.28), 0 0 22px rgba(228, 30, 38, 0.82);
+}
+
+.game-connect-four .scoreboard .score:last-child.winner {
+    border-color: #ffd700;
+    box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.28), 0 0 22px rgba(255, 215, 0, 0.82);
 }
 
 /* Die nicht angezeigte adaptive Leiste darf keine Leerzeile im Infobadge reservieren. */

@@ -52,6 +52,7 @@ const statusLine1El = document.getElementById("statusLine1");
 const matchLineEl = document.getElementById("matchLine");
 const scoreRedEl = document.getElementById("scoreRed");
 const scoreYellowEl = document.getElementById("scoreYellow");
+const matchScoreEl = document.getElementById("matchScore");
 const adaptiveStrengthEl = document.getElementById("adaptive-strength");
 const adaptiveStrengthTrackEl = document.getElementById("adaptive-strength-track");
 const adaptiveStrengthFillEl = document.getElementById("adaptive-strength-fill");
@@ -237,6 +238,7 @@ settingsMatchButton.addEventListener("click", () => {
     settingsMatchButton.textContent = MATCH_OPTIONS[matchModeIndex];
     setNextRoundButtonState(matchModeIndex > 0, false);
     updateUIStatus();
+    matchScoreEl.hidden = matchModeIndex === 0;
 });
 
 settingsBotLevelButton.addEventListener("click", () => {
@@ -516,6 +518,7 @@ function positionHoverZones() {
 function updateScoreUI() {
     scoreRedEl.textContent = scores[PLAYER_RED].toString();
     scoreYellowEl.textContent = scores[PLAYER_YELLOW].toString();
+    matchScoreEl.hidden = matchModeIndex === 0;
     document.querySelectorAll(".score.winner").forEach(score => score.classList.remove("winner"));
 }
 
@@ -524,6 +527,7 @@ function playerName(player) {
 }
 
 function updateUIStatus(message, keepLine2 = false) {
+    matchScoreEl.hidden = matchModeIndex === 0;
     matchLineEl.textContent = matchModeIndex === 0
         ? "Einzelrunde"
         : "Abwechselnd";
@@ -888,7 +892,7 @@ function onWin(player) {
     cancelPendingBotMove();
     scores[player] += 1;
     updateScoreUI();
-    document.querySelector(`.score ${player === PLAYER_RED ? "#scoreRed" : "#scoreYellow"}`)?.parentElement.classList.add("winner");
+    document.querySelector(`.scoreboard > .score:${player === PLAYER_RED ? "first-child" : "last-child"}`)?.classList.add("winner");
     roundResultProcessed = true;
 
     if (modeIndex === 1) {
@@ -989,4 +993,3 @@ function hideWinner() {
     boardEl.style.pointerEvents = "auto"; // Klicks wieder erlauben
     setNextRoundButtonState(matchModeIndex > 0, false);
 }
-

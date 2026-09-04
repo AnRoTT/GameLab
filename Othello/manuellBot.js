@@ -50,7 +50,8 @@ function getOthelloBotMove(level, player = "white", stateBoard = null, playerPro
     const core = OthelloBotCore;
     const activeBoard = stateBoard || (typeof board !== "undefined" ? board : null);
     if (!activeBoard) return null;
-    const effectiveProfile = stateBoard ? playerProfile : window.othelloPlayerProfile;
+    // Manuelle Level dürfen keinen persistenten Spieler-Lernkontext verwenden.
+    const effectiveProfile = null;
     const moves = core.getAllValidMovesForState(player, activeBoard);
     if (!moves.length) return null;
 
@@ -65,7 +66,9 @@ function getOthelloBotMove(level, player = "white", stateBoard = null, playerPro
         player,
         depth,
         config.randomChance * 35,
-        config.weights
+        config.weights,
+        config.curve,
+        "ranked"
     );
 
     const randomMove = () => moves[Math.floor(Math.random() * moves.length)];
@@ -86,28 +89,23 @@ function getOthelloBotMove(level, player = "white", stateBoard = null, playerPro
         }
     }
 
-    if (Math.random() < config.randomChance) {
-        recordOthelloBotDiagnostic(level, config, "random");
-        return randomMove();
-    }
-
     if (effectiveProfile && Math.random() < config.learnedUsage) {
         const learnedInfluence = 0.2 + config.curve * 0.6;
         recordOthelloBotDiagnostic(level, config, "learned");
         return chooseLearnedMove(moves, learnedInfluence, effectiveProfile);
     }
 
-    const edges = moves.filter(isEdge);
-    if (edges.length && Math.random() < config.edgeChance) {
-        recordOthelloBotDiagnostic(level, config, "edge");
-        return edges[Math.floor(Math.random() * edges.length)];
-    }
-    if (corners.length && Math.random() < config.cornerChance) {
-        const cornerIndex = config.randomChance === 0
-            ? 0
-            : Math.floor(Math.random() * corners.length);
-        recordOthelloBotDiagnostic(level, config, "corner");
-        return corners[cornerIndex];
+    const scored = moves.map(move => ({
+        move,
+        score: core.othelloScoreMove(activeBoard, move, player, null, config.weights)
+            + (isCorner(move) ? 120 * config.cornerChance : 0)
+            + (isEdge(move) ? 4 * config.edgeChance : 0)
+            + Math.random() * config.randomChance * 20
+    }));
+    const selected = window.SharedDifficulty.selectSoftCandidate(scored, config.curve, true);
+    if (selected) {
+        recordOthelloBotDiagnostic(level, config, isCorner(selected.move) ? "corner" : isEdge(selected.move) ? "edge" : "random");
+        return selected.move;
     }
     recordOthelloBotDiagnostic(level, config, "random");
     return randomMove();
@@ -118,14 +116,9 @@ function getOthelloBotMoveForState({ board, level = 1, player = "white", playerP
 }
 
 function getOthelloBotThinkTime(level, player = "white") {
-    const clampedLevel = Math.max(1, Math.min(4, Math.round(level || 1)));
-    const ranges = {
-        1: [250, 500],
-        2: [450, 800],
-        3: [700, 1100],
-        4: [950, 1500]
-    };
-    const [min, max] = ranges[clampedLevel];
+    const config = OthelloBotCore.getManualProfile(level);
+    const min = 250 + config.curve * 700;
+    const max = min + 250 + (1 - config.curve) * 180;
     const availableMoves = typeof getAllValidMoves === "function"
         ? getAllValidMoves(player).length
         : 0;

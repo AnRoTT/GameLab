@@ -326,6 +326,11 @@ body:not(.mobile-prototype) .mobile-game-actions {
     }
 }
 
+@media (orientation: landscape) and (max-height: 700px) {
+    .mobile-prototype.game-active .game-side-panel { gap: 0; }
+    .mobile-prototype.game-active .mobile-game-actions { margin: 12px 0 0 !important; }
+}
+
 @media (max-width: 500px) {
     body {
         padding: 0;
@@ -430,7 +435,7 @@ body:not(.mobile-prototype) .mobile-game-actions {
         margin: var(--game-action-gap) 0 0;
     }
 
-    .mobile-prototype .mobile-game-actions .primary-button {
+.mobile-prototype .mobile-game-actions .primary-button {
         width: max-content;
         min-width: 170px;
         min-height: 42px;
@@ -467,6 +472,12 @@ body:not(.mobile-prototype) .mobile-game-actions {
         width: var(--othello-piece-size, 80%) !important;
         height: var(--othello-piece-size, 80%) !important;
     }
+}
+
+@media (orientation: portrait) and (max-width: 700px) {
+    .mobile-prototype .game-screen .game-info { margin-bottom: 12px !important; }
+    .mobile-prototype .mobile-game-actions { margin: 0 !important; }
+    .mobile-prototype #board { margin-top: 12px; }
 }
 
 @media (orientation: landscape) and (min-width: 701px) {
@@ -518,8 +529,6 @@ body:not(.mobile-prototype) .mobile-game-actions {
    Gesperrter Zustand
    ----------------------------------------- */
 .board.disabled {
-    opacity: 0.4;
-    filter: grayscale(0.8);
     pointer-events: none; /* Klicks werden ignoriert */
 }
 
@@ -599,6 +608,28 @@ body:not(.mobile-prototype) .mobile-game-actions {
 .score-bar span:first-child { color: #000; } /* Schwarz Score */
 .score-bar span:last-child { color: #555; } /* Weiß Score */
 
+.score-bar > .win-score {
+    display: none;
+    min-width: auto;
+    padding: 4px 2px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--text-main) !important;
+    text-shadow: none;
+    font-variant-numeric: tabular-nums;
+}
+
+.score-bar > .win-score:not([hidden]) {
+    display: inline-flex;
+    align-items: center;
+}
+
+.score-bar {
+    justify-content: center;
+    gap: 15px;
+}
+
 /* -----------------------------------------
    Responsive für Handy
    ----------------------------------------- */
@@ -636,7 +667,7 @@ body:not(.mobile-prototype) .mobile-game-actions {
         padding: 8px 12px;
     }
     .status { font-size: 1rem; }
-    .score-bar { font-size: 0.9rem; gap: 15px; }
+    .score-bar { font-size: 0.9rem; justify-content: center; gap: 15px; }
 }
 
 .game-info {
