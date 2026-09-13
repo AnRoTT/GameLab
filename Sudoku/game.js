@@ -26,6 +26,7 @@
     const customPuzzleStatus = document.getElementById("customPuzzleStatus");
     const customImportAssistant = document.getElementById("customImportAssistant");
     const ocrProgressBadge = document.getElementById("ocrProgressBadge");
+    const ocrLiveGrid = document.getElementById("ocrLiveGrid");
     const customImportCanvas = document.getElementById("customImportCanvas");
     const customImportMagnifier = document.getElementById("customImportMagnifier");
     const customImportHint = document.getElementById("customImportHint");
@@ -1568,7 +1569,42 @@ function normalizeLocalIllumination(image) {
             && confidenceGap >= 28;
     }
 
-    async function recognizeSudokuCells(worker, source, statusElement) {
+    function resetOcrLiveGrid() {
+        if (!ocrLiveGrid) return;
+        ocrLiveGrid.innerHTML = "";
+        for (let index = 0; index < 81; index++) {
+            const cell = document.createElement("div");
+            cell.className = "ocr-live-cell pending";
+            cell.dataset.ocrLiveIndex = String(index);
+            cell.setAttribute("aria-hidden", "true");
+            ocrLiveGrid.appendChild(cell);
+        }
+        ocrLiveGrid.hidden = false;
+    }
+
+    function updateOcrLiveCell(details) {
+        if (!ocrLiveGrid) return;
+        const { row, col, value, candidates, status } = details;
+        const index = row * 9 + col;
+        const cell = ocrLiveGrid.querySelector('[data-ocr-live-index="' + index + '"]');
+        if (!cell) return;
+        ocrLiveGrid.querySelector(".active")?.classList.remove("active");
+        cell.className = "ocr-live-cell " + status;
+        cell.textContent = value
+            ? String(value) + (status === "uncertain" ? "?" : "")
+            : status === "uncertain" ? (candidates?.length ? candidates.join("/") : "?") : "";
+        cell.setAttribute("aria-label", value
+            ? "Zeile " + (row + 1) + ", Spalte " + (col + 1) + ": " + value
+                + (status === "uncertain" ? " unsicher" : "")
+            : "Zeile " + (row + 1) + ", Spalte " + (col + 1) + ": kein Treffer");
+        if (status !== "recognized") cell.classList.add("active");
+    }
+
+    function hideOcrLiveGrid() {
+        if (ocrLiveGrid) ocrLiveGrid.hidden = true;
+    }
+
+    async function recognizeSudokuCells(worker, source, statusElement, onCellRecognized = null) {
         const result = new Map();
         const uncertain = [];
         let processed = 0;
@@ -1629,6 +1665,16 @@ function normalizeLocalIllumination(image) {
                         inkScore: ink.score
                     });
                 }
+                const clearDecision = Boolean(best && isClearOcrDecision(ranked));
+                onCellRecognized?.({
+                    row,
+                    col,
+                    value: clearDecision ? best.value : null,
+                    candidates: ranked.map(candidate => candidate.value),
+                    status: clearDecision
+                        ? "recognized"
+                        : (ink.reviewable || ranked.length ? "uncertain" : "empty")
+                });
                 processed++;
                 statusElement.textContent = `Ziffern werden erkannt … ${Math.round((processed / 81) * 100)} %`;
             }
@@ -1834,7 +1880,13 @@ function normalizeLocalIllumination(image) {
                 tessedit_char_whitelist: "123456789",
                 tessedit_pageseg_mode: "10"
             });
-            const recognitionPromise = recognizeSudokuCells(worker, prepared.source, ocrProgressTarget);
+            resetOcrLiveGrid();
+            const recognitionPromise = recognizeSudokuCells(
+                worker,
+                prepared.source,
+                ocrProgressTarget,
+                updateOcrLiveCell
+            );
             recognitionPromise.catch(() => {});
             let timeoutId;
             const timeout = new Promise((_, reject) => {
@@ -1914,6 +1966,7 @@ function normalizeLocalIllumination(image) {
             customPuzzleStatus.textContent = error.message || "Die Fotoerkennung ist fehlgeschlagen. Bitte übertrage das Rätsel manuell.";
             finishOcrProgress("OCR-Import fehlgeschlagen");
         } finally {
+            hideOcrLiveGrid();
             if (worker) await worker.terminate().catch(() => {});
             customImportButton.disabled = false;
             customValidateButton.disabled = false;
