@@ -1521,7 +1521,7 @@
         return canvas;
     }
 
-    async async function recognizeOcrVariant(worker, cell) {
+    async function recognizeOcrVariant(worker, cell) {
         const recognition = await worker.recognize(cell);
         const rawText = recognition.data?.text || "";
         const text = rawText.replace(/\s/g, "");
@@ -1567,7 +1567,7 @@
             && confidenceGap >= 28;
     }
 
-    async async function recognizeSudokuCells(worker, source, statusElement) {
+    async function recognizeSudokuCells(worker, source, statusElement) {
         const result = new Map();
         const uncertain = [];
         let processed = 0;
