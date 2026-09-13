@@ -252,6 +252,46 @@
         return image;
     }
 
+    function normalizeLocalIllumination(image) {
+        const { width, height, data } = image;
+        const integral = new Uint32Array((width + 1) * (height + 1));
+        for (let y = 1; y <= height; y++) {
+            let rowSum = 0;
+            for (let x = 1; x <= width; x++) {
+                const offset = ((y - 1) * width + (x - 1)) * 4;
+                rowSum += data[offset];
+                integral[y * (width + 1) + x] =
+                    integral[(y - 1) * (width + 1) + x] + rowSum;
+            }
+        }
+
+        const radius = Math.max(10, Math.round(Math.min(width, height) * .09));
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const left = Math.max(0, x - radius);
+                const top = Math.max(0, y - radius);
+                const right = Math.min(width - 1, x + radius);
+                const bottom = Math.min(height - 1, y + radius);
+                const area = (right - left + 1) * (bottom - top + 1);
+                const localSum = integral[(bottom + 1) * (width + 1) + right + 1]
+                    - integral[top * (width + 1) + right + 1]
+                    - integral[(bottom + 1) * (width + 1) + left]
+                    + integral[top * (width + 1) + left];
+                const localMean = localSum / area;
+                const offset = (y * width + x) * 4;
+                // Lokale Abweichungen bleiben erhalten, großflächige Schatten
+                // werden neutralisiert. Der Sicherheitsabstand verhindert,
+                // dass sehr dunkle Zellen künstlich übersteuern.
+                const normalized = Math.max(0, Math.min(255,
+                    Math.round(150 + (data[offset] - localMean) * 2.2)));
+                data[offset] = normalized;
+                data[offset + 1] = normalized;
+                data[offset + 2] = normalized;
+            }
+        }
+        return image;
+    }
+
     function strengthenOcrContrast(image) {
         // Die reine Histogramm-Normalisierung macht den Gesamtbereich nutzbar.
         // Dieser zweite, vorsichtige Kontrastschritt trennt dunkle Druckfarbe
@@ -339,7 +379,9 @@
     function prepareOcrCell(source, row, col, variant = "otsu") {
         const cell = createOcrCellBase(source, row, col);
         const context = cell.getContext("2d", { willReadFrequently: true });
-        const image = normalizeOcrContrast(grayscaleImage(context.getImageData(0, 0, cell.width, cell.height)));
+        const image = grayscaleImage(context.getImageData(0, 0, cell.width, cell.height));
+        normalizeLocalIllumination(image);
+        normalizeOcrContrast(image);
         if (variant === "otsu") otsuThreshold(image);
         if (variant === "enhanced") {
             strengthenOcrContrast(image);
@@ -1479,13 +1521,19 @@
         return canvas;
     }
 
-    async function recognizeOcrVariant(worker, cell) {
+    async async function recognizeOcrVariant(worker, cell) {
         const recognition = await worker.recognize(cell);
-        const text = recognition.data?.text?.replace(/\s/g, "") || "";
+        const rawText = recognition.data?.text || "";
+        const text = rawText.replace(/\s/g, "");
         const confidence = Number(recognition.data?.confidence);
-        return /^[1-9]$/.test(text) && Number.isFinite(confidence)
-            ? { value: Number(text), confidence, preview: cell }
-            : null;
+        const digits = text.match(/[1-9]/g) || [];
+        if (digits.length !== 1 || !Number.isFinite(confidence)) return null;
+        return {
+            value: Number(digits[0]),
+            confidence,
+            preview: cell,
+            normalized: text !== digits[0]
+        };
     }
 
     function rankOcrCandidates(variants) {
@@ -1509,14 +1557,17 @@
         const best = ranked[0];
         const second = ranked[1];
         if (!best) return false;
-        if (best.votes >= 2 && best.bestConfidence >= 38) return true;
-        // Einzelne Ergebnisse werden nur noch bei sehr hoher Sicherheit direkt
-        // übernommen. Ähnliche Ziffern wie 1/7 oder 8/9 gehen sonst in die Review.
-        return best.votes === 1 && best.bestConfidence >= 82
-            && (!second || best.bestConfidence - second.bestConfidence >= 28);
+        const confidenceGap = !second
+            ? Infinity
+            : best.confidence - second.confidence;
+        if (best.votes >= 2 && best.bestConfidence >= 42
+            && confidenceGap >= 12) return true;
+        return best.votes === 1
+            && best.bestConfidence >= 82
+            && confidenceGap >= 28;
     }
 
-    async function recognizeSudokuCells(worker, source, statusElement) {
+    async async function recognizeSudokuCells(worker, source, statusElement) {
         const result = new Map();
         const uncertain = [];
         let processed = 0;
@@ -1530,18 +1581,32 @@
                 const reviewCell = prepareReviewCell(source, row, col);
                 const ink = analyzeCellInk(source, row, col);
                 const variants = [];
-                for (const variantName of ["raw", "otsu"]) {
-                    const candidate = await recognizeOcrVariant(worker,
-                        variantName === "raw" ? rawCell : prepareOcrCell(source, row, col, variantName));
+
+                // Drei unterschiedliche Bildaufbereitungen liefern eine
+                // stabilere Entscheidung als eine einzelne Schwelle.
+                for (const variantName of ["raw", "otsu", "adaptive"]) {
+                    const candidate = await recognizeOcrVariant(
+                        worker,
+                        variantName === "raw"
+                            ? rawCell
+                            : prepareOcrCell(source, row, col, variantName)
+                    );
                     if (candidate) variants.push(candidate);
                 }
+
                 let ranked = rankOcrCandidates(variants);
-                if (!isClearOcrDecision(ranked) && (ranked.length || ink.reviewable)) {
-                    const candidate = await recognizeOcrVariant(worker,
-                        prepareOcrCell(source, row, col, "enhanced"));
+                // Bei sichtbarer Struktur oder einem schwachen OCR-Kandidaten
+                // folgt eine zusätzliche kontrastverstärkte Prüfung.
+                if (!isClearOcrDecision(ranked)
+                    && (ranked.length || ink.reviewable || ink.score >= .055)) {
+                    const candidate = await recognizeOcrVariant(
+                        worker,
+                        prepareOcrCell(source, row, col, "enhanced")
+                    );
                     if (candidate) variants.push(candidate);
                     ranked = rankOcrCandidates(variants);
                 }
+
                 const best = ranked[0];
                 if (best && isClearOcrDecision(ranked)) {
                     result.set(row * 9 + col, {
