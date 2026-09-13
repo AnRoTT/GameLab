@@ -1568,7 +1568,7 @@ function normalizeLocalIllumination(image) {
             && confidenceGap >= 28;
     }
 
-    async async function recognizeSudokuCells(worker, source, statusElement) {
+    async function recognizeSudokuCells(worker, source, statusElement) {
         const result = new Map();
         const uncertain = [];
         let processed = 0;
