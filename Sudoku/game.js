@@ -338,19 +338,56 @@
         return image;
     }
 
+function normalizeLocalIllumination(image) {
+        const { width, height, data } = image;
+        const integral = new Uint32Array((width + 1) * (height + 1));
+        for (let y = 1; y <= height; y++) {
+            let rowSum = 0;
+            for (let x = 1; x <= width; x++) {
+                const offset = ((y - 1) * width + (x - 1)) * 4;
+                rowSum += data[offset];
+                integral[y * (width + 1) + x] =
+                    integral[(y - 1) * (width + 1) + x] + rowSum;
+            }
+        }
+        const radius = Math.max(10, Math.round(Math.min(width, height) * .09));
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const left = Math.max(0, x - radius);
+                const top = Math.max(0, y - radius);
+                const right = Math.min(width - 1, x + radius);
+                const bottom = Math.min(height - 1, y + radius);
+                const area = (right - left + 1) * (bottom - top + 1);
+                const localSum = integral[(bottom + 1) * (width + 1) + right + 1]
+                    - integral[top * (width + 1) + right + 1]
+                    - integral[(bottom + 1) * (width + 1) + left]
+                    + integral[top * (width + 1) + left];
+                const localMean = localSum / area;
+                const offset = (y * width + x) * 4;
+                const normalized = Math.max(0, Math.min(255,
+                    Math.round(150 + (data[offset] - localMean) * 1.55)));
+                data[offset] = normalized;
+                data[offset + 1] = normalized;
+                data[offset + 2] = normalized;
+            }
+        }
+        return image;
+    }
+
     function prepareOcrCell(source, row, col, variant = "otsu") {
         const cell = createOcrCellBase(source, row, col);
         const context = cell.getContext("2d", { willReadFrequently: true });
-        // Bewährte Aufbereitung: Graustufen und globale Kontrastnormalisierung.
-        // Die frühere lokale Helligkeitskorrektur wurde bewusst entfernt, weil
-        // sie Papierstruktur und Schatten als Ziffern verstärken konnte.
-        const image = normalizeOcrContrast(
-            grayscaleImage(context.getImageData(0, 0, cell.width, cell.height))
-        );
-        if (variant === "otsu") otsuThreshold(image);
-        if (variant === "enhanced") {
-            strengthenOcrContrast(image);
-            otsuThreshold(image);
+        const image = grayscaleImage(context.getImageData(0, 0, cell.width, cell.height));
+        normalizeOcrContrast(image);
+        // Lokale Korrektur und adaptive Schwellenwerte helfen Tesseract,
+        // beeinflussen aber niemals die Originalbild-Belegungserkennung.
+        if (variant === "local" || variant === "adaptive" || variant === "enhanced") {
+            normalizeLocalIllumination(image);
+        }
+        if (variant === "otsu" || variant === "adaptive" || variant === "enhanced") {
+            if (variant === "enhanced") strengthenOcrContrast(image);
+            if (variant === "adaptive") adaptiveThreshold(image);
+            else otsuThreshold(image);
         }
         context.putImageData(image, 0, 0);
         return cell;
@@ -1531,7 +1568,7 @@
             && confidenceGap >= 28;
     }
 
-    async function recognizeSudokuCells(worker, source, statusElement) {
+    async async function recognizeSudokuCells(worker, source, statusElement) {
         const result = new Map();
         const uncertain = [];
         let processed = 0;
@@ -1543,10 +1580,12 @@
             for (let col = 0; col < 9; col++) {
                 const rawCell = prepareOcrCell(source, row, col, "raw");
                 const reviewCell = prepareReviewCell(source, row, col);
+                // Diese Analyse verwendet ausschließlich das unveränderte
+                // entzerrte Originalbild und schützt vor Leerfeld-Fehlalarmen.
                 const ink = analyzeCellInk(source, row, col);
                 const variants = [];
 
-                for (const variantName of ["raw", "otsu"]) {
+                for (const variantName of ["raw", "otsu", "local", "adaptive"]) {
                     const candidate = await recognizeOcrVariant(
                         worker,
                         variantName === "raw"
@@ -1568,7 +1607,7 @@
                 }
 
                 const best = ranked[0];
-                if (best && isClearOcrDecision(ranked)) {
+                if (best && isClearOcrDecision(ranked) && ink.reviewable) {
                     result.set(row * 9 + col, {
                         index: row * 9 + col,
                         value: best.value,
@@ -1842,7 +1881,9 @@
             // Nur Felder, für die OCR mindestens eine konkrete Ziffer anbietet,
             // werden in der schnellen Bild-Korrektur angezeigt.
             const reviewItems = mergeReviewItems([
-                ...recognition.uncertain.filter(item => item.candidates.length),
+                ...recognition.uncertain.filter(item =>
+                    item.candidates.length && item.inkScore >= .045
+                ),
                 ...solverConflictItems,
                 ...conflicts
             ]);
