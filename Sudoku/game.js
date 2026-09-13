@@ -353,8 +353,6 @@
     function analyzeCellInk(source, row, col) {
         const context = source.getContext("2d", { willReadFrequently: true });
         const cellSize = source.width / 9;
-        // Der innere Bereich vermeidet Gitterlinien, lässt aber auch hellere
-        // Zeitungsziffern am Rand der Druckfläche noch zu.
         const size = Math.max(24, Math.round(cellSize * .70));
         const inset = cellSize * .15;
         const x0 = Math.max(0, Math.round(col * cellSize + inset));
@@ -370,9 +368,21 @@
         const area = width * height;
         if (!area) return { score: 0, reviewable: false };
 
-        let best = { score: 0, darkRatio: 0, componentRatio: 0, density: 0 };
-        // Mehrere Schwellenwerte machen die Belegung unabhängig von
-        // Beleuchtung, Papierfarbe und leichtem Schatten.
+        let best = {
+            score: 0,
+            darkRatio: 0,
+            componentRatio: 0,
+            density: 0,
+            widthRatio: 0,
+            heightRatio: 0,
+            centerDistance: 1
+        };
+        let evidenceCount = 0;
+
+        // Eine echte Druckziffer muss bei mehreren Schwellenwerten als
+        // kompakte, zentral liegende Struktur sichtbar bleiben. Schatten und
+        // Papierfaser tauchen dagegen meist nur bei einer hohen Schwelle auf
+        // oder bilden breite, flache Komponenten.
         for (const threshold of [65, 85, 105, 125, 145]) {
             const dark = new Uint8Array(area);
             let darkCount = 0;
@@ -391,7 +401,10 @@
             let largestWidth = 0;
             let largestHeight = 0;
             let largestDensity = 0;
+            let largestCenterX = width / 2;
+            let largestCenterY = height / 2;
             const queue = [];
+
             for (let start = 0; start < area; start++) {
                 if (!dark[start]) continue;
                 dark[start] = 0;
@@ -430,25 +443,56 @@
                     largestWidth = maxX - minX + 1;
                     largestHeight = maxY - minY + 1;
                     largestDensity = componentSize / (largestWidth * largestHeight);
+                    largestCenterX = (minX + maxX) / 2;
+                    largestCenterY = (minY + maxY) / 2;
                 }
             }
 
             const darkRatio = darkCount / area;
             const componentRatio = largest / area;
-            // Ein Schatten füllt eher eine breite Fläche; eine Druckziffer
-            // bildet dagegen eine kompakte, begrenzte Komponente.
-            const shapeScore = Math.min(1, largestDensity / .22)
-                * Math.min(1, componentRatio / .035);
-            const score = darkRatio * .45 + shapeScore * .55;
+            const widthRatio = largestWidth / width;
+            const heightRatio = largestHeight / height;
+            const centerDistance = Math.hypot(
+                (largestCenterX / width) - .5,
+                (largestCenterY / height) - .5
+            );
+            const plausibleShape = componentRatio >= .012
+                && componentRatio <= .34
+                && widthRatio >= .07
+                && widthRatio <= .72
+                && heightRatio >= .16
+                && heightRatio <= .92
+                && largestDensity >= .07
+                && centerDistance <= .34;
+            if (plausibleShape) evidenceCount++;
+
+            const shapeScore = plausibleShape
+                ? Math.min(1, largestDensity / .22)
+                    * Math.min(1, componentRatio / .035)
+                : 0;
+            const score = darkRatio * .35 + shapeScore * .65;
             if (score > best.score) {
-                best = { score, darkRatio, componentRatio, density: largestDensity };
+                best = {
+                    score,
+                    darkRatio,
+                    componentRatio,
+                    density: largestDensity,
+                    widthRatio,
+                    heightRatio,
+                    centerDistance
+                };
             }
         }
 
-        const reviewable = best.score >= .075
+        const reviewable = evidenceCount >= 2
             && best.componentRatio >= .012
-            && best.density >= .055;
-        return { ...best, reviewable };
+            && best.density >= .07
+            && best.centerDistance <= .34;
+        return { ...best, evidenceCount, reviewable };
+    }
+
+    function cellContainsDarkMark(source, row, col) {
+        return analyzeCellInk(source, row, col).reviewable;
     }
 
     function cellContainsDarkMark(source, row, col) {
