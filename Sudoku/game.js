@@ -350,75 +350,109 @@
         return cell;
     }
 
-    function cellContainsDarkMark(source, row, col) {
+    function analyzeCellInk(source, row, col) {
         const context = source.getContext("2d", { willReadFrequently: true });
-        // Den Rand großzügig auslassen: leichte Verzerrungen, Gitternetzreste
-        // und Papierschatten dürfen kein leeres Feld zur Review machen.
         const cellSize = source.width / 9;
-        const size = Math.round(cellSize * .64);
-        const inset = cellSize * .18;
-        const pixels = context.getImageData(col * cellSize + inset, row * cellSize + inset, size, size).data;
-        const dark = new Uint8Array(size * size);
-        for (let index = 0; index < pixels.length; index += 4) {
-            const gray = pixels[index] * .299 + pixels[index + 1] * .587 + pixels[index + 2] * .114;
-            // Papierstruktur und Schatten sind meist einzelne verstreute Pixel;
-            // eine gedruckte Ziffer bildet dagegen eine kompakte Fläche.
-            if (gray < 95) dark[index / 4] = 1;
-        }
-        let largestComponent = 0;
-        let largestWidth = 0;
-        let largestHeight = 0;
-        let largestDensity = 0;
-        let darkPixelCount = 0;
-        const queue = [];
-        for (let start = 0; start < dark.length; start++) {
-            if (!dark[start]) continue;
-            dark[start] = 0;
-            queue.push(start);
-            let componentSize = 0;
-            let minX = size;
-            let minY = size;
-            let maxX = 0;
-            let maxY = 0;
-            while (queue.length) {
-                const current = queue.pop();
-                componentSize++;
-                darkPixelCount++;
-                const x = current % size;
-                const y = Math.floor(current / size);
-                minX = Math.min(minX, x);
-                minY = Math.min(minY, y);
-                maxX = Math.max(maxX, x);
-                maxY = Math.max(maxY, y);
-                for (let offsetY = -1; offsetY <= 1; offsetY++) {
-                    for (let offsetX = -1; offsetX <= 1; offsetX++) {
-                        if (!offsetX && !offsetY) continue;
-                        const neighborX = x + offsetX;
-                        const neighborY = y + offsetY;
-                        if (neighborX < 0 || neighborX >= size || neighborY < 0 || neighborY >= size) continue;
-                        const neighbor = neighborY * size + neighborX;
-                        if (dark[neighbor]) {
-                            dark[neighbor] = 0;
-                            queue.push(neighbor);
+        // Der innere Bereich vermeidet Gitterlinien, lässt aber auch hellere
+        // Zeitungsziffern am Rand der Druckfläche noch zu.
+        const size = Math.max(24, Math.round(cellSize * .70));
+        const inset = cellSize * .15;
+        const x0 = Math.max(0, Math.round(col * cellSize + inset));
+        const y0 = Math.max(0, Math.round(row * cellSize + inset));
+        const pixels = context.getImageData(
+            x0,
+            y0,
+            Math.min(size, source.width - x0),
+            Math.min(size, source.height - y0)
+        );
+        const width = pixels.width;
+        const height = pixels.height;
+        const area = width * height;
+        if (!area) return { score: 0, reviewable: false };
+
+        let best = { score: 0, darkRatio: 0, componentRatio: 0, density: 0 };
+        // Mehrere Schwellenwerte machen die Belegung unabhängig von
+        // Beleuchtung, Papierfarbe und leichtem Schatten.
+        for (const threshold of [65, 85, 105, 125, 145]) {
+            const dark = new Uint8Array(area);
+            let darkCount = 0;
+            for (let index = 0; index < pixels.data.length; index += 4) {
+                const gray = pixels.data[index] * .299
+                    + pixels.data[index + 1] * .587
+                    + pixels.data[index + 2] * .114;
+                if (gray < threshold) {
+                    dark[index / 4] = 1;
+                    darkCount++;
+                }
+            }
+            if (!darkCount) continue;
+
+            let largest = 0;
+            let largestWidth = 0;
+            let largestHeight = 0;
+            let largestDensity = 0;
+            const queue = [];
+            for (let start = 0; start < area; start++) {
+                if (!dark[start]) continue;
+                dark[start] = 0;
+                queue.push(start);
+                let componentSize = 0;
+                let minX = width;
+                let minY = height;
+                let maxX = 0;
+                let maxY = 0;
+                while (queue.length) {
+                    const current = queue.pop();
+                    componentSize++;
+                    const x = current % width;
+                    const y = Math.floor(current / width);
+                    minX = Math.min(minX, x);
+                    minY = Math.min(minY, y);
+                    maxX = Math.max(maxX, x);
+                    maxY = Math.max(maxY, y);
+                    for (let offsetY = -1; offsetY <= 1; offsetY++) {
+                        for (let offsetX = -1; offsetX <= 1; offsetX++) {
+                            if (!offsetX && !offsetY) continue;
+                            const neighborX = x + offsetX;
+                            const neighborY = y + offsetY;
+                            if (neighborX < 0 || neighborX >= width
+                                || neighborY < 0 || neighborY >= height) continue;
+                            const neighbor = neighborY * width + neighborX;
+                            if (dark[neighbor]) {
+                                dark[neighbor] = 0;
+                                queue.push(neighbor);
+                            }
                         }
                     }
                 }
+                if (componentSize > largest) {
+                    largest = componentSize;
+                    largestWidth = maxX - minX + 1;
+                    largestHeight = maxY - minY + 1;
+                    largestDensity = componentSize / (largestWidth * largestHeight);
+                }
             }
-            if (componentSize > largestComponent) {
-                largestComponent = componentSize;
-                largestWidth = maxX - minX + 1;
-                largestHeight = maxY - minY + 1;
-                largestDensity = componentSize / (largestWidth * largestHeight);
+
+            const darkRatio = darkCount / area;
+            const componentRatio = largest / area;
+            // Ein Schatten füllt eher eine breite Fläche; eine Druckziffer
+            // bildet dagegen eine kompakte, begrenzte Komponente.
+            const shapeScore = Math.min(1, largestDensity / .22)
+                * Math.min(1, componentRatio / .035);
+            const score = darkRatio * .45 + shapeScore * .55;
+            if (score > best.score) {
+                best = { score, darkRatio, componentRatio, density: largestDensity };
             }
         }
-        const scale = size / 64;
-        return darkPixelCount >= 50 * scale * scale
-            && largestComponent >= 45 * scale * scale
-            && largestWidth >= 6 * scale
-            && largestWidth <= 52 * scale
-            && largestHeight >= 12 * scale
-            && largestHeight <= 60 * scale
-            && largestDensity >= .12;
+
+        const reviewable = best.score >= .075
+            && best.componentRatio >= .012
+            && best.density >= .055;
+        return { ...best, reviewable };
+    }
+
+    function cellContainsDarkMark(source, row, col) {
+        return analyzeCellInk(source, row, col).reviewable;
     }
 
     function assessSudokuImageQuality(source) {
@@ -1438,7 +1472,7 @@
             && (!second || best.bestConfidence - second.bestConfidence >= 28);
     }
 
-    async function recognizeSudokuCells(worker, source, statusElement) {
+    async async function recognizeSudokuCells(worker, source, statusElement) {
         const result = new Map();
         const uncertain = [];
         let processed = 0;
@@ -1450,7 +1484,7 @@
             for (let col = 0; col < 9; col++) {
                 const rawCell = prepareOcrCell(source, row, col, "raw");
                 const reviewCell = prepareReviewCell(source, row, col);
-                const hasInk = cellContainsDarkMark(source, row, col);
+                const ink = analyzeCellInk(source, row, col);
                 const variants = [];
                 for (const variantName of ["raw", "otsu"]) {
                     const candidate = await recognizeOcrVariant(worker,
@@ -1458,31 +1492,33 @@
                     if (candidate) variants.push(candidate);
                 }
                 let ranked = rankOcrCandidates(variants);
-                // Die dritte Meinung verstärkt den Kontrast vor der
-                // Schwellwertbildung. Das hilft besonders bei grauem
-                // Zeitungspapier und flachem Druck, ohne Leerfelder pauschal
-                // als Ziffern zu behandeln.
-                if (!isClearOcrDecision(ranked) && (ranked.length || hasInk)) {
-                    const candidate = await recognizeOcrVariant(worker, prepareOcrCell(source, row, col, "enhanced"));
+                if (!isClearOcrDecision(ranked) && (ranked.length || ink.reviewable)) {
+                    const candidate = await recognizeOcrVariant(worker,
+                        prepareOcrCell(source, row, col, "enhanced"));
                     if (candidate) variants.push(candidate);
                     ranked = rankOcrCandidates(variants);
                 }
                 const best = ranked[0];
-                if (hasInk && isClearOcrDecision(ranked)) {
+                if (best && isClearOcrDecision(ranked)) {
                     result.set(row * 9 + col, {
                         index: row * 9 + col,
                         value: best.value,
                         confidence: best.bestConfidence,
                         preview: reviewCell,
-                        candidates: ranked.map(candidate => candidate.value)
+                        candidates: ranked.map(candidate => candidate.value),
+                        inkScore: ink.score
                     });
-                } else if (hasInk && (ranked.length || hasInk)) {
+                } else if (ink.reviewable || ranked.length) {
                     uncertain.push({
                         row,
                         col,
                         candidates: ranked.map(candidate => candidate.value),
                         preview: reviewCell,
-                        gridPreview: source
+                        gridPreview: source,
+                        reason: ranked.length
+                            ? "OCR-Ergebnis unsicher"
+                            : "Ziffer möglicherweise übersehen",
+                        inkScore: ink.score
                     });
                 }
                 processed++;
