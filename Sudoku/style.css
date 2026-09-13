@@ -48,9 +48,9 @@
 .ocr-live-cell { display: grid; place-items: center; min-width: 0; border: 1px solid rgba(102, 119, 166, .42); color: var(--text-main); font-size: clamp(1rem, 5vw, 2rem); font-weight: 700; transition: background-color .12s ease, color .12s ease, transform .12s ease; }
 .ocr-live-cell:nth-child(3n) { border-right: 2px solid rgba(142, 102, 255, .9); }
 .ocr-live-cell:nth-child(n+19):nth-child(-n+27), .ocr-live-cell:nth-child(n+46):nth-child(-n+54) { border-bottom: 2px solid rgba(142, 102, 255, .9); }
-.ocr-live-cell.pending { color: rgba(184, 194, 220, .45); background: rgba(30, 38, 58, .48); }
-.ocr-live-cell.empty { color: rgba(184, 194, 220, .3); background: rgba(12, 15, 25, .82); }
-.ocr-live-cell.recognized { color: #f5f7ff; background: rgba(44, 98, 175, .6); }
+.ocr-live-cell.pending { color: rgba(184, 194, 220, .45); background: #1e263a; }
+.ocr-live-cell.empty { color: rgba(184, 194, 220, .3); background: #0c0f19; }
+.ocr-live-cell.recognized { color: #f5f7ff; background: #2c62af; }
 .ocr-live-cell.active { outline: 2px solid var(--accent); outline-offset: -2px; transform: scale(.96); }
 .ocr-progress-badge { position: absolute; top: 50%; left: 50%; z-index: 8; display: grid; place-items: center; width: min(82%, 300px); min-height: 54px; padding: 10px 14px; transform: translate(-50%, -50%); border: 1px solid var(--accent); border-radius: var(--radius-md); background: rgba(12, 15, 25, .94); box-shadow: 0 8px 26px rgba(0,0,0,.55), 0 0 18px rgba(79,140,255,.22); color: var(--text-main); font-size: .85rem; line-height: 1.3; text-align: center; pointer-events: none; opacity: 1; transition: opacity .35s ease; }
 .ocr-progress-badge.fade-out { opacity: 0; }
