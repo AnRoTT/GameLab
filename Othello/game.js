@@ -29,6 +29,11 @@ const gameScreen = document.getElementById("gameScreen");
 const fullscreenToggle = document.getElementById("fullscreenToggle");
 const mobileSettingsBack = document.getElementById("mobileSettingsBack");
 const mobileGameAction = document.getElementById("mobileGameAction");
+const resumeSavedButton = document.getElementById("resumeSavedButton");
+const resumeConfirmBackdrop = document.getElementById("resumeConfirmBackdrop");
+const resumeDecline = document.getElementById("resumeDecline");
+const resumeAccept = document.getElementById("resumeAccept");
+const resumeProgress = document.getElementById("resumeProgress");
 let mobilePrototype = window.AndisMobileLayout?.detectMobileSession?.() ?? false;
 const screenController = window.AndisMobileLayout?.createScreenController?.({
     setupScreen,
@@ -108,6 +113,8 @@ settingsStartButton.addEventListener("click", () => {
     window.AndisSound?.playUiClick?.(0.22);
     if (gameStarted && !gameOver) {
         resetGame();
+        OthelloStorage.clear();
+        updateResumeAction();
         return;
     }
     initGame();
@@ -231,11 +238,95 @@ let passTimer = null;
 let gameToken = 0;
 let keyboardRow = 3;
 let keyboardCol = 3;
+let pendingTransitionKind = null;
+let resumePreviouslyFocused = null;
+let pendingSavedState = null;
+let savedInSetup = false;
+let leavingToMenu = false;
+let returningToSetup = false;
 
 window.othelloPlayerProfile = createOthelloPlayerProfile();
 
+function hasSavableGame() {
+    return Boolean(gameStarted && (!gameOver || (matchInProgress && getMatchMode() > 0)));
+}
+
+function createSavedState() {
+    return {
+        schemaVersion: 1,
+        gameId: "othello",
+        savedAt: new Date().toISOString(),
+        board: board.map(row => row.slice()),
+        currentPlayer,
+        gameOver,
+        gameStarted,
+        turnTransitionActive,
+        pendingTransitionKind,
+        playerOneColor,
+        matchRound,
+        matchWins: { ...matchWins },
+        matchInProgress,
+        lastMoveWasPressure,
+        keyboardRow,
+        keyboardCol,
+        settings: {
+            vsComputer,
+            botLevelIndex,
+            adaptSpeedIndex,
+            showMoveHints,
+            matchModeIndex,
+            botType
+        },
+        status: statusEl?.textContent || "",
+        scoreBlack: Number(scoreBlackEl?.textContent) || 0,
+        scoreWhite: Number(scoreWhiteEl?.textContent) || 0
+    };
+}
+
+function isValidSavedState(saved) {
+    return Boolean(saved
+        && saved.gameId === "othello"
+        && Array.isArray(saved.board)
+        && saved.board.length === 8
+        && saved.board.every(row => Array.isArray(row)
+            && row.length === 8
+            && row.every(value => value === null || value === "black" || value === "white"))
+        && (saved.currentPlayer === "black" || saved.currentPlayer === "white")
+        && typeof saved.gameStarted === "boolean"
+        && saved.gameStarted
+        && saved.settings
+        && typeof saved.settings.vsComputer === "boolean"
+        && Number.isInteger(saved.settings.botLevelIndex)
+        && saved.settings.botLevelIndex >= 0
+        && saved.settings.botLevelIndex < BOT_LEVELS.length
+        && Number.isInteger(saved.settings.adaptSpeedIndex)
+        && saved.settings.adaptSpeedIndex >= 0
+        && saved.settings.adaptSpeedIndex < ADAPT_SPEEDS.length
+        && Number.isInteger(saved.settings.matchModeIndex)
+        && saved.settings.matchModeIndex >= 0
+        && saved.settings.matchModeIndex < MATCH_OPTIONS.length);
+}
+
+function writeSavedGame() {
+    if (hasSavableGame()) OthelloStorage.save(createSavedState());
+    else OthelloStorage.clear();
+}
+
+function saveCurrentGame() {
+    if (savedInSetup || leavingToMenu) return;
+    writeSavedGame();
+}
+
+function updateResumeAction() {
+    const saved = OthelloStorage.load();
+    resumeSavedButton.hidden = !mobilePrototype || !isValidSavedState(saved);
+}
+
 function initGame() {
     cancelPendingTurnTimers();
+    savedInSetup = false;
+    returningToSetup = false;
+    pendingTransitionKind = null;
     const token = gameToken;
     if (!matchInProgress || getMatchMode() === 0) {
         matchInProgress = getMatchMode() > 0;
@@ -292,6 +383,7 @@ moveHintsBtn.classList.add("disabled"); // nur Zughilfe sperren
             botMove(token);
         }, openingDelay);
     }
+    saveCurrentGame();
 }
 
 function cancelPendingTurnTimers() {
@@ -307,22 +399,27 @@ function cancelPendingTurnTimers() {
         clearTimeout(passTimer);
         passTimer = null;
     }
+    pendingTransitionKind = null;
     gameToken += 1;
 }
 
 function scheduleNextTurn(delay, token = gameToken) {
     if (nextTurnTimer !== null) clearTimeout(nextTurnTimer);
     turnTransitionActive = true;
+    pendingTransitionKind = "move";
     nextTurnTimer = setTimeout(() => {
         nextTurnTimer = null;
         if (token !== gameToken || !gameStarted || gameOver) return;
         turnTransitionActive = false;
+        pendingTransitionKind = null;
         nextTurn();
     }, delay);
 }
 
 function resetGame() {
     cancelPendingTurnTimers();
+    savedInSetup = false;
+    returningToSetup = false;
     [scoreBlackEl.parentElement, scoreWhiteEl.parentElement].forEach(element => element.classList.remove("winner"));
     board = Array(8).fill(null).map(() => Array(8).fill(null));
     keyboardRow = 3;
@@ -364,10 +461,142 @@ function showGameScreen() {
     fullscreenController?.requestIfChosen();
 }
 
+function showSetupAfterSavedGame() {
+    fullscreenController?.exit();
+    cancelPendingTurnTimers();
+    document.body.classList.remove("game-active");
+    gameStarted = false;
+    gameOver = true;
+    matchInProgress = false;
+    turnTransitionActive = false;
+    boardEl.classList.add("disabled");
+    boardEl.tabIndex = -1;
+    startBtn.textContent = "Jetzt spielen";
+    if (mobileGameAction) mobileGameAction.textContent = "Spiel abbrechen";
+    if (typeof window.setOthelloMatchSettingsLocked === "function") {
+        window.setOthelloMatchSettingsLocked(false);
+    }
+    if (mobilePrototype) screenController?.showSetup();
+    updateResumeAction();
+}
+
+function abortToSetup() {
+    returningToSetup = false;
+    savedInSetup = false;
+    window.AndisSavedGameNotice?.hide?.();
+    resetGame();
+    OthelloStorage.clear();
+    updateResumeAction();
+    showSetupScreen();
+}
+
+function saveAndReturnToSetup() {
+    if (returningToSetup) return;
+    if (!hasSavableGame()) {
+        showSetupScreen();
+        return;
+    }
+    writeSavedGame();
+    cancelPendingTurnTimers();
+    savedInSetup = true;
+    returningToSetup = true;
+    window.AndisSavedGameNotice?.show?.("Spiel gespeichert", 1000, () => {
+        returningToSetup = false;
+        showSetupAfterSavedGame();
+    });
+}
+
+function leaveToMenu() {
+    if (leavingToMenu) return;
+    leavingToMenu = true;
+    if (savedInSetup) {
+        window.location.href = "../index.html?menu=1";
+        return;
+    }
+    if (hasSavableGame()) {
+        writeSavedGame();
+        cancelPendingTurnTimers();
+        window.AndisSavedGameNotice?.show?.("Spiel gespeichert", 1000, () => {
+            window.location.href = "../index.html?menu=1";
+        });
+        return;
+    }
+    OthelloStorage.clear();
+    window.location.href = "../index.html?menu=1";
+}
+
+function restoreSavedGame(saved) {
+    if (!isValidSavedState(saved)) return false;
+    cancelPendingTurnTimers();
+    savedInSetup = false;
+    returningToSetup = false;
+    leavingToMenu = false;
+
+    vsComputer = Boolean(saved.settings.vsComputer);
+    botLevelIndex = saved.settings.botLevelIndex;
+    adaptSpeedIndex = saved.settings.adaptSpeedIndex;
+    showMoveHints = Boolean(saved.settings.showMoveHints);
+    matchModeIndex = saved.settings.matchModeIndex;
+    botType = saved.settings.botType === "manual" ? "manual" : "adaptive";
+    settingsModeButton.textContent = vsComputer ? "1 Spieler" : "2 Spieler";
+    settingsMoveHintsButton.textContent = showMoveHints ? "Ein" : "Aus";
+    updateBotLevelUI();
+    updateMatchModeUI();
+
+    board = saved.board.map(row => row.slice());
+    currentPlayer = saved.currentPlayer;
+    gameOver = Boolean(saved.gameOver);
+    gameStarted = true;
+    turnTransitionActive = Boolean(saved.turnTransitionActive);
+    pendingTransitionKind = saved.pendingTransitionKind === "pass" || saved.pendingTransitionKind === "move"
+        ? saved.pendingTransitionKind
+        : null;
+    playerOneColor = saved.playerOneColor === "white" ? "white" : "black";
+    matchRound = Math.max(1, Number(saved.matchRound) || 1);
+    matchWins = {
+        playerOne: Math.max(0, Number(saved.matchWins?.playerOne) || 0),
+        playerTwo: Math.max(0, Number(saved.matchWins?.playerTwo) || 0)
+    };
+    matchInProgress = Boolean(saved.matchInProgress);
+    lastMoveWasPressure = Boolean(saved.lastMoveWasPressure);
+    keyboardRow = Math.max(0, Math.min(7, Number(saved.keyboardRow) || 0));
+    keyboardCol = Math.max(0, Math.min(7, Number(saved.keyboardCol) || 0));
+
+    document.body.classList.add("game-active");
+    boardEl.classList.toggle("disabled", gameOver || !gameStarted);
+    boardEl.tabIndex = gameOver || !gameStarted || turnTransitionActive ? -1 : 0;
+    renderBoard();
+    updateScore();
+    statusEl.textContent = saved.status || `${getColorLabel(currentPlayer)} am Zug – ${getPlayerLabel(currentPlayer)}`;
+    updateMatchInfo();
+    startBtn.textContent = getMatchMode() > 0 ? "Match beenden" : "Spiel abbrechen";
+    if (mobileGameAction) mobileGameAction.textContent = "Spiel abbrechen";
+    if (typeof window.setOthelloMatchSettingsLocked === "function") {
+        window.setOthelloMatchSettingsLocked(true);
+    }
+    if (mobilePrototype) showGameScreen();
+    updateResumeAction();
+
+    const token = gameToken;
+    if (!gameOver && pendingTransitionKind === "move") {
+        scheduleNextTurn(0, token);
+    } else if (!gameOver && pendingTransitionKind === "pass") {
+        setTimeout(() => {
+            if (token === gameToken) continueTurnAfterTransition();
+        }, 0);
+    } else if (!gameOver && vsComputer && currentPlayer === getBotColor()) {
+        continueTurnAfterTransition();
+    }
+    saveCurrentGame();
+    return true;
+}
+
 mobileGameAction?.addEventListener("click", () => {
     window.AndisSound?.playUiClick?.(0.22);
     if (gameStarted && !gameOver) {
         resetGame();
+        OthelloStorage.clear();
+        updateResumeAction();
         showSetupScreen();
         return;
     }
@@ -418,7 +647,7 @@ function isHumanTurn() {
 
 boardEl.tabIndex = -1;
 boardEl.addEventListener("keydown", event => {
-    if (gameOver || !gameStarted || boardEl.classList.contains("disabled")) return;
+    if (gameOver || !gameStarted || turnTransitionActive || boardEl.classList.contains("disabled")) return;
     if (vsComputer && currentPlayer !== playerOneColor) return;
 
     let nextRow = keyboardRow;
@@ -501,6 +730,35 @@ function updateScoreLabels() {
     document.getElementById("scoreWhiteLabel").textContent = getPlayerLabel("white");
 }
 
+function continueTurnAfterTransition() {
+    passTimer = null;
+    if (gameOver || !gameStarted) return;
+
+    turnTransitionActive = false;
+    pendingTransitionKind = null;
+    updateTurnStatus();
+    renderBoard();
+
+    if (vsComputer && currentPlayer === getBotColor()) {
+        const botColor = getBotColor();
+        const moves = getAllValidMoves(botColor);
+        if (moves.length > 0) {
+            const thinkTime = botType === "adaptive" && typeof getAdaptiveBotThinkTime === "function"
+                ? getAdaptiveBotThinkTime()
+                : typeof getOthelloBotThinkTime === "function"
+                ? getOthelloBotThinkTime(botLevelIndex + 1, botColor)
+                : 300;
+            const token = gameToken;
+            botMoveTimer = setTimeout(() => {
+                botMoveTimer = null;
+                if (token !== gameToken || !gameStarted || gameOver) return;
+                botMove(token);
+            }, thinkTime);
+        }
+    }
+    saveCurrentGame();
+}
+
 function nextTurn() { // NEU: Zentrale Funktion für Spielerwechsel + Bot
     if(checkGameOver()) return;
 
@@ -522,45 +780,19 @@ function nextTurn() { // NEU: Zentrale Funktion für Spielerwechsel + Bot
         currentPlayer = otherPlayer;
     }
 
-    const continueTurn = () => {
-        passTimer = null;
-        if (gameOver || !gameStarted) return;
-
-        updateTurnStatus();
-        renderBoard();
-
-        // Wenn Bot dran ist und Spiel läuft: nach seiner Denkzeit ziehen.
-        if(vsComputer && currentPlayer === getBotColor()) {
-            const botColor = getBotColor();
-            const moves = getAllValidMoves(botColor);
-            if(moves.length > 0) {
-                const thinkTime = botType === "adaptive" && typeof getAdaptiveBotThinkTime === "function"
-                    ? getAdaptiveBotThinkTime()
-                    : typeof getOthelloBotThinkTime === "function"
-                    ? getOthelloBotThinkTime(botLevelIndex + 1, botColor)
-                    : 300;
-                const token = gameToken;
-                botMoveTimer = setTimeout(() => {
-                    botMoveTimer = null;
-                    if (token !== gameToken || !gameStarted || gameOver) return;
-                    botMove(token);
-                }, thinkTime);
-            }
-        }
-    };
-
     if (passMessage) {
         statusEl.textContent = passMessage;
         renderBoard();
         const token = gameToken;
+        pendingTransitionKind = "pass";
         passTimer = setTimeout(() => {
             if (token !== gameToken) return;
-            continueTurn();
+            continueTurnAfterTransition();
         }, 800);
         return;
     }
 
-    continueTurn();
+    continueTurnAfterTransition();
 }
 
 function botMove(token = gameToken) { // Bot zieht und ruft dann nextTurn
@@ -590,6 +822,7 @@ function botMove(token = gameToken) { // Bot zieht und ruft dann nextTurn
     animateMove(result.move, result.flips, botColor);
     lastMoveWasPressure = getPressureState(botColor);
     scheduleNextTurn(430 + result.flips.length * 65, token); // Nach der Animation ist Schwarz dran
+    saveCurrentGame();
 }
 
 function checkGameOver() {
@@ -647,6 +880,7 @@ function endGame() {
         if (typeof window.setOthelloMatchSettingsLocked === "function") {
             window.setOthelloMatchSettingsLocked(true);
         }
+        saveCurrentGame();
         return;
     }
     statusEl.textContent = `Spiel vorbei! ${winner} ${black}:${white}`;
@@ -655,12 +889,13 @@ function endGame() {
     if (typeof window.setOthelloMatchSettingsLocked === "function") {
         window.setOthelloMatchSettingsLocked(false);
     }
+    saveCurrentGame();
 }
 
 boardEl.addEventListener("pointerdown", (e) => {
     const cell = e.target.closest(".cell");
     if (!cell) return;
-    const invalid = gameOver || !gameStarted || (vsComputer && currentPlayer !== playerOneColor);
+    const invalid = gameOver || !gameStarted || turnTransitionActive || (vsComputer && currentPlayer !== playerOneColor);
     if (!invalid) return;
     e.preventDefault();
     cell.blur();
@@ -668,7 +903,7 @@ boardEl.addEventListener("pointerdown", (e) => {
 }, true);
 
 boardEl.addEventListener("click", (e) => {
-    if(gameOver ||!gameStarted) return;
+    if(gameOver || !gameStarted || turnTransitionActive) return;
     if(vsComputer && currentPlayer !== playerOneColor) return; // Klick blocken wenn Bot dran
 
     const cell = e.target.closest(".cell");
@@ -713,6 +948,7 @@ boardEl.addEventListener("click", (e) => {
         animateMove(result.move, result.flips, currentPlayer);
         lastMoveWasPressure = getPressureState(currentPlayer);
         scheduleNextTurn(430 + result.flips.length * 65); // Erst nach der Animation wechseln
+        saveCurrentGame();
     } else {
         playSound(soundError, 0.22);
     }
@@ -720,21 +956,94 @@ boardEl.addEventListener("click", (e) => {
 
 resetGame();
 
+function closeResumeConfirm() {
+    resumeConfirmBackdrop.hidden = true;
+    pendingSavedState = null;
+    resumePreviouslyFocused?.focus?.({ preventScroll: true });
+    resumePreviouslyFocused = null;
+}
+
+function requestResume(saved) {
+    pendingSavedState = saved;
+    resumePreviouslyFocused = document.activeElement;
+    const filled = saved.board.flat().filter(Boolean).length;
+    const modeText = saved.settings.vsComputer ? "Gegen den Bot" : "2 Spieler";
+    resumeProgress.textContent = `${modeText} · ${filled} belegte Felder · Runde ${saved.matchRound || 1}`;
+    resumeConfirmBackdrop.hidden = false;
+    resumeAccept.focus();
+}
+
+resumeDecline?.addEventListener("click", () => {
+    window.AndisSound?.playUiClick?.(0.22);
+    closeResumeConfirm();
+    OthelloStorage.clear();
+    updateResumeAction();
+    settingsModeButton.focus({ preventScroll: true });
+});
+
+resumeAccept?.addEventListener("click", () => {
+    window.AndisSound?.playUiClick?.(0.22);
+    const saved = pendingSavedState;
+    closeResumeConfirm();
+    restoreSavedGame(saved);
+});
+
+resumeConfirmBackdrop?.addEventListener("click", event => {
+    if (event.target === resumeConfirmBackdrop) closeResumeConfirm();
+});
+
+document.addEventListener("keydown", event => {
+    if (!resumeConfirmBackdrop || resumeConfirmBackdrop.hidden) return;
+    if (event.key === "Escape") {
+        event.preventDefault();
+        closeResumeConfirm();
+        return;
+    }
+    if (event.key !== "Tab") return;
+    const focusable = [resumeDecline, resumeAccept].filter(Boolean);
+    const currentIndex = focusable.indexOf(document.activeElement);
+    const nextIndex = event.shiftKey
+        ? (currentIndex <= 0 ? focusable.length - 1 : currentIndex - 1)
+        : (currentIndex === focusable.length - 1 ? 0 : currentIndex + 1);
+    event.preventDefault();
+    focusable[nextIndex]?.focus();
+});
+
+window.addEventListener("beforeunload", saveCurrentGame);
+
+const menuButton = document.getElementById("backIcon");
+menuButton?.addEventListener("click", event => {
+    event.preventDefault();
+    window.AndisSound?.playUiClick?.(0.22);
+    if (hasSavableGame()) leaveToMenu();
+    else window.location.href = "../index.html?menu=1";
+});
+
 window.AndisNavigation?.bindBackButton?.({
     button: mobileSettingsBack,
     isGameActive: () => document.body.classList.contains("game-active") || gameStarted,
     isMatchRunning: () => gameStarted && !gameOver,
-    onAbortConfirmed: () => {
-        resetGame();
-        showSetupScreen();
-    }
+    onActiveBack: saveAndReturnToSetup,
+    onAbortConfirmed: abortToSetup,
+    onMenuBack: saveAndReturnToSetup
 });
 
 const browserBackGuard = window.AndisNavigation?.bindBrowserBack?.({
     isGameActive: () => document.body.classList.contains("game-active") || gameStarted,
     isMatchRunning: () => gameStarted && !gameOver,
-    onAbortConfirmed: () => {
-        resetGame();
-        showSetupScreen();
-    }
+    onAbortConfirmed: leaveToMenu
 });
+
+resumeSavedButton?.addEventListener("click", () => {
+    window.AndisSound?.playUiClick?.(0.22);
+    const saved = OthelloStorage.load();
+    if (isValidSavedState(saved)) restoreSavedGame(saved);
+});
+
+updateResumeAction();
+const savedOthello = OthelloStorage.load();
+const returnedFromGuide = new URLSearchParams(window.location.search).get("guide") === "1";
+if (isValidSavedState(savedOthello)) {
+    if (returnedFromGuide) restoreSavedGame(savedOthello);
+    else requestResume(savedOthello);
+}

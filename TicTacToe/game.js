@@ -66,12 +66,22 @@ const setupScreen = document.getElementById("setupScreen");
 const gameScreen = document.getElementById("gameScreen");
 const mobileGameAction = document.getElementById("mobileGameAction");
 const mobileSettingsBack = document.getElementById("mobileSettingsBack");
+const resumeSavedButton = document.getElementById("resumeSavedButton");
 const fullscreenToggle = document.getElementById("fullscreenToggle");
+const resumeConfirmBackdrop = document.getElementById("resumeConfirmBackdrop");
+const resumeDecline = document.getElementById("resumeDecline");
+const resumeAccept = document.getElementById("resumeAccept");
+const resumeProgress = document.getElementById("resumeProgress");
 function syncMobileGameAction() {
     if (!mobileGameAction) return;
-    const nextRoundPending = reset.textContent === "Neue Runde";
-    mobileGameAction.hidden = nextRoundPending;
-    mobileGameAction.textContent = reset.textContent || "Spiel abbrechen";
+    if (leavingToMenu) {
+        mobileGameAction.textContent = "Spiel gespeichert";
+        mobileGameAction.disabled = true;
+        return;
+    }
+    mobileGameAction.hidden = false;
+    mobileGameAction.textContent = "Spiel abbrechen";
+    mobileGameAction.disabled = false;
 }
 function detectMobilePrototype() {
     return window.AndisMobileLayout?.detectMobileSession?.() ?? false;
@@ -151,6 +161,11 @@ let waitingForNextRound = false;
 let botMoveTimer = null;
 let nextRoundCountdownTimer = null;
 let keyboardCursor = 0;
+let resumePreviouslyFocused = null;
+let pendingSavedState = null;
+let leavingToMenu = false;
+let savedInSetup = false;
+let returningToSetup = false;
 
 function readSettings() {
     activeMatch = {
@@ -160,6 +175,142 @@ function readSettings() {
         roundMode: window.currentMode ?? "short",
         adaptSpeed: window.currentAdapt ?? "normal"
     };
+}
+
+function savedSettings() {
+    return {
+        mode: activeMatch.mode,
+        botLevel: activeMatch.botLevel,
+        totalRounds: activeMatch.totalRounds,
+        roundMode: activeMatch.roundMode,
+        adaptSpeed: activeMatch.adaptSpeed
+    };
+}
+
+function hasSavableGame() {
+    return Boolean(!matchOver && (!gameOver || waitingForNextRound || roundsPlayed > 0));
+}
+
+function saveCurrentGame() {
+    if (savedInSetup) return;
+    if (!hasSavableGame()) {
+        window.TicTacToeStorage?.clear?.();
+        return;
+    }
+    window.TicTacToeStorage?.save?.({
+        schemaVersion: 1,
+        gameId: "tictactoe",
+        savedAt: new Date().toISOString(),
+        settings: savedSettings(),
+        cells: cells.slice(),
+        current,
+        gameOver,
+        waitingForNextRound,
+        matchOver,
+        activeMatch: { ...activeMatch },
+        scoreX,
+        scoreO,
+        scoreDraw,
+        roundsPlayed,
+        startingPlayer,
+        winRowGlobal: winRowGlobal ? winRowGlobal.slice() : null,
+        keyboardCursor,
+        status: status.textContent,
+        winnerBanner: winnerBanner.textContent
+    });
+}
+
+function leaveToMenu() {
+    if (leavingToMenu) return;
+    leavingToMenu = true;
+    cancelPendingBotMove();
+    cancelNextRoundCountdown();
+    if (savedInSetup) {
+        window.location.href = "../index.html?menu=1";
+        return;
+    }
+    saveCurrentGame();
+    window.AndisSavedGameNotice?.show?.("Spiel gespeichert", 1000, () => {
+        window.location.href = "../index.html?menu=1";
+    });
+}
+
+function applySavedSettings(settings = {}) {
+    playersIdx = settings.mode === "bot" ? 0 : 1;
+    roundsIdx = Math.max(0, roundsOptions.indexOf(Number(settings.totalRounds)));
+    modeIdx = Math.max(0, ["short", "full", "tournament"].indexOf(settings.roundMode));
+    diffIdx = Math.max(0, Math.min(difficultyOptions.length - 1, Number(settings.botLevel || 1) - 1));
+    adaptIdx = Math.max(0, ["slow", "normal", "fast"].indexOf(settings.adaptSpeed));
+    updateSettingsUI();
+}
+
+function isValidSavedState(saved) {
+    return Boolean(saved
+        && saved.gameId === "tictactoe"
+        && Array.isArray(saved.cells) && saved.cells.length === 9
+        && saved.cells.every(value => value === null || value === "X" || value === "O")
+        && (saved.current === "X" || saved.current === "O"));
+}
+
+function updateResumeAction() {
+    const saved = window.TicTacToeStorage?.load?.();
+    resumeSavedButton.hidden = !mobilePrototype
+        || !isValidSavedState(saved)
+        || Boolean(saved.matchOver);
+}
+
+function closeResumeConfirm() {
+    resumeConfirmBackdrop.hidden = true;
+    pendingSavedState = null;
+    resumePreviouslyFocused?.focus?.({ preventScroll: true });
+    resumePreviouslyFocused = null;
+}
+
+function requestResume(saved) {
+    pendingSavedState = saved;
+    resumePreviouslyFocused = document.activeElement;
+    const filled = saved.cells.filter(Boolean).length;
+    const roundText = `${saved.roundsPlayed || 0} Runde${saved.roundsPlayed === 1 ? "" : "n"}`;
+    resumeProgress.textContent = `${saved.settings?.mode === "bot" ? "Gegen den Bot" : "2 Spieler"} · ${filled} gesetzte Felder · ${roundText}`;
+    resumeConfirmBackdrop.hidden = false;
+    resumeAccept.focus();
+}
+
+function restoreSavedGame(saved) {
+    if (!isValidSavedState(saved)) return false;
+    cancelPendingBotMove();
+    cancelNextRoundCountdown();
+    savedInSetup = false;
+    applySavedSettings(saved.settings);
+    activeMatch = { ...activeMatch, ...(saved.activeMatch || {}) };
+    cells = saved.cells.slice();
+    current = saved.current;
+    gameOver = Boolean(saved.gameOver);
+    waitingForNextRound = Boolean(saved.waitingForNextRound);
+    matchOver = Boolean(saved.matchOver);
+    scoreX = Number(saved.scoreX) || 0;
+    scoreO = Number(saved.scoreO) || 0;
+    scoreDraw = Number(saved.scoreDraw) || 0;
+    roundsPlayed = Number(saved.roundsPlayed) || 0;
+    startingPlayer = saved.startingPlayer === "O" ? "O" : "X";
+    winRowGlobal = Array.isArray(saved.winRowGlobal) ? saved.winRowGlobal.slice() : null;
+    keyboardCursor = Math.max(0, Math.min(8, Number(saved.keyboardCursor) || 0));
+    applySettingsLock(!matchOver && (roundsPlayed > 0 || !gameOver));
+    document.body.classList.add("game-active");
+    if (mobilePrototype) showGameScreen();
+    board.classList.toggle("locked", gameOver || waitingForNextRound || matchOver);
+    board.tabIndex = gameOver || waitingForNextRound || matchOver ? -1 : 0;
+    updateScore(scoreX, scoreDraw, scoreO);
+    status.textContent = saved.status || `${current} ist dran`;
+    winnerBanner.textContent = saved.winnerBanner || "";
+    winnerBanner.classList.toggle("show", Boolean(saved.winnerBanner));
+    reset.textContent = waitingForNextRound ? "Neue Runde" : matchOver ? "Neues Spiel" : "Spiel abbrechen";
+    syncMobileGameAction();
+    render();
+    if (waitingForNextRound && !matchOver) startNextRoundCountdown();
+    else if (canBotMove()) scheduleBotMove(getBotDelay(), true);
+    saveCurrentGame();
+    return true;
 }
 
 /* Render Board */
@@ -341,6 +492,7 @@ function playMove(index, player) {
         status.textContent = `${current} ist dran`;
     }
     render();
+    saveCurrentGame();
 
     if (canBotMove()) {
         scheduleBotMove(getBotDelay());
@@ -463,18 +615,20 @@ if(matchFinished){
     winnerBanner.classList.add("show");
     reset.textContent = "Neues Spiel";
     syncMobileGameAction();
-} else {
-    status.textContent = message;
+    } else {
+        status.textContent = message;
     winnerBanner.classList.remove("show");
     winnerBanner.textContent = "";
     reset.textContent = "Neue Runde";
     syncMobileGameAction();
-    startNextRoundCountdown();
-}
+        startNextRoundCountdown();
+    }
+    saveCurrentGame();
 }
 
 /* Reset - ÃœBERARBEITET */
 function resetGame(full = true) {
+    savedInSetup = false;
     ["scoreX", "scoreO"].forEach(id => document.getElementById(id).classList.remove("winner"));
     cancelPendingBotMove();
     cancelNextRoundCountdown();
@@ -522,6 +676,7 @@ function resetGame(full = true) {
     reset.textContent = "Spiel abbrechen";
     syncMobileGameAction();
     render();
+    saveCurrentGame();
 
     if (canBotMove()) {
         scheduleBotMove(getBotDelay(), true);
@@ -541,7 +696,23 @@ function showSetupScreen() {
     status.textContent = "Einstellungen wählen und 'Neues Spiel' klicken";
     reset.textContent = "Neues Spiel";
     syncMobileGameAction();
+    updateResumeAction();
     render();
+}
+
+function saveAndReturnToSetup() {
+    if (returningToSetup) return;
+    if (!hasSavableGame()) {
+        showSetupScreen();
+        return;
+    }
+    saveCurrentGame();
+    savedInSetup = true;
+    returningToSetup = true;
+        window.AndisSavedGameNotice?.show?.("Spiel gespeichert", 1000, () => {
+        returningToSetup = false;
+        showSetupScreen();
+    });
 }
 
 function showGameScreen() {
@@ -552,6 +723,9 @@ function showGameScreen() {
 }
 
 function abortMatch() {
+    returningToSetup = false;
+    window.AndisSavedGameNotice?.hide?.();
+    savedInSetup = false;
     cancelPendingBotMove();
     cancelNextRoundCountdown();
     cells = Array(9).fill(null);
@@ -576,6 +750,7 @@ function abortMatch() {
     reset.textContent = "Neues Spiel";
     applySettingsLock(false);
     render();
+    window.TicTacToeStorage?.clear?.();
 }
 
 /* NEU: Reset Button Logik */
@@ -597,12 +772,7 @@ reset.onclick = () => {
 };
 
 mobileGameAction?.addEventListener("click", () => {
-    if (mobilePrototype && !gameOver && !waitingForNextRound && !matchOver) {
-        playUiClick(0.2);
-        abortMatch();
-        showSetupScreen();
-        return;
-    }
+    playUiClick(0.2);
     reset.click();
 });
 
@@ -620,6 +790,7 @@ function init() {
     status.textContent = "Einstellungen wählen und 'Neues Spiel' klicken";
     reset.textContent = "Neues Spiel";
     syncMobileGameAction();
+    updateResumeAction();
     render();
 }
 
@@ -635,23 +806,57 @@ reset.addEventListener('click', () => {
     playUiClick(0.2);
 });
 
+window.addEventListener("beforeunload", saveCurrentGame);
+
+resumeDecline.addEventListener("click", () => {
+    playUiClick(0.2);
+    closeResumeConfirm();
+    window.TicTacToeStorage?.clear?.();
+    updateResumeAction();
+    document.getElementById("btnPlayers")?.focus({ preventScroll: true });
+});
+resumeAccept.addEventListener("click", () => {
+    playUiClick(0.2);
+    const saved = pendingSavedState;
+    closeResumeConfirm();
+    restoreSavedGame(saved);
+});
+resumeConfirmBackdrop.addEventListener("click", event => {
+    if (event.target === resumeConfirmBackdrop) closeResumeConfirm();
+});
+document.addEventListener("keydown", event => {
+    if (event.key === "Escape" && !resumeConfirmBackdrop.hidden) {
+        event.preventDefault();
+        closeResumeConfirm();
+    } else if (event.key === "Tab" && !resumeConfirmBackdrop.hidden) {
+        const focusable = [resumeDecline, resumeAccept];
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
+    }
+});
+
 const backBtn = document.getElementById("backIcon");
 init();
 
-window.AndisNavigation?.bindBackButton?.({
-    button: backBtn,
-    isGameActive: () => document.body.classList.contains("game-active")
-        || !gameOver
-        || roundsPlayed > 0,
-    isMatchRunning: () => !gameOver && !waitingForNextRound && !matchOver,
-    onAbortConfirmed: () => {
-        abortMatch();
-        showSetupScreen();
-    },
-    onMenuBack: () => {
-        window.AndisSound?.playUiClick?.(0.22);
-        setTimeout(() => { window.location.href = "../index.html?menu=1"; }, 100);
-    }
+const savedTicTacToe = window.TicTacToeStorage?.load?.();
+if (isValidSavedState(savedTicTacToe) && !savedTicTacToe.matchOver) {
+    const returnedFromGuide = new URLSearchParams(window.location.search).get("guide") === "1";
+    if (returnedFromGuide) restoreSavedGame(savedTicTacToe);
+    else requestResume(savedTicTacToe);
+}
+
+backBtn?.addEventListener("click", event => {
+    event.preventDefault();
+    window.AndisSound?.playUiClick?.(0.22);
+    if (hasSavableGame()) leaveToMenu();
+    else window.location.href = "../index.html?menu=1";
 });
 
 window.AndisNavigation?.bindBackButton?.({
@@ -660,10 +865,17 @@ window.AndisNavigation?.bindBackButton?.({
         || !gameOver
         || roundsPlayed > 0,
     isMatchRunning: () => !gameOver && !waitingForNextRound && !matchOver,
+    onActiveBack: saveAndReturnToSetup,
     onAbortConfirmed: () => {
         abortMatch();
         showSetupScreen();
     }
+});
+
+resumeSavedButton?.addEventListener("click", () => {
+    playUiClick(0.2);
+    const saved = window.TicTacToeStorage?.load?.();
+    if (isValidSavedState(saved) && !saved.matchOver) restoreSavedGame(saved);
 });
 
 const browserBackGuard = window.AndisNavigation?.bindBrowserBack?.({
@@ -672,7 +884,6 @@ const browserBackGuard = window.AndisNavigation?.bindBrowserBack?.({
         || roundsPlayed > 0,
     isMatchRunning: () => !gameOver && !waitingForNextRound && !matchOver,
     onAbortConfirmed: () => {
-        abortMatch();
-        showSetupScreen();
+        leaveToMenu();
     }
 });

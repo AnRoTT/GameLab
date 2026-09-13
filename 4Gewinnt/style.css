@@ -532,6 +532,8 @@ main {
 
 .board.disabled {
     pointer-events: none;
+    opacity: .45;
+    filter: grayscale(35%);
 }
 .button-disabled {
     pointer-events: none;
@@ -1143,6 +1145,31 @@ body:not(.mobile-prototype) .game-screen { display: contents; }
     display: none !important;
 }
 
+.connect-four-confirm-backdrop[hidden] { display: none; }
+.connect-four-confirm-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    display: grid;
+    place-items: center;
+    padding: 18px;
+    background: rgba(0, 0, 0, .62);
+    backdrop-filter: blur(2px);
+}
+.connect-four-confirm-dialog {
+    width: min(100%, 360px);
+    padding: 16px;
+    border: 1px solid #30364c;
+    border-radius: var(--radius-lg);
+    background: rgba(16, 18, 26, .98);
+    box-shadow: var(--shadow-soft);
+    text-align: center;
+}
+.connect-four-confirm-dialog h2 { margin: 0 0 8px; font-size: 1rem; }
+.connect-four-confirm-dialog p { margin: 0 0 14px; color: var(--text-muted); font-size: .85rem; }
+.connect-four-confirm-dialog .resume-progress { color: var(--text-main); }
+.connect-four-confirm-actions { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+
 /* Mobile Spielaktion. */
 .game-connect-four.mobile-prototype .mobile-game-actions {
     display: flex !important;
@@ -1265,11 +1292,23 @@ body:not(.mobile-prototype) .game-screen { display: contents; }
     }
 
     .mobile-prototype:not(.game-active) .setup-screen > .game-actions #resetGameButton {
-        order: 3;
+        order: 1;
         width: max-content !important;
         min-width: 0;
         min-height: 42px;
         margin: 0;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions #resumeSavedButton {
+        order: 2;
+        width: max-content !important;
+        min-width: 0;
+        min-height: 42px;
+        margin: 0;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions .landscape-setup-tools {
+        order: 3;
     }
 
     .mobile-prototype:not(.game-active) .setup-screen > .game-actions #setupExtraSettingsToggle {

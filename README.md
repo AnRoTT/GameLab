@@ -1,6 +1,6 @@
 # Andis Game Foundry
 
-Eine selbst entwickelte Sammlung browserbasierter Spiele mit eigenen Bots und adaptiver Schwierigkeitssteuerung.
+Eine browserbasierte Sammlung selbst entwickelter Spiele für Desktop und mobile Geräte.
 
 ## Live-Version
 
@@ -10,38 +10,73 @@ Die Spiele können direkt über GitHub Pages gespielt werden:
 
 ## Enthaltene Spiele
 
-- Tic-Tac-Toe
-- 4 Gewinnt
-- Othello
-- Quarto
-- Mühle
+- **Tic-Tac-Toe** – Botgegner und adaptive Schwierigkeit
+- **4 Gewinnt** – Botgegner und adaptive Schwierigkeit
+- **Othello** – Botgegner und adaptive Schwierigkeit
+- **Quarto** – Botgegner und adaptive Schwierigkeit
+- **Mühle** – Botgegner und adaptive Schwierigkeit
+- **Sudoku** – Generator, Solver, eigene Rätsel und Fotoimport per OCR
 
-Weitere Spiele können später ergänzt werden.
+## Gemeinsame Funktionen
+
+- Desktop- und mobile Darstellung
+- Unterstützung für Hoch- und Querformat
+- Responsive Spielfeld- und Buttongrößen
+- Spielstände speichern und fortsetzen
+- Lokale Speicherung im Browser
+- Einheitliche Einstellungen und Bedienlogik
+- Sicherheitsabfragen beim Abbrechen und Löschen
+- Anleitungen für jedes Spiel
+
+## Sudoku
+
+Sudoku bietet zusätzlich:
+
+- Mehrere Schwierigkeitsstufen
+- Zufällige Rätselerzeugung
+- Prüfung auf gültige und lösbare Rätsel
+- Eigenes Rätsel manuell erstellen
+- Sudoku-Rätsel aus einem Foto übernehmen
+- OCR-Erkennung mit manueller Korrekturmöglichkeit
+- Hinweisfunktion
+- Notizenmodus
+- Rückgängig- und Wiederholen-Funktion
+- Lösung anzeigen
+
+Die OCR-Bibliothek wird bevorzugt lokal aus dem Projekt geladen. Falls die lokale Version nicht verfügbar ist, steht eine fest versionierte Online-Reserve zur Verfügung.
 
 ## Adaptive Bots
 
-Die Spiele enthalten unterschiedlich starke Bots sowie adaptive Bots.
+Die Strategiespiele enthalten unterschiedlich starke Botgegner. Zusätzlich verfügen sie über adaptive Bots.
 
-Ein adaptiver Bot passt seine Spielstärke während des Spiels an das Spielniveau des Spielers an. Nach Siegen und Niederlagen wird die Stärke schrittweise angepasst, damit der Bot weder dauerhaft zu leicht noch zu schwer ist.
+Ein adaptiver Bot passt seine Spielstärke schrittweise an das Spielniveau des Spielers an. Dabei werden unter anderem Spielergebnisse, Spielzüge und taktische Entscheidungen berücksichtigt.
 
-Die adaptiven Bots beobachten außerdem das Spielverhalten des Spielers und bauen daraus ein individuelles Spielerprofil auf. Sie erkennen unter anderem bevorzugte Spielzüge, taktische Muster sowie sichere und riskante Entscheidungen.
+Die adaptive Botlogik basiert auf einer gemeinsamen Difficulty-Core-Architektur. Die jeweiligen Spielregeln, Taktiken und Bewertungsfunktionen bleiben spielabhängig.
 
-Auf dieser Grundlage passen sie ihre eigene Spielweise an, lernen den Spieler kennen und entwickeln im Verlauf eine individuellere Gegenstrategie.
+## Spielstände und Spielerwerte
 
-Die Spiele verwenden eine gemeinsame Difficulty-Core-Architektur. Die jeweiligen Spielregeln, Taktiken und Bewertungsfunktionen bleiben dabei spielabhängig.
+Laufende Spiele können gespeichert und später fortgesetzt werden. Dabei werden beispielsweise Spielbrett, aktuelle Runde, Spielstand und relevante Einstellungen gespeichert.
+
+Spielstände und adaptive Spielerwerte werden lokal im Browser gespeichert und nicht an einen Server übertragen.
+
+Über das Einstellungsmenü können Spielstände und Spielerwerte getrennt voneinander gelöscht werden.
 
 ## Technik
 
-- HTML
-- CSS
+- HTML5
+- CSS3
 - JavaScript
+- Responsive Webdesign
 - Minimax-Suche
-- eigene Bewertungs- und Botlogik
-- responsive Darstellung für Desktop und mobile Geräte
+- Eigene Bewertungs- und Botlogik
+- Gemeinsame Shared-Komponenten
+- LocalStorage
+- Tesseract.js für den Sudoku-Fotoimport
+- GitHub Pages
 
 ## Entwicklung
 
-Andis Game Foundry befindet sich aktiv in Entwicklung. Die Spiele, Bots und Benutzeroberflächen werden laufend getestet und verbessert.
+Andis Game Foundry befindet sich aktiv in Entwicklung. Die Spiele, Bots, Benutzeroberflächen und gemeinsamen Komponenten werden laufend getestet und verbessert.
 
 ## Nutzung des Quellcodes
 

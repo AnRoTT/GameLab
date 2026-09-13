@@ -23,6 +23,11 @@
     const gameScreen = document.getElementById("gameScreen");
     const mobileSettingsBack = document.getElementById("mobileSettingsBack");
     const mobileGameAction = document.getElementById("mobileGameAction");
+    const resumeSavedButton = document.getElementById("resumeSavedButton");
+    const resumeConfirmBackdrop = document.getElementById("resumeConfirmBackdrop");
+    const resumeDecline = document.getElementById("resumeDecline");
+    const resumeAccept = document.getElementById("resumeAccept");
+    const resumeProgress = document.getElementById("resumeProgress");
     const fullscreenToggle = document.getElementById("fullscreenToggle");
     const detectMobile = () => window.AndisMobileLayout?.detectMobileSession?.() ?? false;
     const screenController = window.AndisMobileLayout?.createScreenController?.({
@@ -98,11 +103,82 @@
     let gameStarted = false;
     let gameOver = false;
     let botTimer = null;
+    let winningLine = [];
     let botSearchCache = null;
     let keyboardMode = false;
+    let resumePreviouslyFocused = null;
+    let pendingSavedState = null;
+    let savedInSetup = false;
+    let leavingToMenu = false;
+    let returningToSetup = false;
     const scores = [0, 0];
     const playerProfile = QuartoAICore.createPlayerProfile();
     window.quartoPlayerProfile = playerProfile;
+
+    function hasSavableGame() {
+        return Boolean(gameStarted && (!gameOver || matchInProgress));
+    }
+
+    function createSavedState() {
+        return {
+            schemaVersion: 1,
+            gameId: "quarto",
+            savedAt: new Date().toISOString(),
+            board: board.slice(),
+            remainingPieces: remainingPieces.slice(),
+            selectedPiece,
+            chooser,
+            startingChooser,
+            matchModeIndex,
+            matchInProgress,
+            gameStarted,
+            gameOver,
+            scores: scores.slice(),
+            winningLine: winningLine.slice(),
+            keyboardMode,
+            settings: {
+                onePlayer,
+                botLevelIndex,
+                adaptSpeedIndex
+            },
+            status: statusElement.textContent
+        };
+    }
+
+    function isValidSavedState(saved) {
+        const validPiece = value => value === null || (Number.isInteger(value) && value >= 0 && value < 16);
+        const validList = values => Array.isArray(values)
+            && values.every(value => Number.isInteger(value) && value >= 0 && value < 16)
+            && new Set(values).size === values.length;
+        return Boolean(saved
+            && saved.gameId === "quarto"
+            && Array.isArray(saved.board) && saved.board.length === 16 && saved.board.every(validPiece)
+            && validList(saved.remainingPieces)
+            && (saved.selectedPiece === null || (Number.isInteger(saved.selectedPiece) && saved.selectedPiece >= 0 && saved.selectedPiece < 16))
+            && (saved.selectedPiece === null || !saved.remainingPieces.includes(saved.selectedPiece))
+            && Number.isInteger(saved.chooser) && (saved.chooser === 0 || saved.chooser === 1)
+            && Number.isInteger(saved.startingChooser) && (saved.startingChooser === 0 || saved.startingChooser === 1)
+            && Number.isInteger(saved.matchModeIndex) && saved.matchModeIndex >= 0 && saved.matchModeIndex < MATCH_OPTIONS.length
+            && saved.settings && typeof saved.settings.onePlayer === "boolean"
+            && Number.isInteger(saved.settings.botLevelIndex) && saved.settings.botLevelIndex >= 0 && saved.settings.botLevelIndex < BOT_LEVELS.length
+            && Number.isInteger(saved.settings.adaptSpeedIndex) && saved.settings.adaptSpeedIndex >= 0 && saved.settings.adaptSpeedIndex < ADAPT_SPEEDS.length
+            && saved.gameStarted);
+    }
+
+    function writeSavedGame() {
+        if (hasSavableGame()) QuartoStorage.save(createSavedState());
+        else QuartoStorage.clear();
+    }
+
+    function saveCurrentGame() {
+        if (savedInSetup || leavingToMenu) return;
+        writeSavedGame();
+    }
+
+    function updateResumeAction() {
+        const saved = QuartoStorage.load();
+        resumeSavedButton.hidden = !mobilePrototype || !isValidSavedState(saved);
+    }
 
     function playerName(player) { return player === 0 ? "Spieler 1" : (onePlayer ? "Bot" : "Spieler 2"); }
     function isBot(player) { return onePlayer && player === 1; }
@@ -324,6 +400,7 @@
         render();
         focusFirstAvailable(boardElement);
         if (isBot(1 - chooser)) scheduleBotMove();
+        saveCurrentGame();
     }
 
     function placeSelectedPiece(index, fromBot = false) {
@@ -349,6 +426,7 @@
         render();
         focusFirstAvailable(poolElement);
         if (isBot(chooser)) scheduleBotMove();
+        saveCurrentGame();
     }
 
     function scheduleBotMove(isOpeningMove = false) {
@@ -376,8 +454,9 @@
         }, delay);
     }
 
-    function finish(message, winningLine = [], winner = null) {
+    function finish(message, line = [], winner = null) {
         gameOver = true;
+        winningLine = line.slice();
         if (isAdaptiveBot()) {
             QuartoAdaptiveBot.recordRoundResult(winner === 0 ? "playerWin" : winner === 1 ? "botWin" : "draw");
         }
@@ -402,15 +481,18 @@
             if (winningLine.includes(Number(cell.dataset.index))) cell.classList.add("win");
         });
         if (keyboardMode) startButton.focus();
+        saveCurrentGame();
     }
 
     function abortMatch() {
         window.clearTimeout(botTimer);
+        botTimer = null;
         QuartoAdaptiveBot.cancelRound();
         board = Array(16).fill(null);
         remainingPieces = Array.from({ length: 16 }, (_, index) => index);
         botSearchCache = null;
         selectedPiece = null;
+        winningLine = [];
         chooser = 0;
         startingChooser = 0;
         matchInProgress = false;
@@ -427,10 +509,15 @@
         setStatus("Einstellungen ändern und 'Jetzt spielen' klicken.");
         render();
         if (keyboardMode) startButton.focus();
+        QuartoStorage.clear();
+        updateResumeAction();
     }
 
     function startGame() {
         window.clearTimeout(botTimer);
+        botTimer = null;
+        savedInSetup = false;
+        returningToSetup = false;
         if (matchModeIndex === 0 || !matchInProgress) {
             scores[0] = 0;
             scores[1] = 0;
@@ -442,6 +529,7 @@
         remainingPieces = Array.from({ length: 16 }, (_, index) => index);
         botSearchCache = QuartoAICore.createSearchCache();
         selectedPiece = null;
+        winningLine = [];
         chooser = matchModeIndex === 0 ? 0 : startingChooser;
         clearWinnerScore();
         gameStarted = true;
@@ -459,6 +547,113 @@
         stabilizeLandscapeBoard();
         focusFirstAvailable(poolElement);
         if (isBot(chooser)) scheduleBotMove(true);
+        saveCurrentGame();
+    }
+
+    function showSetupAfterSavedGame() {
+        window.clearTimeout(botTimer);
+        botTimer = null;
+        QuartoAdaptiveBot.cancelRound();
+        fullscreenController?.exit();
+        document.body.classList.remove("game-active");
+        gameStarted = false;
+        gameOver = true;
+        matchInProgress = false;
+        startButton.textContent = "Jetzt spielen";
+        updateMobileGameAction("Spiel abbrechen", true);
+        if (mobilePrototype) screenController?.showSetup?.();
+        updateResumeAction();
+    }
+
+    function saveAndReturnToSetup() {
+        if (returningToSetup) return;
+        if (!hasSavableGame()) {
+            showSetupAfterSavedGame();
+            return;
+        }
+        writeSavedGame();
+        window.clearTimeout(botTimer);
+        botTimer = null;
+        returningToSetup = true;
+        savedInSetup = true;
+        window.AndisSavedGameNotice?.show?.("Spiel gespeichert", 1000, () => {
+            returningToSetup = false;
+            showSetupAfterSavedGame();
+        });
+    }
+
+    function leaveToMenu() {
+        if (leavingToMenu) return;
+        leavingToMenu = true;
+        if (savedInSetup) {
+            window.location.href = "../index.html?menu=1";
+            return;
+        }
+        if (hasSavableGame()) {
+            writeSavedGame();
+            window.clearTimeout(botTimer);
+            botTimer = null;
+            window.AndisSavedGameNotice?.show?.("Spiel gespeichert", 1000, () => {
+                window.location.href = "../index.html?menu=1";
+            });
+            return;
+        }
+        QuartoStorage.clear();
+        window.location.href = "../index.html?menu=1";
+    }
+
+    function restoreSavedGame(saved) {
+        if (!isValidSavedState(saved)) return false;
+        window.clearTimeout(botTimer);
+        botTimer = null;
+        QuartoAdaptiveBot.cancelRound();
+        savedInSetup = false;
+        returningToSetup = false;
+        leavingToMenu = false;
+
+        onePlayer = Boolean(saved.settings.onePlayer);
+        botLevelIndex = saved.settings.botLevelIndex;
+        adaptSpeedIndex = saved.settings.adaptSpeedIndex;
+        modeButton.textContent = onePlayer ? "1 Spieler" : "2 Spieler";
+        matchModeIndex = saved.matchModeIndex;
+        matchButton.textContent = MATCH_OPTIONS[matchModeIndex];
+
+        board = saved.board.slice();
+        remainingPieces = saved.remainingPieces.slice();
+        selectedPiece = saved.selectedPiece;
+        chooser = saved.chooser;
+        startingChooser = saved.startingChooser;
+        matchInProgress = Boolean(saved.matchInProgress);
+        gameStarted = true;
+        gameOver = Boolean(saved.gameOver);
+        scores[0] = Number(saved.scores?.[0]) || 0;
+        scores[1] = Number(saved.scores?.[1]) || 0;
+        winningLine = Array.isArray(saved.winningLine) ? saved.winningLine.slice() : [];
+        keyboardMode = Boolean(saved.keyboardMode);
+        botSearchCache = QuartoAICore.createSearchCache();
+        document.body.classList.add("game-active");
+        if (isAdaptiveBot()) QuartoAdaptiveBot.beginRound({ enabled: true, adaptSpeed: adaptiveSpeed() });
+        renderScores();
+        render();
+        setStatus(saved.status || `${playerName(chooser)} wählt einen Spielstein für ${playerName(1 - chooser)}.`);
+        if (gameOver) {
+            startButton.textContent = matchModeIndex === 0 ? "Jetzt spielen" : "Nächste Runde";
+            updateMobileGameAction(matchModeIndex === 0 ? "Neues Spiel" : "Neue Runde");
+            winningLine.forEach(index => boardElement.children[index]?.classList.add("win"));
+        } else {
+            startButton.textContent = matchModeIndex > 0 ? "Match beenden" : "Spiel abbrechen";
+            updateMobileGameAction("Spiel abbrechen");
+        }
+        if (mobilePrototype) {
+            screenController?.showGame?.();
+            fullscreenController?.requestIfChosen();
+        }
+        updateResumeAction();
+        if (!gameOver && ((isBot(chooser) && selectedPiece === null) || (isBot(1 - chooser) && selectedPiece !== null))) {
+            scheduleBotMove();
+        }
+        saveCurrentGame();
+        return true;
     }
 
     modeButton.addEventListener("click", () => {
@@ -512,6 +707,67 @@
     renderScores();
     render();
 
+    function closeResumeConfirm() {
+        resumeConfirmBackdrop.hidden = true;
+        pendingSavedState = null;
+        resumePreviouslyFocused?.focus?.({ preventScroll: true });
+        resumePreviouslyFocused = null;
+    }
+
+    function requestResume(saved) {
+        pendingSavedState = saved;
+        resumePreviouslyFocused = document.activeElement;
+        const filled = saved.board.filter(piece => piece !== null).length;
+        const phase = saved.selectedPiece === null ? "Stein auswählen" : "Stein platzieren";
+        resumeProgress.textContent = `${saved.settings.onePlayer ? "Gegen den Bot" : "2 Spieler"} · ${filled} von 16 Feldern · ${phase}`;
+        resumeConfirmBackdrop.hidden = false;
+        resumeAccept.focus();
+    }
+
+    resumeDecline?.addEventListener("click", () => {
+        window.AndisSound?.playUiClick?.(0.22);
+        closeResumeConfirm();
+        QuartoStorage.clear();
+        updateResumeAction();
+        modeButton.focus({ preventScroll: true });
+    });
+
+    resumeAccept?.addEventListener("click", () => {
+        window.AndisSound?.playUiClick?.(0.22);
+        const saved = pendingSavedState;
+        closeResumeConfirm();
+        restoreSavedGame(saved);
+    });
+
+    resumeConfirmBackdrop?.addEventListener("click", event => {
+        if (event.target === resumeConfirmBackdrop) closeResumeConfirm();
+    });
+
+    document.addEventListener("keydown", event => {
+        if (!resumeConfirmBackdrop || resumeConfirmBackdrop.hidden) return;
+        if (event.key === "Escape") {
+            event.preventDefault();
+            closeResumeConfirm();
+            return;
+        }
+        if (event.key !== "Tab") return;
+        const focusable = [resumeDecline, resumeAccept].filter(Boolean);
+        const currentIndex = focusable.indexOf(document.activeElement);
+        const nextIndex = event.shiftKey
+            ? (currentIndex <= 0 ? focusable.length - 1 : currentIndex - 1)
+            : (currentIndex === focusable.length - 1 ? 0 : currentIndex + 1);
+        event.preventDefault();
+        focusable[nextIndex]?.focus();
+    });
+
+    window.addEventListener("beforeunload", saveCurrentGame);
+
+    resumeSavedButton?.addEventListener("click", () => {
+        window.AndisSound?.playUiClick?.(0.22);
+        const saved = QuartoStorage.load();
+        if (isValidSavedState(saved)) restoreSavedGame(saved);
+    });
+
     const navigationState = {
         isGameActive: () => document.body.classList.contains("game-active") || gameStarted,
         isMatchRunning: () => gameStarted && !gameOver
@@ -520,21 +776,32 @@
     window.AndisNavigation?.bindBackButton?.({
         button: document.getElementById("backIcon"),
         ...navigationState,
-        onAbortConfirmed: abortMatch,
+        onActiveBack: leaveToMenu,
+        onAbortConfirmed: leaveToMenu,
         onMenuBack: () => {
             window.AndisSound?.playUiClick?.(0.22);
-            setTimeout(() => { window.location.href = "../index.html?menu=1"; }, 100);
+            window.location.href = "../index.html?menu=1";
         }
     });
 
     window.AndisNavigation?.bindBackButton?.({
         button: mobileSettingsBack,
         ...navigationState,
-        onAbortConfirmed: abortMatch
+        onActiveBack: saveAndReturnToSetup,
+        onAbortConfirmed: abortMatch,
+        onMenuBack: saveAndReturnToSetup
     });
 
     window.AndisNavigation?.bindBrowserBack?.({
         ...navigationState,
-        onAbortConfirmed: abortMatch
+        onAbortConfirmed: leaveToMenu
     });
+
+    updateResumeAction();
+    const savedQuarto = QuartoStorage.load();
+    const returnedFromGuide = new URLSearchParams(window.location.search).get("guide") === "1";
+    if (isValidSavedState(savedQuarto)) {
+        if (returnedFromGuide) restoreSavedGame(savedQuarto);
+        else requestResume(savedQuarto);
+    }
 })();

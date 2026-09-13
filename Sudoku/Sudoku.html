@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sudoku</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="../theme.css">
+    <link rel="stylesheet" href="../Shared/savedGameNotice.css">
+</head>
+<body class="game-page game-sudoku" data-mobile-orientation="both" data-game-storage="SudokuStorage">
+    <div id="backIcon">⟵ Menü</div>
+    <a id="helpIcon" class="help-button" href="Anleitung.html" aria-label="Kurzanleitung zu Sudoku">Anleitung</a>
+    <button id="settingsToggle" class="secondary-button" type="button" aria-expanded="false" aria-controls="extraSettings" aria-label="Einstellungen" title="Einstellungen">⚙</button>
+    <span id="soundToggle" role="status" aria-live="polite" aria-label="Ton eingeschaltet">🔊</span>
+
+    <section id="setupScreen" class="screen setup-screen" aria-labelledby="setupTitle">
+        <h1 id="setupTitle" class="game-title">Sudoku</h1>
+        <div class="settings">
+            <div class="cycle-group setting-row">
+                <span class="label">Schwierigkeit:</span>
+                <button id="difficultyButton" class="cycle-button" type="button">Leicht</button>
+            </div>
+        </div>
+        <div class="game-actions">
+            <button id="startButton" class="primary-button" type="button">Jetzt spielen</button>
+            <button id="resumeSavedButton" class="primary-button" type="button" hidden>Spiel fortsetzen</button>
+            <div class="landscape-setup-tools" aria-label="Weitere Einstellungen">
+                <button id="setupExtraSettingsToggle" class="secondary-button setup-extra-settings-button" type="button" aria-label="Weitere Einstellungen" title="Weitere Einstellungen">⚙</button>
+            </div>
+        </div>
+    </section>
+
+    <div id="settingsBackdrop" class="settings-backdrop" hidden></div>
+    <section id="extraSettings" class="extra-settings" hidden>
+        <h2>Einstellungen</h2>
+        <button id="settingsSound" class="settings-action" type="button">🔊 Sound an</button>
+        <button id="settingsClose" class="settings-action settings-close" type="button">Schließen</button>
+    </section>
+
+    <div id="newPuzzleConfirmBackdrop" class="sudoku-confirm-backdrop" hidden>
+        <section class="sudoku-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="newPuzzleConfirmTitle">
+            <h2 id="newPuzzleConfirmTitle">Neues Rätsel starten?</h2>
+            <p>Das aktuelle Rätsel und dein Fortschritt werden verworfen.</p>
+            <div class="sudoku-confirm-actions">
+                <button id="newPuzzleCancel" class="settings-action" type="button">Nein</button>
+                <button id="newPuzzleConfirm" class="settings-action danger" type="button">Ja, neues Rätsel</button>
+            </div>
+        </section>
+    </div>
+
+    <div id="resumeConfirmBackdrop" class="sudoku-confirm-backdrop" hidden>
+        <section class="sudoku-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="resumeConfirmTitle">
+            <h2 id="resumeConfirmTitle">Laufendes Spiel gefunden</h2>
+            <p>Es gibt bereits ein begonnenes Sudoku. Möchtest du es fortsetzen?</p>
+            <p id="resumeProgress" class="resume-progress"></p>
+            <div class="sudoku-confirm-actions">
+                <button id="resumeDecline" class="settings-action" type="button">Nein, Einstellungen</button>
+                <button id="resumeAccept" class="settings-action" type="button">Ja, fortsetzen</button>
+            </div>
+        </section>
+    </div>
+
+    <div id="customImportAssistant" class="sudoku-import-backdrop" hidden>
+        <section class="sudoku-import-dialog" role="dialog" aria-modal="true" aria-labelledby="customImportTitle">
+            <h2 id="customImportTitle">Sudoku aus Foto übernehmen</h2>
+            <p id="customImportInstruction">Ziehe die vier Eckpunkte genau auf den äußeren Sudoku-Rahmen.</p>
+            <div class="sudoku-import-preview">
+                <canvas id="customImportCanvas" aria-label="Foto mit verschiebbarem Sudoku-Rahmen"></canvas>
+                <canvas id="customImportMagnifier" class="sudoku-import-magnifier" width="200" height="200" aria-label="Vergrößerung des aktiven Eckpunkts"></canvas>
+            </div>
+            <p id="customImportHint" class="custom-puzzle-status">Die Ausrichtung wird zuerst nur geprüft.</p>
+            <p id="customImportQuality" class="custom-import-quality" aria-live="polite"></p>
+            <div class="sudoku-confirm-actions">
+                <button id="customImportCancel" class="settings-action" type="button">Abbrechen</button>
+                <button id="customImportAccept" class="settings-action" type="button">Ausrichtung übernehmen</button>
+            </div>
+        </section>
+    </div>
+
+    <div id="customImportReview" class="sudoku-import-backdrop" hidden>
+        <section class="sudoku-import-dialog sudoku-import-review-dialog" role="dialog" aria-modal="true" aria-labelledby="customReviewTitle">
+            <h2 id="customReviewTitle">Ziffer bitte prüfen</h2>
+            <p id="customReviewQuestion"></p>
+            <div class="sudoku-review-grid-preview">
+                <canvas id="customReviewGridCanvas" width="240" height="240" aria-label="Sudoku-Raster mit markierter Prüfposition"></canvas>
+            </div>
+            <div class="sudoku-review-preview">
+                <canvas id="customReviewCanvas" width="240" height="240" aria-label="Vergrößerter Zellenausschnitt"></canvas>
+            </div>
+            <p id="customReviewCandidates" class="custom-puzzle-status"></p>
+            <div id="customReviewNumbers" class="sudoku-review-numbers" aria-label="Ziffer auswählen"></div>
+        </section>
+    </div>
+
+    <section id="gameScreen" class="screen game-screen" hidden aria-live="polite">
+        <div class="game-screen-header" aria-label="Spielsteuerung">
+            <button id="mobileSettingsBack" class="mobile-settings-back" type="button" aria-label="Zurück zu den Sudoku-Einstellungen">← Zurück</button>
+            <h1 class="game-title">Sudoku</h1>
+            <div class="game-screen-controls">
+                <button id="fullscreenToggle" class="secondary-button fullscreen-toggle" type="button" aria-label="Vollbild aktivieren">⛶ Vollbild</button>
+            </div>
+        </div>
+
+        <div class="sudoku-layout">
+            <div class="board-wrapper">
+                <div id="board" class="sudoku-board" role="grid" aria-label="Sudoku-Spielfeld" tabindex="0"></div>
+                <div id="ocrProgressBadge" class="ocr-progress-badge" role="status" aria-live="polite" hidden></div>
+            </div>
+
+            <section class="sudoku-controls" aria-label="Sudoku-Eingabe">
+                <div id="numberPad" class="number-pad" aria-label="Zahlenfeld"></div>
+                <button id="newPuzzleButton" class="secondary-button tool-button new-puzzle-button" type="button">Neues Rätsel</button>
+                <div class="tool-row">
+                    <button id="notesButton" class="secondary-button tool-button" type="button" aria-pressed="false">Notizen</button>
+                    <button id="undoButton" class="secondary-button tool-button" type="button" disabled>Zurück</button>
+                    <button id="redoButton" class="secondary-button tool-button" type="button" disabled>Vor</button>
+                    <button id="checkButton" class="secondary-button tool-button" type="button">Prüfen</button>
+                    <button id="hintButton" class="secondary-button tool-button" type="button">Hinweis</button>
+                    <button id="customSolveButton" class="secondary-button tool-button" type="button" hidden>Lösung anzeigen</button>
+                </div>
+                <div id="customPuzzleTools" class="custom-puzzle-tools" hidden>
+                    <button id="customImportButton" class="secondary-button tool-button" type="button">Foto importieren</button>
+                    <button id="customValidateButton" class="secondary-button tool-button" type="button">Rätsel prüfen</button>
+                    <button id="customResetButton" class="secondary-button tool-button" type="button">Zurücksetzen</button>
+                    <input id="customImportInput" type="file" accept="image/*" capture="environment" hidden>
+                </div>
+                <p id="customPuzzleStatus" class="custom-puzzle-status" aria-live="polite"></p>
+                <div class="mobile-game-actions">
+                    <button id="mobileGameAction" class="primary-button" type="button">Spiel abbrechen</button>
+                </div>
+            </section>
+        </div>
+    </section>
+
+    <footer class="footer">Andis Game Foundry | Sudoku | by Andreas Rollinger | 2026.09.13</footer>
+
+    <script src="../Shared/soundManager.js"></script>
+    <script src="../Shared/mobileLayout.js"></script>
+    <script src="../Shared/navigationGuard.js"></script>
+    <script src="../Shared/savedGameNotice.js"></script>
+    <script src="../Shared/boardLayout.js"></script>
+    <script src="settings.js"></script>
+    <script src="generator.js"></script>
+    <script src="solver.js"></script>
+    <script src="difficulty.js"></script>
+    <script src="storage.js"></script>
+    <script src="game.js"></script>
+    <script src="../Shared/matchConfirm.js"></script>
+    <script src="../Shared/settingsMenu.js"></script>
+    <script src="../Shared/buttonOverflow.js"></script>
+    <script>
+        document.getElementById("backIcon").style.display =
+            new URLSearchParams(location.search).get("menu") === "1" ? "block" : "none";
+        document.getElementById("helpIcon").addEventListener("click", (event) => {
+            event.preventDefault();
+            const target = event.currentTarget;
+            const href = target.href;
+            window.AndisSound?.playUiClick?.();
+            setTimeout(() => { window.location.href = href; }, 100);
+        });
+    </script>
+</body>
+</html>

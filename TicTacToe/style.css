@@ -20,6 +20,13 @@ body {
     margin: 0 auto 12px;
 }
 
+.tictactoe-confirm-backdrop[hidden] { display: none; }
+.tictactoe-confirm-backdrop { position: fixed; inset: 0; z-index: 1100; display: grid; place-items: center; padding: 18px; background: rgba(0,0,0,.62); backdrop-filter: blur(2px); }
+.tictactoe-confirm-dialog { width: min(100%, 360px); padding: 16px; border: 1px solid #30364c; border-radius: var(--radius-lg); background: rgba(16,18,26,.98); box-shadow: var(--shadow-soft); text-align: center; }
+.tictactoe-confirm-dialog h2 { margin: 0 0 8px; font-size: 1rem; }
+.tictactoe-confirm-dialog p { margin: 0 0 14px; color: var(--text-muted); font-size: .85rem; }
+.tictactoe-confirm-actions { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+
 /* Desktop: Abstand wie bei den übrigen Spielen zwischen Einstellungen
    und Startaktion. Die mobile Anordnung bleibt unverändert. */
 .game-page:not(.mobile-prototype) #reset {
@@ -363,6 +370,8 @@ body {
 /* Board gesperrt */
 .board.locked {
     pointer-events: none !important;
+    opacity: .45;
+    filter: grayscale(35%);
 }
 .board.locked .cell {
     pointer-events: none !important;
@@ -767,8 +776,16 @@ body {
     }
 
     .mobile-prototype:not(.game-active) .setup-screen > .game-actions > #reset {
-        order: 3;
+        order: 1;
         margin-top: 0;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions > #resumeSavedButton {
+        order: 2;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions > .landscape-setup-tools {
+        order: 3;
     }
 
     .mobile-prototype:not(.game-active) .setup-screen > .game-actions .landscape-setup-tools > #setupExtraSettingsToggle {

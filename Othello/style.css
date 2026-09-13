@@ -356,7 +356,7 @@ body:not(.mobile-prototype) .mobile-game-actions {
 
     .mobile-prototype:not(.game-active) .setup-extra-settings-button {
         display: inline-flex !important;
-        order: 2;
+        order: 3;
         width: 42px;
         min-width: 42px;
         height: 36px;
@@ -380,9 +380,16 @@ body:not(.mobile-prototype) .mobile-game-actions {
     }
 
     .mobile-prototype:not(.game-active) .setup-screen > .game-actions > .primary-button {
-        order: 3;
         width: max-content;
         min-height: 42px;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions > #startBtn {
+        order: 1;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions > #resumeSavedButton {
+        order: 2;
     }
 
     .mobile-prototype:not(.game-active) .setup-screen {
@@ -474,6 +481,30 @@ body:not(.mobile-prototype) .mobile-game-actions {
     }
 }
 
+.othello-confirm-backdrop[hidden] { display: none; }
+.othello-confirm-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    display: grid;
+    place-items: center;
+    padding: 18px;
+    background: rgba(0, 0, 0, .62);
+    backdrop-filter: blur(2px);
+}
+.othello-confirm-dialog {
+    width: min(100%, 360px);
+    padding: 16px;
+    border: 1px solid #30364c;
+    border-radius: var(--radius-lg);
+    background: rgba(16, 18, 26, .98);
+    box-shadow: var(--shadow-soft);
+    text-align: center;
+}
+.othello-confirm-dialog h2 { margin: 0 0 8px; font-size: 1rem; }
+.othello-confirm-dialog p { margin: 0 0 14px; color: var(--text-muted); font-size: .85rem; }
+.othello-confirm-actions { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+
 @media (orientation: portrait) and (max-width: 700px) {
     .mobile-prototype .game-screen .game-info { margin-bottom: 12px !important; }
     .mobile-prototype .mobile-game-actions { margin: 0 !important; }
@@ -530,6 +561,8 @@ body:not(.mobile-prototype) .mobile-game-actions {
    ----------------------------------------- */
 .board.disabled {
     pointer-events: none; /* Klicks werden ignoriert */
+    opacity: .45;
+    filter: grayscale(35%);
 }
 
 .board.disabled .cell {

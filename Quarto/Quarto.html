@@ -6,8 +6,9 @@
     <title>Quarto</title>
     <link rel="stylesheet" href="style.css?v=20260904-3" />
     <link rel="stylesheet" href="../theme.css?v=20260904-2" />
+    <link rel="stylesheet" href="../Shared/savedGameNotice.css" />
 </head>
-<body class="game-page game-quarto" data-mobile-orientation="both" data-adaptive-bot="QuartoAdaptiveBot">
+<body class="game-page game-quarto" data-mobile-orientation="both" data-adaptive-bot="QuartoAdaptiveBot" data-game-storage="QuartoStorage">
     <div id="backIcon">⟵ Menü</div>
     <a id="helpIcon" class="help-button" href="Anleitung.html" aria-label="Kurzanleitung zu Quarto">Anleitung</a>
     <button id="settingsToggle" class="secondary-button" type="button" aria-expanded="false" aria-controls="extraSettings" aria-label="Einstellungen" title="Einstellungen">⚙</button>
@@ -41,23 +42,32 @@
             </div>
         <div class="game-actions">
             <button id="startButton" class="primary-button" type="button">Jetzt spielen</button>
+            <button id="resumeSavedButton" class="primary-button" type="button" hidden>Spiel fortsetzen</button>
             <div class="landscape-setup-tools" aria-label="Weitere Einstellungen">
                 <button id="setupExtraSettingsToggle" class="secondary-button setup-extra-settings-button" type="button" aria-label="Weitere Einstellungen" title="Weitere Einstellungen">⚙</button>
             </div>
         </div>
         </section>
+        <div id="resumeConfirmBackdrop" class="quarto-confirm-backdrop" hidden>
+            <section class="quarto-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="resumeConfirmTitle">
+                <h2 id="resumeConfirmTitle">Laufendes Spiel gefunden</h2>
+                <p id="resumeProgress">Es wurde ein gespeichertes Spiel gefunden.</p>
+                <div class="quarto-confirm-actions">
+                    <button id="resumeDecline" class="settings-action" type="button">Nein, Einstellungen</button>
+                    <button id="resumeAccept" class="settings-action" type="button">Ja, fortsetzen</button>
+                </div>
+            </section>
+        </div>
         <div id="settingsBackdrop" class="settings-backdrop" hidden></div>
         <section id="extraSettings" class="extra-settings" hidden>
             <h2>Einstellungen</h2>
             <button id="settingsSound" class="settings-action" type="button">🔊 Sound an</button>
-            <button id="resetPlayerValues" class="settings-action danger" type="button">Spielerwerte löschen</button>
             <button id="settingsClose" class="settings-action settings-close" type="button">Schließen</button>
-            <div id="resetConfirm" class="reset-confirm" hidden><p>Adaptive Spielerwerte wirklich löschen?</p><div><button id="resetCancel" class="settings-action" type="button">Abbrechen</button><button id="resetConfirmButton" class="settings-action danger" type="button">Löschen</button></div></div>
         </section>
 
         <section id="gameScreen" class="screen game-screen" hidden aria-live="polite">
         <div class="game-screen-header" aria-label="Spielsteuerung">
-            <button id="mobileSettingsBack" class="mobile-settings-back" type="button" aria-label="Zu den Spieleinstellungen">← Einstellungen</button>
+            <button id="mobileSettingsBack" class="mobile-settings-back" type="button" aria-label="Zurück zu den Spieleinstellungen">← Zurück</button>
             <h1 class="game-title">Quarto</h1>
             <div class="game-screen-controls">
                 <button id="fullscreenToggle" class="secondary-button fullscreen-toggle" type="button" aria-label="Vollbild aktivieren">⛶ Vollbild</button>
@@ -106,7 +116,7 @@
 
         </section>
 
-        <footer class="footer">Andis Game Foundry | Quarto | by Andreas Rollinger | 2026.08.22</footer>
+        <footer class="footer">Andis Game Foundry | Quarto | by Andreas Rollinger | 2026.09.13</footer>
 
     <script src="../Shared/soundManager.js"></script>
     <script src="../Shared/difficultyCore.js?v=20260902-4"></script>
@@ -118,13 +128,15 @@
     <script src="../Shared/mobileLayout.js"></script>
     <script src="../Shared/navigationGuard.js"></script>
     <script src="../Shared/boardLayout.js"></script>
-    <script src="game.js?v=20260904-2"></script>
+    <script src="../Shared/savedGameNotice.js"></script>
+    <script src="storage.js"></script>
+    <script src="game.js?v=20260913-1"></script>
     <script src="../Shared/matchConfirm.js"></script>
     <script src="../Shared/settingsMenu.js"></script>
     <script src="../Shared/buttonOverflow.js"></script>
     <script>
-        const backIcon = document.getElementById("backIcon");
-        backIcon.style.display =
+        const menuButtonInline = document.getElementById("backIcon");
+        menuButtonInline.style.display =
             new URLSearchParams(location.search).get("menu") === "1" ? "block" : "none";
         document.getElementById("helpIcon").addEventListener("click", (event) => {
             event.preventDefault();

@@ -85,22 +85,44 @@
     });
     updateSound();
 
-    ["resetPlayerValues", "settingsClose", "resetCancel", "resetConfirmButton"]
-        .map(id => document.getElementById(id))
-        .filter(Boolean)
-        .forEach(button => {
-            button.addEventListener("click", () => {
-                window.AndisSound?.playUiClick?.();
-            });
-        });
+    // Gemeinsamer Löschdialog für alle Spiele. Die jeweilige Seite liefert nur
+    // den Namen ihres Storage-Moduls über data-game-storage.
+    const closeButton = document.getElementById("settingsClose");
+    const hasPlayerValues = Boolean(document.body.dataset.adaptiveBot);
+    const storage = window[document.body.dataset.gameStorage];
 
-    document.getElementById("resetPlayerValues")?.addEventListener("click", () => {
-        document.getElementById("resetConfirm")?.removeAttribute("hidden");
-    });
-    document.getElementById("resetCancel")?.addEventListener("click", () => {
-        document.getElementById("resetConfirm")?.setAttribute("hidden", "");
-    });
-    document.getElementById("resetConfirmButton")?.addEventListener("click", () => {
+    const deleteButton = document.createElement("button");
+    deleteButton.id = "deleteDataButton";
+    deleteButton.className = "settings-action danger";
+    deleteButton.type = "button";
+    deleteButton.textContent = "Löschen …";
+    closeButton?.before(deleteButton);
+
+    const choicePanel = document.createElement("div");
+    choicePanel.id = "deleteChoicePanel";
+    choicePanel.className = "reset-confirm";
+    choicePanel.hidden = true;
+    choicePanel.innerHTML = `<p>Was möchtest du löschen?</p>
+        <div><button class="settings-action danger" type="button" data-delete-kind="player">Spielerwerte</button>
+        <button class="settings-action danger" type="button" data-delete-kind="state">Spielstände</button></div>
+        <button id="deleteCancel" class="settings-action" type="button">Abbrechen</button>`;
+    closeButton?.before(choicePanel);
+
+    const confirmPanel = document.createElement("div");
+    confirmPanel.id = "deleteConfirmPanel";
+    confirmPanel.className = "reset-confirm";
+    confirmPanel.hidden = true;
+    confirmPanel.innerHTML = `<p id="deleteConfirmText"></p>
+        <div><button id="deleteConfirmCancel" class="settings-action" type="button">Abbrechen</button>
+        <button id="deleteConfirmButton" class="settings-action danger" type="button">Ja, löschen</button></div>`;
+    closeButton?.before(confirmPanel);
+
+    const hideDeletePanels = () => {
+        choicePanel.hidden = true;
+        confirmPanel.hidden = true;
+    };
+    const playClick = () => window.AndisSound?.playUiClick?.();
+    const resetPlayerValues = () => {
         const botName = document.body.dataset.adaptiveBot;
         window[botName]?.resetForLab?.(35);
         window[botName]?.clearPersistentState?.(35);
@@ -109,10 +131,52 @@
             : botName === "QuartoAdaptiveBot" ? window.QuartoAICore
             : null;
         profileCore?.clearPlayerProfile?.();
+        window.TicTacToeAdaptiveBot?.clearPersistentState?.(35);
         window.updateTicTacToeAdaptiveStrengthUI?.(35);
         window.updateAdaptiveStrengthUI?.();
         window.updateQuartoAdaptiveStrengthUI?.();
         window.updateOthelloAdaptiveStrengthUI?.(35);
-        document.getElementById("resetConfirm")?.setAttribute("hidden", "");
+    };
+
+    if (!hasPlayerValues) choicePanel.querySelector('[data-delete-kind="player"]')?.remove();
+    deleteButton.addEventListener("click", () => {
+        playClick();
+        deleteButton.hidden = true;
+        choicePanel.hidden = false;
     });
+    choicePanel.querySelectorAll("button").forEach(button => button.addEventListener("click", () => {
+        playClick();
+        if (button.id === "deleteCancel") {
+            hideDeletePanels();
+            deleteButton.hidden = false;
+            return;
+        }
+        const kind = button.dataset.deleteKind;
+        document.getElementById("deleteConfirmText").textContent = kind === "player"
+            ? "Spielerwerte wirklich löschen?"
+            : "Spielstände wirklich löschen?";
+        choicePanel.hidden = true;
+        confirmPanel.hidden = false;
+        confirmPanel.dataset.deleteKind = kind;
+    }));
+    document.getElementById("deleteConfirmCancel")?.addEventListener("click", () => {
+        playClick();
+        hideDeletePanels();
+        deleteButton.hidden = false;
+    });
+    document.getElementById("deleteConfirmButton")?.addEventListener("click", () => {
+        playClick();
+        const kind = confirmPanel.dataset.deleteKind;
+        hideDeletePanels();
+        deleteButton.hidden = false;
+        close();
+        if (kind === "player") {
+            resetPlayerValues();
+            window.AndisSavedGameNotice?.show?.("Spielerwerte gelöscht");
+            return;
+        }
+        storage?.clear?.();
+        window.AndisSavedGameNotice?.show?.("Spielstände gelöscht", 1000, () => window.location.reload());
+    });
+    closeButton?.addEventListener("click", playClick);
 })();

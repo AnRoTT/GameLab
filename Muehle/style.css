@@ -194,6 +194,60 @@
 .point-button.player-one .muehle-stone::after { border-color: #a88420; }
 .point-button.player-two .muehle-stone::after { border-color: #6f6548; }
 
+@media (orientation: landscape) and (max-height: 700px) {
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 9px;
+    }
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions > #startButton {
+        order: 1;
+        width: max-content;
+        min-height: 42px;
+    }
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions > #resumeSavedButton {
+        order: 2;
+        width: max-content;
+        min-height: 42px;
+    }
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions .landscape-setup-tools {
+        display: contents !important;
+    }
+    .mobile-prototype:not(.game-active) .setup-extra-settings-button {
+        display: inline-flex !important;
+        order: 3;
+        width: 42px;
+        min-width: 42px;
+        min-height: 36px;
+        padding: 0;
+    }
+}
+
+.muehle-confirm-backdrop[hidden] { display: none; }
+.muehle-confirm-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    display: grid;
+    place-items: center;
+    padding: 18px;
+    background: rgba(0, 0, 0, .62);
+    backdrop-filter: blur(2px);
+}
+.muehle-confirm-dialog {
+    width: min(100%, 360px);
+    padding: 16px;
+    border: 1px solid #30364c;
+    border-radius: var(--radius-lg);
+    background: rgba(16, 18, 26, .98);
+    box-shadow: var(--shadow-soft);
+    text-align: center;
+}
+.muehle-confirm-dialog h2 { margin: 0 0 8px; font-size: 1rem; }
+.muehle-confirm-dialog p { margin: 0 0 14px; color: var(--text-muted); font-size: .85rem; }
+.muehle-confirm-actions { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+
 .point-button.valid-target { box-shadow: 0 0 0 5px #4b8c58; }
 .point-button.available-source { box-shadow: 0 0 0 4px #bd8b20; }
 .point-button.selected-source { box-shadow: 0 0 0 5px #bd8b20; }
@@ -349,5 +403,6 @@
 
 /* Das beendete Brett bleibt sichtbar, Eingaben bleiben gesperrt. */
 .board-disabled {
-    opacity: 1;
+    opacity: .45;
+    filter: grayscale(35%);
 }

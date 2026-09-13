@@ -34,6 +34,11 @@ let chipDropActive = false;
 let chipDropTimer = null;
 let chipDropFrame = null;
 const CHIP_DROP_DURATION = 180;
+let resumePreviouslyFocused = null;
+let pendingSavedState = null;
+let leavingToMenu = false;
+let savedInSetup = false;
+let returningToSetup = false;
 
 // === SOUNDS ===
 const soundChip = new Audio('../assets/sounds/Chip_Drop.mp3');
@@ -72,6 +77,11 @@ const setupScreen = document.getElementById("setupScreen");
 const gameScreen = document.getElementById("gameScreen");
 const mobileGameAction = document.getElementById("mobileGameAction");
 const mobileSettingsBack = document.getElementById("mobileSettingsBack");
+const resumeSavedButton = document.getElementById("resumeSavedButton");
+const resumeConfirmBackdrop = document.getElementById("resumeConfirmBackdrop");
+const resumeDecline = document.getElementById("resumeDecline");
+const resumeAccept = document.getElementById("resumeAccept");
+const resumeProgress = document.getElementById("resumeProgress");
 const screenController = window.AndisMobileLayout?.createScreenController?.({
     setupScreen,
     gameScreen,
@@ -131,10 +141,8 @@ let matchModeIndex = 0;
 const RESET_BUTTON_STATES = ["Neues Spiel", "Neues Spiel"];
 let resetButtonIndex = 0;
 const ACTIVE_RESET_BUTTON_TEXT = "Match beenden";
-const FINISHED_RESET_BUTTON_TEXT = "Neues Match beginnen";
 
 const settingsBoard = boardEl;
-const settingsStatusLine = statusLine1El;
 const settingsModeButton = modeButton;
 const settingsMatchButton = matchButton;
 const settingsNewGameButton = roundActionButton;
@@ -146,6 +154,67 @@ const settingsAdaptiveTrack = adaptiveStrengthTrackEl;
 const settingsAdaptiveFill = adaptiveStrengthFillEl;
 const settingsAdaptiveValue = adaptiveStrengthFillEl?.parentElement?.querySelector("[data-strength-value]")
     || document.getElementById("adaptive-strength-value");
+
+function hasSavableGame() {
+    return Boolean(matchActive);
+}
+
+function createSavedState() {
+    return {
+        schemaVersion: 1,
+        gameId: "connect-four",
+        savedAt: new Date().toISOString(),
+        board: board.map(row => row.slice()),
+        currentPlayer,
+        startingPlayer,
+        scores: { ...scores },
+        gameOver,
+        matchActive,
+        roundResultProcessed,
+        modeIndex,
+        matchModeIndex,
+        botLevelIndex,
+        adaptSpeedIndex,
+        resetButtonIndex,
+        keyboardColumn,
+        winnerText: winnerTextEl?.textContent || ""
+    };
+}
+
+function isValidSavedState(saved) {
+    return Boolean(saved
+        && saved.gameId === "connect-four"
+        && Array.isArray(saved.board)
+        && saved.board.length === ROWS
+        && saved.board.every(row => Array.isArray(row)
+            && row.length === COLS
+            && row.every(value => value === 0 || value === PLAYER_RED || value === PLAYER_YELLOW))
+        && (saved.currentPlayer === PLAYER_RED || saved.currentPlayer === PLAYER_YELLOW)
+        && (saved.startingPlayer === PLAYER_RED || saved.startingPlayer === PLAYER_YELLOW)
+        && saved.scores
+        && Number.isFinite(Number(saved.scores[PLAYER_RED]))
+        && Number.isFinite(Number(saved.scores[PLAYER_YELLOW]))
+        && Number.isInteger(saved.modeIndex)
+        && saved.modeIndex >= 0 && saved.modeIndex < MODE_OPTIONS.length
+        && Number.isInteger(saved.matchModeIndex)
+        && saved.matchModeIndex >= 0 && saved.matchModeIndex < MATCH_OPTIONS.length
+        && Boolean(saved.matchActive));
+}
+
+function writeSavedGame() {
+    if (hasSavableGame()) ConnectFourStorage.save(createSavedState());
+    else ConnectFourStorage.clear();
+}
+
+function saveCurrentGame() {
+    if (savedInSetup || leavingToMenu) return;
+    writeSavedGame();
+}
+
+function updateResumeAction() {
+    const saved = ConnectFourStorage.load();
+    resumeSavedButton.hidden = !mobilePrototype || !isValidSavedState(saved);
+}
 
 function updateBotButtonState() {
     settingsBotLevelButton.disabled = modeIndex === 0 || matchActive;
@@ -305,12 +374,7 @@ mobileGameAction?.addEventListener("click", () => {
         return;
     }
 
-    resetMatchOnly();
-    if (mobilePrototype) fullscreenController?.exit();
-    setResetButtonForRound(false);
-    setMatchInProgressLocked(false);
-    updateBotButtonState();
-    if (mobilePrototype) screenController?.showSetup();
+    abortMatchToSetup();
 });
 
 nextRoundBtnEl.addEventListener("click", () => {
@@ -345,17 +409,11 @@ window.AndisNavigation?.bindBackButton?.({
         || matchActive
         || roundResultProcessed,
     isMatchRunning: () => matchActive && !gameOver,
-    onAbortConfirmed: () => {
-        resetMatchOnly();
-        fullscreenController?.exit();
-        screenController?.showSetup();
-        setResetButtonForRound(false);
-        setMatchInProgressLocked(false);
-        updateBotButtonState();
-    },
+    onActiveBack: leaveToMenu,
+    onAbortConfirmed: leaveToMenu,
     onMenuBack: () => {
         window.AndisSound?.playUiClick?.(0.22);
-        setTimeout(() => { window.location.href = "../index.html?menu=1"; }, 100);
+        window.location.href = "../index.html?menu=1";
     }
 });
 
@@ -365,14 +423,9 @@ window.AndisNavigation?.bindBackButton?.({
         || matchActive
         || roundResultProcessed,
     isMatchRunning: () => matchActive && !gameOver,
-    onAbortConfirmed: () => {
-        resetMatchOnly();
-        fullscreenController?.exit();
-        screenController?.showSetup();
-        setResetButtonForRound(false);
-        setMatchInProgressLocked(false);
-        updateBotButtonState();
-    }
+    onActiveBack: saveAndReturnToSetup,
+    onAbortConfirmed: abortMatchToSetup,
+    onMenuBack: saveAndReturnToSetup
 });
 
 const browserBackGuard = window.AndisNavigation?.bindBrowserBack?.({
@@ -380,14 +433,7 @@ const browserBackGuard = window.AndisNavigation?.bindBrowserBack?.({
         || matchActive
         || roundResultProcessed,
     isMatchRunning: () => matchActive && !gameOver,
-    onAbortConfirmed: () => {
-        resetMatchOnly();
-        fullscreenController?.exit();
-        screenController?.showSetup();
-        setResetButtonForRound(false);
-        setMatchInProgressLocked(false);
-        updateBotButtonState();
-    }
+    onAbortConfirmed: leaveToMenu
 });
 
 // --- Board-Aufbau ----------------------------------------------------------
@@ -568,6 +614,7 @@ function finalizeAdaptiveRoundSafely(resultSign) {
 function startNewRound() {
     if (roundStartInProgress) return;
     roundStartInProgress = true;
+    savedInSetup = false;
 
     try {
     if (!matchActive) matchActive = true;
@@ -589,6 +636,7 @@ function startNewRound() {
     setMatchInProgressLocked(true);
     setResetButtonForRound(true);
     setNextRoundButtonState(matchModeIndex > 0, false);
+    saveCurrentGame();
     maybeBotMove(true);
     } finally {
         roundStartInProgress = false;
@@ -605,6 +653,82 @@ function clearBoardVisual() {
         chip.style.transform = "";
         chip.style.opacity = "";
     });
+}
+
+function renderSavedBoard() {
+    clearBoardVisual();
+    board.forEach((row, r) => row.forEach((player, c) => {
+        if (!player) return;
+        const chip = getCell(r, c)?.querySelector(".chip");
+        chip?.classList.add(player === PLAYER_RED ? "red" : "yellow", "visible", "landed");
+    }));
+    const winner = connectFourAICore.findWinner(board);
+    if (winner?.coordinates) highlightWin(winner.coordinates);
+}
+
+function closeResumeConfirm() {
+    resumeConfirmBackdrop.hidden = true;
+    pendingSavedState = null;
+    resumePreviouslyFocused?.focus?.({ preventScroll: true });
+    resumePreviouslyFocused = null;
+}
+
+function requestResume(saved) {
+    pendingSavedState = saved;
+    resumePreviouslyFocused = document.activeElement;
+    const filled = saved.board.flat().filter(Boolean).length;
+    const total = saved.board.flat().length;
+    resumeProgress.textContent = `${MODE_OPTIONS[saved.modeIndex]} · ${filled} von ${total} Feldern belegt`;
+    resumeConfirmBackdrop.hidden = false;
+    resumeAccept.focus();
+}
+
+function restoreSavedGame(saved) {
+    if (!isValidSavedState(saved)) return false;
+    cancelPendingBotMove();
+    clearDropAnimation();
+    roundToken += 1;
+    savedInSetup = false;
+    modeIndex = saved.modeIndex;
+    matchModeIndex = saved.matchModeIndex;
+    botLevelIndex = Math.max(0, Math.min(BOT_LEVELS.length - 1, saved.botLevelIndex || 0));
+    adaptSpeedIndex = Math.max(0, Math.min(ADAPT_SPEED_OPTIONS.length - 1, saved.adaptSpeedIndex ?? 1));
+    window.currentAdaptSpeedFactor = ADAPT_SPEED_FACTORS[adaptSpeedIndex];
+    const savedBoard = saved.board.map(row => row.slice());
+    currentPlayer = saved.currentPlayer;
+    startingPlayer = saved.startingPlayer;
+    scores = { [PLAYER_RED]: Number(saved.scores[PLAYER_RED]) || 0, [PLAYER_YELLOW]: Number(saved.scores[PLAYER_YELLOW]) || 0 };
+    gameOver = Boolean(saved.gameOver);
+    matchActive = Boolean(saved.matchActive);
+    roundResultProcessed = Boolean(saved.roundResultProcessed);
+    resetButtonIndex = Number(saved.resetButtonIndex) || 0;
+    keyboardColumn = Math.max(0, Math.min(COLS - 1, Number(saved.keyboardColumn) || 0));
+    modeButton.textContent = MODE_OPTIONS[modeIndex];
+    matchButton.textContent = MATCH_OPTIONS[matchModeIndex];
+    updateBotButtonState();
+    initBoard();
+    board = savedBoard;
+    attachColumnHoverZones();
+    positionHoverZones();
+    renderSavedBoard();
+    boardEl.classList.toggle("disabled", gameOver || !matchActive);
+    boardEl.tabIndex = gameOver || !matchActive ? -1 : 0;
+    boardEl.style.pointerEvents = gameOver || !matchActive ? "none" : "auto";
+    updateKeyboardColumnFocus();
+    updateScoreUI();
+    if (gameOver) showWinner(saved.winnerText || "Runde beendet.");
+    else hideWinner();
+    setMatchInProgressLocked(true);
+    setResetButtonForRound(matchActive, gameOver);
+    updateUIStatus();
+    document.body.classList.add("game-active");
+    if (mobilePrototype) screenController?.showGame?.();
+    else { setupScreen.hidden = false; gameScreen.hidden = false; }
+    updateResumeAction();
+    if (!gameOver) refreshGhostForActivePlayer();
+    if (!gameOver && isBotTurn()) maybeBotMove();
+    saveCurrentGame();
+    return true;
 }
 
 function resetBoardArray() {
@@ -660,6 +784,7 @@ function handleColumnClick(col) {
     switchPlayer();
     updateUIStatus();
     refreshGhostForActivePlayer();
+    saveCurrentGame();
     maybeBotMove();
 }
 
@@ -751,6 +876,7 @@ function botMove(token) {
     switchPlayer();
     updateUIStatus();
     refreshGhostForActivePlayer();
+    saveCurrentGame();
 }
 
 // --- Hilfsfunktionen -------------------------------------------------------
@@ -914,6 +1040,7 @@ function onWin(player) {
     showWinner(`${playerName(player)} hat gewonnen!`);
     setMatchInProgressLocked(matchModeIndex > 0);
     setNextRoundButtonState(matchModeIndex > 0 && matchActive, matchModeIndex > 0 && matchActive);
+    saveCurrentGame();
 }
 
 function resetMatchOnly() {
@@ -947,6 +1074,71 @@ function resetMatchOnly() {
     nextRoundBtnEl.hidden = true;
 }
 
+function showSetupAfterSavedGame() {
+    fullscreenController?.exit();
+    gameOver = true;
+    matchActive = false;
+    roundResultProcessed = false;
+    if (mobilePrototype) screenController?.showSetup();
+    setResetButtonForRound(false);
+    setMatchInProgressLocked(false);
+    updateBotButtonState();
+    updateResumeAction();
+}
+
+function abortMatchToSetup() {
+    returningToSetup = false;
+    savedInSetup = false;
+    window.AndisSavedGameNotice?.hide?.();
+    resetMatchOnly();
+    ConnectFourStorage.clear();
+    fullscreenController?.exit();
+    if (mobilePrototype) screenController?.showSetup();
+    setResetButtonForRound(false);
+    setMatchInProgressLocked(false);
+    updateBotButtonState();
+    updateResumeAction();
+}
+
+function saveAndReturnToSetup() {
+    if (returningToSetup) return;
+    if (!hasSavableGame()) {
+        showSetupAfterSavedGame();
+        return;
+    }
+    cancelPendingBotMove();
+    clearDropAnimation();
+    roundToken += 1;
+    writeSavedGame();
+    savedInSetup = true;
+    returningToSetup = true;
+    window.AndisSavedGameNotice?.show?.("Spiel gespeichert", 1000, () => {
+        returningToSetup = false;
+        showSetupAfterSavedGame();
+    });
+}
+
+function leaveToMenu() {
+    if (leavingToMenu) return;
+    leavingToMenu = true;
+    cancelPendingBotMove();
+    clearDropAnimation();
+    roundToken += 1;
+    if (savedInSetup) {
+        window.location.href = "../index.html?menu=1";
+        return;
+    }
+    if (hasSavableGame()) {
+        writeSavedGame();
+        window.AndisSavedGameNotice?.show?.("Spiel gespeichert", 1000, () => {
+            window.location.href = "../index.html?menu=1";
+        });
+        return;
+    }
+    ConnectFourStorage.clear();
+    window.location.href = "../index.html?menu=1";
+}
+
 function resetFullGame() {
     resetMatchOnly();
     window.resetAdaptiveState?.();
@@ -977,6 +1169,7 @@ function onDraw() {
     showWinner("Unentschieden!");
     setMatchInProgressLocked(matchModeIndex > 0);
     setNextRoundButtonState(matchModeIndex > 0 && matchActive, matchModeIndex > 0 && matchActive);
+    saveCurrentGame();
 }
 
 // --- Winner Banner Funktionen ---
@@ -992,4 +1185,58 @@ function hideWinner() {
     nextRoundBtnEl.hidden = true;
     boardEl.style.pointerEvents = "auto"; // Klicks wieder erlauben
     setNextRoundButtonState(matchModeIndex > 0, false);
+}
+
+resumeSavedButton?.addEventListener("click", () => {
+    window.AndisSound?.playUiClick?.(0.22);
+    const saved = ConnectFourStorage.load();
+    if (isValidSavedState(saved)) restoreSavedGame(saved);
+});
+
+resumeDecline?.addEventListener("click", () => {
+    window.AndisSound?.playUiClick?.(0.22);
+    closeResumeConfirm();
+    ConnectFourStorage.clear();
+    updateResumeAction();
+    modeButton.focus({ preventScroll: true });
+});
+
+resumeAccept?.addEventListener("click", () => {
+    window.AndisSound?.playUiClick?.(0.22);
+    const saved = pendingSavedState;
+    closeResumeConfirm();
+    restoreSavedGame(saved);
+});
+
+resumeConfirmBackdrop?.addEventListener("click", event => {
+    if (event.target === resumeConfirmBackdrop) closeResumeConfirm();
+});
+
+document.addEventListener("keydown", event => {
+    if (!resumeConfirmBackdrop || resumeConfirmBackdrop.hidden) return;
+    if (event.key === "Escape") {
+        event.preventDefault();
+        closeResumeConfirm();
+        return;
+    }
+    if (event.key === "Tab") {
+        const focusable = [resumeDecline, resumeAccept].filter(Boolean);
+        if (!focusable.length) return;
+        const currentIndex = focusable.indexOf(document.activeElement);
+        const nextIndex = event.shiftKey
+            ? (currentIndex <= 0 ? focusable.length - 1 : currentIndex - 1)
+            : (currentIndex === focusable.length - 1 ? 0 : currentIndex + 1);
+        event.preventDefault();
+        focusable[nextIndex].focus();
+    }
+});
+
+window.addEventListener("beforeunload", saveCurrentGame);
+
+updateResumeAction();
+const savedConnectFour = ConnectFourStorage.load();
+const returnedFromGuide = new URLSearchParams(window.location.search).get("guide") === "1";
+if (isValidSavedState(savedConnectFour)) {
+    if (returnedFromGuide) restoreSavedGame(savedConnectFour);
+    else requestResume(savedConnectFour);
 }
