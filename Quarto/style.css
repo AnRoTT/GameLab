@@ -156,7 +156,7 @@ main { padding: 12px 0 18px; }
 .piece-button.selection-player-1.keyboard-focus, .board-cell.place-player-1.keyboard-focus { outline-color: var(--accent); }
 .piece-button.selection-player-2.keyboard-focus, .board-cell.place-player-2.keyboard-focus { outline-color: var(--quarto-gold); }
 .board-cell.win { box-shadow: 0 0 16px rgba(213,169,94,.8); border-color: var(--quarto-gold); }
-.board.board-disabled { pointer-events: none; }
+.board.board-disabled { pointer-events: none; opacity: .45; filter: grayscale(35%); }
 .board-cell .piece-shape { width: 58%; height: auto; }
 .board-cell .piece-shape.short { width: 55%; height: auto; }
 .board-cell .piece-shape.tall { width: 72%; height: auto; }
@@ -278,6 +278,38 @@ main { padding: 12px 0 18px; }
 /* Mobile Landscape: Quarto-Play-Screen. Die gemeinsame Kopfzeile kommt aus
    theme.css; hier wird nur das Quarto-Spielfeldraster angeordnet. */
 @media (orientation: landscape) and (max-height: 700px) {
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 9px;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions > #startButton {
+        order: 1;
+        width: max-content;
+        min-height: 42px;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions > #resumeSavedButton {
+        order: 2;
+        width: max-content;
+        min-height: 42px;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-screen > .game-actions .landscape-setup-tools {
+        display: contents !important;
+    }
+
+    .mobile-prototype:not(.game-active) .setup-extra-settings-button {
+        display: inline-flex !important;
+        order: 3;
+        width: 42px;
+        min-width: 42px;
+        min-height: 36px;
+        padding: 0;
+    }
+
     .mobile-prototype.game-active .game-screen:not([hidden]) {
         display: grid;
         grid-template-columns: minmax(0, 1fr) minmax(76px, 100px) minmax(200px, 280px);
@@ -387,6 +419,30 @@ main { padding: 12px 0 18px; }
         min-width: 0;
     }
 }
+
+.quarto-confirm-backdrop[hidden] { display: none; }
+.quarto-confirm-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    display: grid;
+    place-items: center;
+    padding: 18px;
+    background: rgba(0, 0, 0, .62);
+    backdrop-filter: blur(2px);
+}
+.quarto-confirm-dialog {
+    width: min(100%, 360px);
+    padding: 16px;
+    border: 1px solid #30364c;
+    border-radius: var(--radius-lg);
+    background: rgba(16, 18, 26, .98);
+    box-shadow: var(--shadow-soft);
+    text-align: center;
+}
+.quarto-confirm-dialog h2 { margin: 0 0 8px; font-size: 1rem; }
+.quarto-confirm-dialog p { margin: 0 0 14px; color: var(--text-muted); font-size: .85rem; }
+.quarto-confirm-actions { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
 
 @media (orientation: landscape) and (max-width: 700px) {
     .mobile-prototype.game-active .game-screen .board {

@@ -6,6 +6,7 @@
         isGameActive,
         isMatchRunning,
         onAbortConfirmed,
+        onActiveBack,
         onMenuBack
     }) {
         if (!button) return;
@@ -13,12 +14,17 @@
         button.addEventListener("click", (event) => {
             event.preventDefault();
 
-            if (!isGameActive?.()) {
-                onMenuBack?.();
-                return;
-            }
+        if (!isGameActive?.()) {
+            onMenuBack?.();
+            return;
+        }
 
-            if (!isMatchRunning?.()) {
+        if (typeof onActiveBack === "function") {
+            onActiveBack();
+            return;
+        }
+
+        if (!isMatchRunning?.()) {
                 onAbortConfirmed?.();
                 return;
             }
