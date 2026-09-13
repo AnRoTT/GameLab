@@ -1671,9 +1671,10 @@ function normalizeLocalIllumination(image) {
                     col,
                     value: clearDecision ? best.value : null,
                     candidates: ranked.map(candidate => candidate.value),
-                    status: clearDecision
-                        ? "recognized"
-                        : (ink.reviewable || ranked.length ? "uncertain" : "empty")
+                    // Die Live-Ansicht zeigt ausschließlich Treffer, die
+                    // später auch sicher in den Import übernommen werden.
+                    // Unsichere Kandidaten bleiben bis zur Korrekturansicht unsichtbar.
+                    status: clearDecision ? "recognized" : "empty"
                 });
                 processed++;
                 statusElement.textContent = `Ziffern werden erkannt … ${Math.round((processed / 81) * 100)} %`;
