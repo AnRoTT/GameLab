@@ -252,45 +252,7 @@
         return image;
     }
 
-    function normalizeLocalIllumination(image) {
-        const { width, height, data } = image;
-        const integral = new Uint32Array((width + 1) * (height + 1));
-        for (let y = 1; y <= height; y++) {
-            let rowSum = 0;
-            for (let x = 1; x <= width; x++) {
-                const offset = ((y - 1) * width + (x - 1)) * 4;
-                rowSum += data[offset];
-                integral[y * (width + 1) + x] =
-                    integral[(y - 1) * (width + 1) + x] + rowSum;
-            }
-        }
-
-        const radius = Math.max(10, Math.round(Math.min(width, height) * .09));
-        for (let y = 0; y < height; y++) {
-            for (let x = 0; x < width; x++) {
-                const left = Math.max(0, x - radius);
-                const top = Math.max(0, y - radius);
-                const right = Math.min(width - 1, x + radius);
-                const bottom = Math.min(height - 1, y + radius);
-                const area = (right - left + 1) * (bottom - top + 1);
-                const localSum = integral[(bottom + 1) * (width + 1) + right + 1]
-                    - integral[top * (width + 1) + right + 1]
-                    - integral[(bottom + 1) * (width + 1) + left]
-                    + integral[top * (width + 1) + left];
-                const localMean = localSum / area;
-                const offset = (y * width + x) * 4;
-                // Lokale Abweichungen bleiben erhalten, großflächige Schatten
-                // werden neutralisiert. Der Sicherheitsabstand verhindert,
-                // dass sehr dunkle Zellen künstlich übersteuern.
-                const normalized = Math.max(0, Math.min(255,
-                    Math.round(150 + (data[offset] - localMean) * 2.2)));
-                data[offset] = normalized;
-                data[offset + 1] = normalized;
-                data[offset + 2] = normalized;
-            }
-        }
-        return image;
-    }
+    
 
     function strengthenOcrContrast(image) {
         // Die reine Histogramm-Normalisierung macht den Gesamtbereich nutzbar.
@@ -379,15 +341,17 @@
     function prepareOcrCell(source, row, col, variant = "otsu") {
         const cell = createOcrCellBase(source, row, col);
         const context = cell.getContext("2d", { willReadFrequently: true });
-        const image = grayscaleImage(context.getImageData(0, 0, cell.width, cell.height));
-        normalizeLocalIllumination(image);
-        normalizeOcrContrast(image);
+        // Bewährte Aufbereitung: Graustufen und globale Kontrastnormalisierung.
+        // Die frühere lokale Helligkeitskorrektur wurde bewusst entfernt, weil
+        // sie Papierstruktur und Schatten als Ziffern verstärken konnte.
+        const image = normalizeOcrContrast(
+            grayscaleImage(context.getImageData(0, 0, cell.width, cell.height))
+        );
         if (variant === "otsu") otsuThreshold(image);
         if (variant === "enhanced") {
             strengthenOcrContrast(image);
             otsuThreshold(image);
         }
-        if (variant === "adaptive") adaptiveThreshold(image);
         context.putImageData(image, 0, 0);
         return cell;
     }
@@ -1567,7 +1531,7 @@
             && confidenceGap >= 28;
     }
 
-    async function recognizeSudokuCells(worker, source, statusElement) {
+    async async function recognizeSudokuCells(worker, source, statusElement) {
         const result = new Map();
         const uncertain = [];
         let processed = 0;
@@ -1582,9 +1546,7 @@
                 const ink = analyzeCellInk(source, row, col);
                 const variants = [];
 
-                // Drei unterschiedliche Bildaufbereitungen liefern eine
-                // stabilere Entscheidung als eine einzelne Schwelle.
-                for (const variantName of ["raw", "otsu", "adaptive"]) {
+                for (const variantName of ["raw", "otsu"]) {
                     const candidate = await recognizeOcrVariant(
                         worker,
                         variantName === "raw"
@@ -1595,10 +1557,8 @@
                 }
 
                 let ranked = rankOcrCandidates(variants);
-                // Bei sichtbarer Struktur oder einem schwachen OCR-Kandidaten
-                // folgt eine zusätzliche kontrastverstärkte Prüfung.
                 if (!isClearOcrDecision(ranked)
-                    && (ranked.length || ink.reviewable || ink.score >= .055)) {
+                    && (ranked.length || ink.reviewable)) {
                     const candidate = await recognizeOcrVariant(
                         worker,
                         prepareOcrCell(source, row, col, "enhanced")
@@ -1914,20 +1874,25 @@
             // feststeht, Tesseract aber keine passende Alternativziffer nennt.
             const solverConflictIndexes = findPuzzleConflictIndexes(state.puzzle);
             const solverConflictItems = createConflictReviewItems(solverConflictIndexes);
-            const reviewItems = mergeReviewItems([...recognition.uncertain, ...solverConflictItems, ...conflicts]);
-            state.conflictIndexes = [...new Set([
+            const conflictIndexes = [...new Set([
                 ...conflicts.map(item => item.row * 9 + item.col),
                 ...solverConflictIndexes
             ])];
+            state.conflictIndexes = conflictIndexes;
+            // Nach dem Fotoimport bleibt das Raster bewusst im Editor-Modus.
+            // Unsichere OCR-Felder werden nicht als Pflichtdialog abgearbeitet;
+            // der Nutzer kann sie direkt im Raster ergänzen oder ändern.
             SudokuStorage.save(state);
             finishOcrProgress("OCR-Import abgeschlossen");
-            if (state.conflictIndexes.length) {
-                const count = state.conflictIndexes.length;
-                customPuzzleStatus.textContent = `Die OCR-Übertragung ist widersprüchlich. Die Korrekturprüfung startet für ${count} markierte Ziffer${count === 1 ? "" : "n"}.`;
+            state.preview = false;
+            state.started = false;
+            state.customPhase = "entry";
+            if (conflictIndexes.length) {
+                customPuzzleStatus.textContent = `OCR übertragen. ${conflictIndexes.length} widersprüchliche Felder sind markiert. Bitte korrigiere oder ergänze das Raster und wähle danach „Rätsel prüfen“.`;
             } else {
                 customPuzzleStatus.textContent = mapped.size
-                    ? `${mapped.size} Ziffern ${prepared.corrected ? "nach Rasterkorrektur" : "im Sudoku-Raster"} erkannt. Bitte prüfe und korrigiere die Übertragung.`
-                        : "Keine sicheren Ziffern erkannt. Bitte übertrage das Rätsel manuell.";
+                    ? `${mapped.size} Ziffern ${prepared.corrected ? "nach Rasterkorrektur" : "im Sudoku-Raster"} erkannt. Bitte ergänze oder korrigiere das Raster und wähle danach „Rätsel prüfen“.`
+                    : "Keine sicheren Ziffern erkannt. Bitte übertrage das Rätsel manuell und wähle danach „Rätsel prüfen“.";
             }
             if (prepared.quality && prepared.quality.score < 75) {
                 customPuzzleStatus.textContent += " Fotoqualität " + prepared.quality.label.toLowerCase()
@@ -1935,7 +1900,7 @@
             }
             render();
             focusBoard();
-            startCustomReview(reviewItems);
+            // Die Review-Warteschlange wird nach dem Import nicht automatisch geöffnet.
         } catch (error) {
             customPuzzleStatus.textContent = error.message || "Die Fotoerkennung ist fehlgeschlagen. Bitte übertrage das Rätsel manuell.";
             finishOcrProgress("OCR-Import fehlgeschlagen");
