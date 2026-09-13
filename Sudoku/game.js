@@ -1637,53 +1637,12 @@
     function finishCustomReview() {
         customImportReview.hidden = true;
         customReviewQueue = [];
-        // Nach der OCR-Korrektur darf die nächste Tastatureingabe nicht
-        // versehentlich in der dauerhaft markierten Zelle 0 landen.
         selected = null;
+        state.preview = false;
+        state.started = false;
+        state.customPhase = "entry";
         SudokuStorage.save(state);
-        const valid = window.SudokuSolver.isValidGrid(state.puzzle);
-        const solvable = valid && window.SudokuSolver.countSolutions(state.puzzle.slice(), 1) > 0;
-        if (!state.puzzle.some(Boolean)) {
-            customPuzzleStatus.textContent = "Keine Ziffern sicher erkannt. Bitte übertrage das Rätsel manuell.";
-        } else if (solvable) {
-            state.conflictIndexes = [];
-            state.solution = window.SudokuSolver.solve(state.puzzle.slice());
-            state.preview = true;
-            state.started = false;
-            state.customPhase = "ready";
-            state.values = state.puzzle.slice();
-            selected = findFirstSelectableCell();
-            state.checked = false;
-            state.completed = false;
-            state.hintIndex = null;
-            state.revealedSolution = false;
-            notesMode = false;
-            undoStack = [];
-            redoStack = [];
-            customPuzzleStatus.textContent = "Rätsel gültig. Vorschau bereit – klicke „Jetzt spielen“.";
-            finishOcrProgress("Rätsel gültig – jetzt spielen", 1800);
-            SudokuStorage.save(state);
-            if (lastImportQuality && lastImportQuality.score < 75) {
-                customPuzzleStatus.textContent += " Fotoqualität " + lastImportQuality.label.toLowerCase()
-                    + " (" + lastImportQuality.score + "/100) – bitte unsichere Leerfelder und Ziffern besonders prüfen.";
-            }
-        } else {
-            const indexes = findPuzzleConflictIndexes(state.puzzle);
-            // Nach einer OCR-Review wird die Eingabe noch einmal selbständig
-            // geprüft. Erkennen wir weiterhin einen konkreten Widerspruch,
-            // öffnet sich die Korrektur direkt erneut statt nur den Hinweis
-            // „Rätsel prüfen“ zu erwarten.
-            if (indexes.length && automaticConflictReviewPass < 1) {
-                automaticConflictReviewPass++;
-                state.conflictIndexes = indexes;
-                customPuzzleStatus.textContent = "Die Übertragung ist noch widersprüchlich. Bitte korrigiere die erneut markierte Ziffer.";
-                SudokuStorage.save(state);
-                render();
-                startCustomReview(createConflictReviewItems(indexes));
-                return;
-            }
-            customPuzzleStatus.textContent = "Die Übertragung ist noch widersprüchlich. Bitte prüfe die markierten Ziffern oder übertrage sie manuell.";
-        }
+        customPuzzleStatus.textContent = "Korrekturprüfung abgeschlossen. Ergänze oder korrigiere das Raster und wähle danach „Rätsel prüfen“.";
         render();
         focusBoard();
     }
@@ -1879,28 +1838,37 @@
                 ...solverConflictIndexes
             ])];
             state.conflictIndexes = conflictIndexes;
-            // Nach dem Fotoimport bleibt das Raster bewusst im Editor-Modus.
-            // Unsichere OCR-Felder werden nicht als Pflichtdialog abgearbeitet;
-            // der Nutzer kann sie direkt im Raster ergänzen oder ändern.
+            // OCR-Unsicherheiten ohne Kandidaten bleiben im editierbaren Raster.
+            // Nur Felder, für die OCR mindestens eine konkrete Ziffer anbietet,
+            // werden in der schnellen Bild-Korrektur angezeigt.
+            const reviewItems = mergeReviewItems([
+                ...recognition.uncertain.filter(item => item.candidates.length),
+                ...solverConflictItems,
+                ...conflicts
+            ]);
             SudokuStorage.save(state);
             finishOcrProgress("OCR-Import abgeschlossen");
             state.preview = false;
             state.started = false;
             state.customPhase = "entry";
             if (conflictIndexes.length) {
-                customPuzzleStatus.textContent = `OCR übertragen. ${conflictIndexes.length} widersprüchliche Felder sind markiert. Bitte korrigiere oder ergänze das Raster und wähle danach „Rätsel prüfen“.`;
+                customPuzzleStatus.textContent = `OCR übertragen. ${conflictIndexes.length} widersprüchliche Felder sind markiert.`;
             } else {
                 customPuzzleStatus.textContent = mapped.size
-                    ? `${mapped.size} Ziffern ${prepared.corrected ? "nach Rasterkorrektur" : "im Sudoku-Raster"} erkannt. Bitte ergänze oder korrigiere das Raster und wähle danach „Rätsel prüfen“.`
-                    : "Keine sicheren Ziffern erkannt. Bitte übertrage das Rätsel manuell und wähle danach „Rätsel prüfen“.";
+                    ? `${mapped.size} Ziffern ${prepared.corrected ? "nach Rasterkorrektur" : "im Sudoku-Raster"} erkannt.`
+                    : "Keine sicheren Ziffern erkannt.";
             }
+            if (reviewItems.length) {
+                customPuzzleStatus.textContent += ` ${reviewItems.length} unsichere Ziffer${reviewItems.length === 1 ? "" : "n"} werden jetzt zur schnellen Prüfung angezeigt.`;
+            }
+            customPuzzleStatus.textContent += " Ergänze oder korrigiere das Raster und wähle danach „Rätsel prüfen“.";
             if (prepared.quality && prepared.quality.score < 75) {
                 customPuzzleStatus.textContent += " Fotoqualität " + prepared.quality.label.toLowerCase()
                     + " (" + prepared.quality.score + "/100) – bitte unsichere Leerfelder und Ziffern besonders prüfen.";
             }
             render();
             focusBoard();
-            // Die Review-Warteschlange wird nach dem Import nicht automatisch geöffnet.
+            startCustomReview(reviewItems);
         } catch (error) {
             customPuzzleStatus.textContent = error.message || "Die Fotoerkennung ist fehlgeschlagen. Bitte übertrage das Rätsel manuell.";
             finishOcrProgress("OCR-Import fehlgeschlagen");
