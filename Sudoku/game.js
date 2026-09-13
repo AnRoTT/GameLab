@@ -1607,7 +1607,7 @@ function normalizeLocalIllumination(image) {
                 }
 
                 const best = ranked[0];
-                if (best && isClearOcrDecision(ranked) && ink.reviewable) {
+                if (best && isClearOcrDecision(ranked)) {
                     result.set(row * 9 + col, {
                         index: row * 9 + col,
                         value: best.value,
