@@ -507,6 +507,38 @@
         ocrProgressBadge.hidden = false;
     }
 
+    function getCustomDifficultyEstimate(puzzle) {
+        const rating = window.SudokuDifficulty.rate(puzzle);
+        return {
+            level: window.SudokuDifficulty.classify(puzzle),
+            technique: rating.technique,
+            clues: rating.clues
+        };
+    }
+
+    function formatCustomDifficultyEstimate(puzzle) {
+        const estimate = getCustomDifficultyEstimate(puzzle);
+        return `Geschätzt: ${estimate.level}\nTyp: ${estimate.technique} / ${estimate.clues} Vorgaben`;
+    }
+
+    function showCustomReadyBadge(puzzle = state?.puzzle) {
+        if (!ocrProgressBadge) return;
+        if (ocrBadgeTimer) window.clearTimeout(ocrBadgeTimer);
+        ocrProgressBadge.dataset.persistent = "custom-ready";
+        ocrProgressBadge.classList.remove("fade-out");
+        ocrProgressBadge.textContent = `Rätsel gültig\n${formatCustomDifficultyEstimate(puzzle)}`;
+        ocrProgressBadge.hidden = false;
+    }
+
+    function clearCustomReadyBadge() {
+        if (!ocrProgressBadge || ocrProgressBadge.dataset.persistent !== "custom-ready") return;
+        if (ocrBadgeTimer) window.clearTimeout(ocrBadgeTimer);
+        delete ocrProgressBadge.dataset.persistent;
+        ocrProgressBadge.classList.remove("fade-out");
+        ocrProgressBadge.hidden = true;
+        ocrBadgeTimer = null;
+    }
+
     function dismissCustomEntryHint() {
         if (!ocrProgressBadge || ocrProgressBadge.dataset.persistent !== "custom-entry") return;
         if (ocrBadgeTimer) window.clearTimeout(ocrBadgeTimer);
@@ -520,6 +552,10 @@
     }
 
     function clearCustomEntryHint() {
+        if (ocrProgressBadge?.dataset.persistent === "custom-ready") {
+            clearCustomReadyBadge();
+            return;
+        }
         if (!ocrProgressBadge || ocrProgressBadge.dataset.persistent !== "custom-entry") return;
         if (ocrBadgeTimer) window.clearTimeout(ocrBadgeTimer);
         delete ocrProgressBadge.dataset.persistent;
@@ -685,9 +721,11 @@
     function updateSetup() {
         difficultyButton.textContent = customMode ? "Rätsel-Sandkasten" : currentLevel();
         const customEntry = Boolean(state?.mode === "custom" && state.customPhase === "entry");
-        const readyPreview = Boolean(state?.preview && state.puzzle?.some(Boolean)
-            && (state.mode !== "custom" || state.customPhase === "ready"));
-        const running = Boolean(state && !state.preview && !state.completed && !savedInSetup && !customEntry);
+        const customReady = Boolean(state?.mode === "custom" && state.customPhase === "ready");
+        const readyPreview = customReady || Boolean(state?.preview && state.puzzle?.some(Boolean)
+            && state.mode !== "custom");
+        const running = Boolean(state && !state.preview && !state.completed && !savedInSetup
+            && !customEntry && !customReady);
         const mobileCustomSetup = Boolean(mobilePrototype && customMode && !state);
         const mobileGeneratedSetup = Boolean(mobilePrototype && !customMode && !state);
         const primaryReady = running || readyPreview || mobileCustomSetup || mobileGeneratedSetup;
@@ -728,6 +766,7 @@
             state.values = Array(81).fill(0);
             state.notes = emptyNotes();
             state.conflictIndexes = [];
+            state.ocrOriginalPuzzle = null;
             selected = 0;
             if (customMode) showCustomEntryHint();
             else clearCustomEntryHint();
@@ -789,6 +828,7 @@
             checked: false,
             completed: false,
             hintIndex: null,
+            ocrOriginalPuzzle: null,
             hintedEntries: Array(81).fill(false),
             revealedSolution: false
         };
@@ -808,10 +848,16 @@
     }
 
     function startCurrentPuzzle() {
-        if (!state?.preview || !state.puzzle?.some(Boolean) || !state.solution) return false;
+        const ready = Boolean(state?.preview
+            || (state?.mode === "custom" && state.customPhase === "ready"));
+        if (!ready || !state.puzzle?.some(Boolean) || !state.solution) return false;
+        clearCustomReadyBadge();
         state.preview = false;
         state.started = true;
-        if (state.mode === "custom") state.customPhase = "solving";
+        if (state.mode === "custom") {
+            state.customPhase = "solving";
+            selected = findFirstSelectableCell();
+        }
         savedInSetup = false;
         if (mobilePrototype) {
             screenController?.showGame?.();
@@ -863,6 +909,10 @@
         state = saved;
         state.mode = state.mode || "generated";
         if (state.mode === "custom") state.level = "Rätsel-Sandkasten";
+        state.ocrOriginalPuzzle = Array.isArray(state.ocrOriginalPuzzle)
+            && state.ocrOriginalPuzzle.length === 81
+            ? state.ocrOriginalPuzzle
+            : null;
         state.customPhase = state.mode === "custom" ? (state.customPhase || "entry") : null;
         state.hintedEntries = Array.isArray(state.hintedEntries) && state.hintedEntries.length === 81
             ? state.hintedEntries
@@ -890,8 +940,24 @@
     function isCustomEntry() {
         return state?.mode === "custom" && state.customPhase === "entry";
     }
+    function isCustomEditable() {
+        return state?.mode === "custom"
+            && (state.customPhase === "entry" || state.customPhase === "ready");
+    }
+    function beginCustomEdit() {
+        if (!state || state.mode !== "custom" || state.customPhase !== "ready") return;
+        state.customPhase = "entry";
+        state.solution = null;
+        state.checked = false;
+        state.conflictIndexes = [];
+        state.hintIndex = null;
+        state.revealedSolution = false;
+        notesMode = false;
+        clearCustomReadyBadge();
+        customPuzzleStatus.textContent = "Übertragung geändert. Bitte Rätsel erneut prüfen.";
+    }
     function isSelectableCell(index) {
-        return index >= 0 && index < 81 && (isCustomEntry() || !isGiven(index));
+        return index >= 0 && index < 81 && (isCustomEditable() || !isGiven(index));
     }
     function findFirstSelectableCell() {
         const index = Array.from({ length: 81 }, (_, cellIndex) => cellIndex)
@@ -941,7 +1007,7 @@
             cell.dataset.index = String(index);
             cell.setAttribute("role", "gridcell");
             cell.setAttribute("aria-selected", String(index === selected));
-            cell.disabled = Boolean(state.preview || savedInSetup || (!isCustomEntry() && isGiven(index)));
+            cell.disabled = Boolean(state.preview || savedInSetup || (!isCustomEditable() && isGiven(index)));
             cell.setAttribute("aria-label", `Zeile ${row + 1}, Spalte ${col + 1}${value ? `, ${value}` : ", leer"}`);
             if (isGiven(index)) cell.classList.add("given");
             else if (value) cell.classList.add("user-entry");
@@ -988,24 +1054,28 @@
         });
         const clearNumberButton = numberPad.querySelector(".clear-number");
         if (clearNumberButton) clearNumberButton.disabled = preview;
+        const customReady = state.mode === "custom" && state.customPhase === "ready";
         const customCompleted = state.mode === "custom" && state.completed;
         const customSolving = state.mode === "custom" && state.customPhase === "solving";
-        customPuzzleTools.hidden = !(customEntry || customCompleted);
+        customPuzzleTools.hidden = !(customEntry || customReady || customCompleted);
         customPuzzleStatus.hidden = state.mode !== "custom";
-        customImportButton.hidden = !customEntry;
-        customValidateButton.hidden = !customEntry;
-        customResetButton.hidden = !(customEntry || customCompleted);
+        const customSetup = customEntry || customReady;
+        customImportButton.hidden = !customSetup;
+        customValidateButton.hidden = !customSetup;
+        customResetButton.hidden = !(customEntry || customReady || customCompleted);
         customSolveButton.hidden = !customSolving;
-        document.getElementById("notesButton").hidden = customEntry;
-        document.getElementById("undoButton").hidden = customEntry;
-        document.getElementById("redoButton").hidden = customEntry;
-        document.getElementById("checkButton").hidden = customEntry;
-        document.getElementById("hintButton").hidden = customEntry;
+        document.getElementById("notesButton").hidden = customSetup;
+        document.getElementById("undoButton").hidden = customSetup;
+        document.getElementById("redoButton").hidden = customSetup;
+        document.getElementById("checkButton").hidden = customSetup;
+        document.getElementById("hintButton").hidden = customSetup;
         const generatedMode = state.mode === "generated" && !customMode;
         newPuzzleButton.hidden = !generatedMode;
         [notesButton, document.getElementById("checkButton"), document.getElementById("hintButton"),
             customImportButton, customValidateButton, customResetButton, customSolveButton]
-            .forEach(button => { button.disabled = preview || button.hidden; });
+            .forEach(button => {
+                button.disabled = (preview && button !== customResetButton) || button.hidden;
+            });
         newPuzzleButton.disabled = !generatedMode || Boolean(
             state && !state.preview && !state.completed && !savedInSetup
         );
@@ -1079,10 +1149,11 @@
     }
     function enterNumber(number) {
         if (!state || state.preview || state.completed || !Number.isInteger(selected)) return;
-        const customEntry = state.mode === "custom" && state.customPhase === "entry";
-        if (!customEntry && isGiven(selected)) return;
+        const customEditing = isCustomEditable();
+        if (!customEditing && isGiven(selected)) return;
+        if (state.customPhase === "ready") beginCustomEdit();
         const before = snapshot();
-        if (customEntry) {
+        if (customEditing) {
             state.puzzle[selected] = state.puzzle[selected] === number ? 0 : number;
             state.values[selected] = state.puzzle[selected];
             state.notes[selected] = [];
@@ -1108,10 +1179,10 @@
         }
         state.checked = false;
         state.hintIndex = null;
-        if (!notesMode || customEntry) cleanInvalidNotes();
+        if (!notesMode || customEditing) cleanInvalidNotes();
         undoStack.push(before);
         redoStack = [];
-        state.completed = customEntry ? false : isComplete();
+        state.completed = customEditing ? false : isComplete();
         SudokuStorage.save(state);
         click();
         render();
@@ -1120,14 +1191,15 @@
 
     function clearSelected() {
         if (!state || state.preview || state.completed || !Number.isInteger(selected)) return;
-        const customEntry = state.mode === "custom" && state.customPhase === "entry";
-        if (!customEntry && isGiven(selected)) return;
+        const customEditing = isCustomEditable();
+        if (!customEditing && isGiven(selected)) return;
+        if (state.customPhase === "ready") beginCustomEdit();
         if (!state.values[selected] && !state.notes[selected].length) return;
         undoStack.push(snapshot());
         state.values[selected] = 0;
         state.notes[selected] = [];
-        if (customEntry) state.puzzle[selected] = 0;
-        if (customEntry) state.conflictIndexes = (state.conflictIndexes || []).filter(index => index !== selected);
+        if (customEditing) state.puzzle[selected] = 0;
+        if (customEditing) state.conflictIndexes = (state.conflictIndexes || []).filter(index => index !== selected);
         state.hintedEntries[selected] = false;
         state.checked = false;
         state.hintIndex = null;
@@ -1243,20 +1315,35 @@
                 : createFallbackCellPreview(state.puzzle[index]),
             gridPreview: lastImportedGridSource || fallbackGrid,
             reason: lastImportedGridSource
-                ? "Diese Ziffer verhindert eine gültige Sudoku-Lösung"
-                : "Diese Ziffer verhindert eine gültige Sudoku-Lösung. Das Originalfoto ist in dieser Sitzung nicht mehr verfügbar"
+                ? `Diese Ziffer verhindert eine gültige Sudoku-Lösung${getImportedChangedIndexes().includes(index) ? " und wurde nach dem OCR-Import geändert" : ""}`
+                : `Diese Ziffer verhindert eine gültige Sudoku-Lösung. Das Originalfoto ist in dieser Sitzung nicht mehr verfügbar${getImportedChangedIndexes().includes(index) ? " und wurde nach dem OCR-Import geändert" : ""}`
         }));
+    }
+
+    function getImportedChangedIndexes(puzzle = state.puzzle) {
+        if (!Array.isArray(state?.ocrOriginalPuzzle)) return [];
+        return puzzle.reduce((indexes, value, index) => {
+            if (value !== state.ocrOriginalPuzzle[index]) indexes.push(index);
+            return indexes;
+        }, []);
+    }
+
+    function formatCellPositions(indexes) {
+        return indexes.map(index => `Z${Math.floor(index / 9) + 1}/S${index % 9 + 1}`).join(", ");
     }
 
     function showCustomPuzzleConflict(puzzle, message) {
         const indexes = findPuzzleConflictIndexes(puzzle);
+        const changedIndexes = getImportedChangedIndexes(puzzle);
         state.conflictIndexes = indexes;
         SudokuStorage.save(state);
         render();
         if (indexes.length) {
-            customPuzzleStatus.textContent = lastImportedGridSource
-                ? `${message} Die verdächtige Ziffer ist im Raster markiert und wird mit dem Originalausschnitt angezeigt.`
-                : `${message} Die verdächtige Ziffer wird jetzt zur Korrektur angezeigt.`;
+            const changedConflictIndexes = changedIndexes.filter(index => indexes.includes(index));
+            const changedMessage = changedConflictIndexes.length
+                ? ` Davon nach OCR geändert: ${formatCellPositions(changedConflictIndexes)}.`
+                : "";
+            customPuzzleStatus.textContent = `${message}${changedMessage} Bitte prüfe die markierten Ziffern.`;
             startCustomReview(createConflictReviewItems(indexes));
             return;
         }
@@ -1278,11 +1365,11 @@
             return;
         }
         if (solutionCount > 1) {
-            customPuzzleStatus.textContent = "Das Rätsel ist nicht eindeutig. Bitte prüfe die übertragenen Vorgaben.";
+            customPuzzleStatus.textContent = "Das Rätsel ist nicht eindeutig. Eine einzelne falsche Zahl kann daraus nicht sicher bestimmt werden. Bitte prüfe die geänderten Vorgaben manuell.";
             return;
         }
         state.solution = window.SudokuSolver.solve(puzzle.slice());
-        state.preview = true;
+        state.preview = false;
         state.started = false;
         state.customPhase = "ready";
         state.values = puzzle.slice();
@@ -1294,8 +1381,9 @@
         notesMode = false;
         undoStack = [];
         redoStack = [];
-        customPuzzleStatus.textContent = "Rätsel gültig. Vorschau bereit – klicke „Jetzt spielen“.";
-        finishOcrProgress("Rätsel gültig – jetzt spielen", 1800);
+        const estimate = formatCustomDifficultyEstimate(puzzle).replace(/\n/g, " – ");
+        customPuzzleStatus.textContent = `Rätsel gültig. ${estimate}. Vorschau bereit – klicke „Jetzt spielen“.`;
+        showCustomReadyBadge(puzzle);
         SudokuStorage.save(state);
         render();
         focusBoard();
@@ -1303,7 +1391,7 @@
 
     function resetCustomPuzzle() {
         if (!state || state.mode !== "custom"
-            || (state.customPhase !== "entry" && !state.completed)) return;
+            || (state.customPhase !== "entry" && state.customPhase !== "ready" && !state.completed)) return;
         state.started = false;
         state.preview = false;
         state.customPhase = "entry";
@@ -1313,6 +1401,7 @@
         state.notes = emptyNotes();
         state.conflictIndexes = [];
         state.solution = null;
+        state.ocrOriginalPuzzle = null;
         state.checked = false;
         state.revealedSolution = false;
         customPuzzleStatus.textContent = "Übertragung zurückgesetzt.";
@@ -1543,7 +1632,7 @@
         } else if (solvable) {
             state.conflictIndexes = [];
             state.solution = window.SudokuSolver.solve(state.puzzle.slice());
-            state.preview = true;
+            state.preview = false;
             state.started = false;
             state.customPhase = "ready";
             state.values = state.puzzle.slice();
@@ -1555,8 +1644,9 @@
             notesMode = false;
             undoStack = [];
             redoStack = [];
-            customPuzzleStatus.textContent = "Rätsel gültig. Vorschau bereit – klicke „Jetzt spielen“.";
-            finishOcrProgress("Rätsel gültig – jetzt spielen", 1800);
+            const estimate = formatCustomDifficultyEstimate(state.puzzle).replace(/\n/g, " – ");
+            customPuzzleStatus.textContent = `Rätsel gültig. ${estimate}. Vorschau bereit – klicke „Jetzt spielen“.`;
+            showCustomReadyBadge(state.puzzle);
             SudokuStorage.save(state);
             if (lastImportQuality && lastImportQuality.score < 75) {
                 customPuzzleStatus.textContent += " Fotoqualität " + lastImportQuality.label.toLowerCase()
@@ -1570,8 +1660,12 @@
             // „Rätsel prüfen“ zu erwarten.
             if (indexes.length && automaticConflictReviewPass < 1) {
                 automaticConflictReviewPass++;
+                const changedIndexes = getImportedChangedIndexes(state.puzzle);
+                const changedConflictIndexes = changedIndexes.filter(index => indexes.includes(index));
                 state.conflictIndexes = indexes;
-                customPuzzleStatus.textContent = "Die Übertragung ist noch widersprüchlich. Bitte korrigiere die erneut markierte Ziffer.";
+                customPuzzleStatus.textContent = changedConflictIndexes.length
+                    ? `Die Übertragung ist noch widersprüchlich. Geänderte Konfliktfelder: ${formatCellPositions(changedConflictIndexes)}.`
+                    : "Die Übertragung ist noch widersprüchlich. Bitte korrigiere die erneut markierte Ziffer.";
                 SudokuStorage.save(state);
                 render();
                 startCustomReview(createConflictReviewItems(indexes));
@@ -1599,6 +1693,7 @@
             checked: false,
             completed: false,
             hintIndex: null,
+            ocrOriginalPuzzle: null,
             hintedEntries: Array(81).fill(false),
             revealedSolution: false
         };
@@ -1758,6 +1853,7 @@
                 state.puzzle[index] = value;
                 state.values[index] = value;
             });
+            state.ocrOriginalPuzzle = state.puzzle.slice();
             // Der OCR-Import soll keine Spielzelle vorselektieren. Die
             // nächste Eingabe darf erst nach einem bewussten Zellklick gelten.
             selected = null;
@@ -1907,6 +2003,8 @@
     });
     customImportButton.addEventListener("click", () => {
         click();
+        beginCustomEdit();
+        render();
         dismissCustomEntryHint();
         customImportInput.click();
     });
@@ -2141,11 +2239,13 @@
     startButton.addEventListener("click", () => {
         click();
         if (state && !state.preview && !state.completed && !savedInSetup
-            && !(state.mode === "custom" && state.customPhase === "entry")) {
+            && !(state.mode === "custom"
+                && (state.customPhase === "entry" || state.customPhase === "ready"))) {
             abortToSetup();
             return;
         }
-        if (state?.preview && state.puzzle?.some(Boolean) && state.solution) {
+        if ((state?.preview || (state?.mode === "custom" && state.customPhase === "ready"))
+            && state.puzzle?.some(Boolean) && state.solution) {
             startCurrentPuzzle();
             return;
         }
@@ -2157,7 +2257,8 @@
         if (isResumableSavedState(saved)) loadSaved(saved);
     });
     document.getElementById("mobileGameAction").addEventListener("click", () => {
-        if (state?.preview && state.puzzle?.some(Boolean) && state.solution) {
+        if ((state?.preview || (state?.mode === "custom" && state.customPhase === "ready"))
+            && state.puzzle?.some(Boolean) && state.solution) {
             startCurrentPuzzle();
             return;
         }
