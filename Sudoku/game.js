@@ -26,6 +26,7 @@
     const customPuzzleStatus = document.getElementById("customPuzzleStatus");
     const customImportAssistant = document.getElementById("customImportAssistant");
     const ocrProgressBadge = document.getElementById("ocrProgressBadge");
+    const ocrLiveGrid = document.getElementById("ocrLiveGrid");
     const customImportCanvas = document.getElementById("customImportCanvas");
     const customImportMagnifier = document.getElementById("customImportMagnifier");
     const customImportHint = document.getElementById("customImportHint");
@@ -252,6 +253,8 @@
         return image;
     }
 
+    
+
     function strengthenOcrContrast(image) {
         // Die reine Histogramm-Normalisierung macht den Gesamtbereich nutzbar.
         // Dieser zweite, vorsichtige Kontrastschritt trennt dunkle Druckfarbe
@@ -336,89 +339,208 @@
         return image;
     }
 
+function normalizeLocalIllumination(image) {
+        const { width, height, data } = image;
+        const integral = new Uint32Array((width + 1) * (height + 1));
+        for (let y = 1; y <= height; y++) {
+            let rowSum = 0;
+            for (let x = 1; x <= width; x++) {
+                const offset = ((y - 1) * width + (x - 1)) * 4;
+                rowSum += data[offset];
+                integral[y * (width + 1) + x] =
+                    integral[(y - 1) * (width + 1) + x] + rowSum;
+            }
+        }
+        const radius = Math.max(10, Math.round(Math.min(width, height) * .09));
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const left = Math.max(0, x - radius);
+                const top = Math.max(0, y - radius);
+                const right = Math.min(width - 1, x + radius);
+                const bottom = Math.min(height - 1, y + radius);
+                const area = (right - left + 1) * (bottom - top + 1);
+                const localSum = integral[(bottom + 1) * (width + 1) + right + 1]
+                    - integral[top * (width + 1) + right + 1]
+                    - integral[(bottom + 1) * (width + 1) + left]
+                    + integral[top * (width + 1) + left];
+                const localMean = localSum / area;
+                const offset = (y * width + x) * 4;
+                const normalized = Math.max(0, Math.min(255,
+                    Math.round(150 + (data[offset] - localMean) * 1.55)));
+                data[offset] = normalized;
+                data[offset + 1] = normalized;
+                data[offset + 2] = normalized;
+            }
+        }
+        return image;
+    }
+
     function prepareOcrCell(source, row, col, variant = "otsu") {
         const cell = createOcrCellBase(source, row, col);
         const context = cell.getContext("2d", { willReadFrequently: true });
-        const image = normalizeOcrContrast(grayscaleImage(context.getImageData(0, 0, cell.width, cell.height)));
-        if (variant === "otsu") otsuThreshold(image);
-        if (variant === "enhanced") {
-            strengthenOcrContrast(image);
-            otsuThreshold(image);
+        const image = grayscaleImage(context.getImageData(0, 0, cell.width, cell.height));
+        normalizeOcrContrast(image);
+        // Lokale Korrektur und adaptive Schwellenwerte helfen Tesseract,
+        // beeinflussen aber niemals die Originalbild-Belegungserkennung.
+        if (variant === "local" || variant === "adaptive" || variant === "enhanced") {
+            normalizeLocalIllumination(image);
         }
-        if (variant === "adaptive") adaptiveThreshold(image);
+        if (variant === "otsu" || variant === "adaptive" || variant === "enhanced") {
+            if (variant === "enhanced") strengthenOcrContrast(image);
+            if (variant === "adaptive") adaptiveThreshold(image);
+            else otsuThreshold(image);
+        }
         context.putImageData(image, 0, 0);
         return cell;
     }
 
-    function cellContainsDarkMark(source, row, col) {
+    function analyzeCellInk(source, row, col) {
         const context = source.getContext("2d", { willReadFrequently: true });
-        // Den Rand großzügig auslassen: leichte Verzerrungen, Gitternetzreste
-        // und Papierschatten dürfen kein leeres Feld zur Review machen.
         const cellSize = source.width / 9;
-        const size = Math.round(cellSize * .64);
-        const inset = cellSize * .18;
-        const pixels = context.getImageData(col * cellSize + inset, row * cellSize + inset, size, size).data;
-        const dark = new Uint8Array(size * size);
-        for (let index = 0; index < pixels.length; index += 4) {
-            const gray = pixels[index] * .299 + pixels[index + 1] * .587 + pixels[index + 2] * .114;
-            // Papierstruktur und Schatten sind meist einzelne verstreute Pixel;
-            // eine gedruckte Ziffer bildet dagegen eine kompakte Fläche.
-            if (gray < 95) dark[index / 4] = 1;
-        }
-        let largestComponent = 0;
-        let largestWidth = 0;
-        let largestHeight = 0;
-        let largestDensity = 0;
-        let darkPixelCount = 0;
-        const queue = [];
-        for (let start = 0; start < dark.length; start++) {
-            if (!dark[start]) continue;
-            dark[start] = 0;
-            queue.push(start);
-            let componentSize = 0;
-            let minX = size;
-            let minY = size;
-            let maxX = 0;
-            let maxY = 0;
-            while (queue.length) {
-                const current = queue.pop();
-                componentSize++;
-                darkPixelCount++;
-                const x = current % size;
-                const y = Math.floor(current / size);
-                minX = Math.min(minX, x);
-                minY = Math.min(minY, y);
-                maxX = Math.max(maxX, x);
-                maxY = Math.max(maxY, y);
-                for (let offsetY = -1; offsetY <= 1; offsetY++) {
-                    for (let offsetX = -1; offsetX <= 1; offsetX++) {
-                        if (!offsetX && !offsetY) continue;
-                        const neighborX = x + offsetX;
-                        const neighborY = y + offsetY;
-                        if (neighborX < 0 || neighborX >= size || neighborY < 0 || neighborY >= size) continue;
-                        const neighbor = neighborY * size + neighborX;
-                        if (dark[neighbor]) {
-                            dark[neighbor] = 0;
-                            queue.push(neighbor);
+        const size = Math.max(24, Math.round(cellSize * .70));
+        const inset = cellSize * .15;
+        const x0 = Math.max(0, Math.round(col * cellSize + inset));
+        const y0 = Math.max(0, Math.round(row * cellSize + inset));
+        const pixels = context.getImageData(
+            x0,
+            y0,
+            Math.min(size, source.width - x0),
+            Math.min(size, source.height - y0)
+        );
+        const width = pixels.width;
+        const height = pixels.height;
+        const area = width * height;
+        if (!area) return { score: 0, reviewable: false };
+
+        let best = {
+            score: 0,
+            darkRatio: 0,
+            componentRatio: 0,
+            density: 0,
+            widthRatio: 0,
+            heightRatio: 0,
+            centerDistance: 1
+        };
+        let evidenceCount = 0;
+
+        // Eine echte Druckziffer muss bei mehreren Schwellenwerten als
+        // kompakte, zentral liegende Struktur sichtbar bleiben. Schatten und
+        // Papierfaser tauchen dagegen meist nur bei einer hohen Schwelle auf
+        // oder bilden breite, flache Komponenten.
+        for (const threshold of [65, 85, 105, 125, 145]) {
+            const dark = new Uint8Array(area);
+            let darkCount = 0;
+            for (let index = 0; index < pixels.data.length; index += 4) {
+                const gray = pixels.data[index] * .299
+                    + pixels.data[index + 1] * .587
+                    + pixels.data[index + 2] * .114;
+                if (gray < threshold) {
+                    dark[index / 4] = 1;
+                    darkCount++;
+                }
+            }
+            if (!darkCount) continue;
+
+            let largest = 0;
+            let largestWidth = 0;
+            let largestHeight = 0;
+            let largestDensity = 0;
+            let largestCenterX = width / 2;
+            let largestCenterY = height / 2;
+            const queue = [];
+
+            for (let start = 0; start < area; start++) {
+                if (!dark[start]) continue;
+                dark[start] = 0;
+                queue.push(start);
+                let componentSize = 0;
+                let minX = width;
+                let minY = height;
+                let maxX = 0;
+                let maxY = 0;
+                while (queue.length) {
+                    const current = queue.pop();
+                    componentSize++;
+                    const x = current % width;
+                    const y = Math.floor(current / width);
+                    minX = Math.min(minX, x);
+                    minY = Math.min(minY, y);
+                    maxX = Math.max(maxX, x);
+                    maxY = Math.max(maxY, y);
+                    for (let offsetY = -1; offsetY <= 1; offsetY++) {
+                        for (let offsetX = -1; offsetX <= 1; offsetX++) {
+                            if (!offsetX && !offsetY) continue;
+                            const neighborX = x + offsetX;
+                            const neighborY = y + offsetY;
+                            if (neighborX < 0 || neighborX >= width
+                                || neighborY < 0 || neighborY >= height) continue;
+                            const neighbor = neighborY * width + neighborX;
+                            if (dark[neighbor]) {
+                                dark[neighbor] = 0;
+                                queue.push(neighbor);
+                            }
                         }
                     }
                 }
+                if (componentSize > largest) {
+                    largest = componentSize;
+                    largestWidth = maxX - minX + 1;
+                    largestHeight = maxY - minY + 1;
+                    largestDensity = componentSize / (largestWidth * largestHeight);
+                    largestCenterX = (minX + maxX) / 2;
+                    largestCenterY = (minY + maxY) / 2;
+                }
             }
-            if (componentSize > largestComponent) {
-                largestComponent = componentSize;
-                largestWidth = maxX - minX + 1;
-                largestHeight = maxY - minY + 1;
-                largestDensity = componentSize / (largestWidth * largestHeight);
+
+            const darkRatio = darkCount / area;
+            const componentRatio = largest / area;
+            const widthRatio = largestWidth / width;
+            const heightRatio = largestHeight / height;
+            const centerDistance = Math.hypot(
+                (largestCenterX / width) - .5,
+                (largestCenterY / height) - .5
+            );
+            const plausibleShape = componentRatio >= .012
+                && componentRatio <= .34
+                && widthRatio >= .07
+                && widthRatio <= .72
+                && heightRatio >= .16
+                && heightRatio <= .92
+                && largestDensity >= .07
+                && centerDistance <= .34;
+            if (plausibleShape) evidenceCount++;
+
+            const shapeScore = plausibleShape
+                ? Math.min(1, largestDensity / .22)
+                    * Math.min(1, componentRatio / .035)
+                : 0;
+            const score = darkRatio * .35 + shapeScore * .65;
+            if (score > best.score) {
+                best = {
+                    score,
+                    darkRatio,
+                    componentRatio,
+                    density: largestDensity,
+                    widthRatio,
+                    heightRatio,
+                    centerDistance
+                };
             }
         }
-        const scale = size / 64;
-        return darkPixelCount >= 50 * scale * scale
-            && largestComponent >= 45 * scale * scale
-            && largestWidth >= 6 * scale
-            && largestWidth <= 52 * scale
-            && largestHeight >= 12 * scale
-            && largestHeight <= 60 * scale
-            && largestDensity >= .12;
+
+        const reviewable = evidenceCount >= 2
+            && best.componentRatio >= .012
+            && best.density >= .07
+            && best.centerDistance <= .34;
+        return { ...best, evidenceCount, reviewable };
+    }
+
+    function cellContainsDarkMark(source, row, col) {
+        return analyzeCellInk(source, row, col).reviewable;
+    }
+
+    function cellContainsDarkMark(source, row, col) {
+        return analyzeCellInk(source, row, col).reviewable;
     }
 
     function assessSudokuImageQuality(source) {
@@ -1492,11 +1614,17 @@
 
     async function recognizeOcrVariant(worker, cell) {
         const recognition = await worker.recognize(cell);
-        const text = recognition.data?.text?.replace(/\s/g, "") || "";
+        const rawText = recognition.data?.text || "";
+        const text = rawText.replace(/\s/g, "");
         const confidence = Number(recognition.data?.confidence);
-        return /^[1-9]$/.test(text) && Number.isFinite(confidence)
-            ? { value: Number(text), confidence, preview: cell }
-            : null;
+        const digits = text.match(/[1-9]/g) || [];
+        if (digits.length !== 1 || !Number.isFinite(confidence)) return null;
+        return {
+            value: Number(digits[0]),
+            confidence,
+            preview: cell,
+            normalized: text !== digits[0]
+        };
     }
 
     function rankOcrCandidates(variants) {
@@ -1520,14 +1648,52 @@
         const best = ranked[0];
         const second = ranked[1];
         if (!best) return false;
-        if (best.votes >= 2 && best.bestConfidence >= 38) return true;
-        // Einzelne Ergebnisse werden nur noch bei sehr hoher Sicherheit direkt
-        // übernommen. Ähnliche Ziffern wie 1/7 oder 8/9 gehen sonst in die Review.
-        return best.votes === 1 && best.bestConfidence >= 82
-            && (!second || best.bestConfidence - second.bestConfidence >= 28);
+        const confidenceGap = !second
+            ? Infinity
+            : best.confidence - second.confidence;
+        if (best.votes >= 2 && best.bestConfidence >= 42
+            && confidenceGap >= 12) return true;
+        return best.votes === 1
+            && best.bestConfidence >= 82
+            && confidenceGap >= 28;
     }
 
-    async function recognizeSudokuCells(worker, source, statusElement) {
+    function resetOcrLiveGrid() {
+        if (!ocrLiveGrid) return;
+        ocrLiveGrid.innerHTML = "";
+        for (let index = 0; index < 81; index++) {
+            const cell = document.createElement("div");
+            cell.className = "ocr-live-cell pending";
+            cell.dataset.ocrLiveIndex = String(index);
+            cell.setAttribute("aria-hidden", "true");
+            ocrLiveGrid.appendChild(cell);
+        }
+        ocrLiveGrid.hidden = false;
+    }
+
+    function updateOcrLiveCell(details) {
+        if (!ocrLiveGrid) return;
+        const { row, col, value, candidates, status } = details;
+        const index = row * 9 + col;
+        const cell = ocrLiveGrid.querySelector('[data-ocr-live-index="' + index + '"]');
+        if (!cell) return;
+        ocrLiveGrid.querySelector(".active")?.classList.remove("active");
+        cell.className = "ocr-live-cell " + status;
+        cell.textContent = value
+            ? String(value) + (status === "uncertain" ? "?" : "")
+            : status === "uncertain" ? (candidates?.length ? candidates.join("/") : "?") : "";
+        cell.setAttribute("aria-label", value
+            ? "Zeile " + (row + 1) + ", Spalte " + (col + 1) + ": " + value
+                + (status === "uncertain" ? " unsicher" : "")
+            : "Zeile " + (row + 1) + ", Spalte " + (col + 1) + ": kein Treffer");
+        if (status !== "recognized") cell.classList.add("active");
+    }
+
+    function hideOcrLiveGrid() {
+        if (ocrLiveGrid) ocrLiveGrid.hidden = true;
+    }
+
+    async function recognizeSudokuCells(worker, source, statusElement, onCellRecognized = null) {
         const result = new Map();
         const uncertain = [];
         let processed = 0;
@@ -1539,41 +1705,66 @@
             for (let col = 0; col < 9; col++) {
                 const rawCell = prepareOcrCell(source, row, col, "raw");
                 const reviewCell = prepareReviewCell(source, row, col);
-                const hasInk = cellContainsDarkMark(source, row, col);
+                // Diese Analyse verwendet ausschließlich das unveränderte
+                // entzerrte Originalbild und schützt vor Leerfeld-Fehlalarmen.
+                const ink = analyzeCellInk(source, row, col);
                 const variants = [];
-                for (const variantName of ["raw", "otsu"]) {
-                    const candidate = await recognizeOcrVariant(worker,
-                        variantName === "raw" ? rawCell : prepareOcrCell(source, row, col, variantName));
+
+                for (const variantName of ["raw", "otsu", "local", "adaptive"]) {
+                    const candidate = await recognizeOcrVariant(
+                        worker,
+                        variantName === "raw"
+                            ? rawCell
+                            : prepareOcrCell(source, row, col, variantName)
+                    );
                     if (candidate) variants.push(candidate);
                 }
+
                 let ranked = rankOcrCandidates(variants);
-                // Die dritte Meinung verstärkt den Kontrast vor der
-                // Schwellwertbildung. Das hilft besonders bei grauem
-                // Zeitungspapier und flachem Druck, ohne Leerfelder pauschal
-                // als Ziffern zu behandeln.
-                if (!isClearOcrDecision(ranked) && (ranked.length || hasInk)) {
-                    const candidate = await recognizeOcrVariant(worker, prepareOcrCell(source, row, col, "enhanced"));
+                if (!isClearOcrDecision(ranked)
+                    && (ranked.length || ink.reviewable)) {
+                    const candidate = await recognizeOcrVariant(
+                        worker,
+                        prepareOcrCell(source, row, col, "enhanced")
+                    );
                     if (candidate) variants.push(candidate);
                     ranked = rankOcrCandidates(variants);
                 }
+
                 const best = ranked[0];
-                if (hasInk && isClearOcrDecision(ranked)) {
+                if (best && isClearOcrDecision(ranked)) {
                     result.set(row * 9 + col, {
                         index: row * 9 + col,
                         value: best.value,
                         confidence: best.bestConfidence,
                         preview: reviewCell,
-                        candidates: ranked.map(candidate => candidate.value)
+                        candidates: ranked.map(candidate => candidate.value),
+                        inkScore: ink.score
                     });
-                } else if (hasInk && (ranked.length || hasInk)) {
+                } else if (ink.reviewable || ranked.length) {
                     uncertain.push({
                         row,
                         col,
                         candidates: ranked.map(candidate => candidate.value),
                         preview: reviewCell,
-                        gridPreview: source
+                        gridPreview: source,
+                        reason: ranked.length
+                            ? "OCR-Ergebnis unsicher"
+                            : "Ziffer möglicherweise übersehen",
+                        inkScore: ink.score
                     });
                 }
+                const clearDecision = Boolean(best && isClearOcrDecision(ranked));
+                onCellRecognized?.({
+                    row,
+                    col,
+                    value: clearDecision ? best.value : null,
+                    candidates: ranked.map(candidate => candidate.value),
+                    // Die Live-Ansicht zeigt ausschließlich Treffer, die
+                    // später auch sicher in den Import übernommen werden.
+                    // Unsichere Kandidaten bleiben bis zur Korrekturansicht unsichtbar.
+                    status: clearDecision ? "recognized" : "empty"
+                });
                 processed++;
                 statusElement.textContent = `Ziffern werden erkannt … ${Math.round((processed / 81) * 100)} %`;
             }
@@ -1621,10 +1812,12 @@
     function finishCustomReview() {
         customImportReview.hidden = true;
         customReviewQueue = [];
-        // Nach der OCR-Korrektur darf die nächste Tastatureingabe nicht
-        // versehentlich in der dauerhaft markierten Zelle 0 landen.
         selected = null;
+        state.preview = false;
+        state.started = false;
+        state.customPhase = "entry";
         SudokuStorage.save(state);
+
         const valid = window.SudokuSolver.isValidGrid(state.puzzle);
         const solvable = valid && window.SudokuSolver.countSolutions(state.puzzle.slice(), 1) > 0;
         if (!state.puzzle.some(Boolean)) {
@@ -1673,6 +1866,9 @@
             }
             customPuzzleStatus.textContent = "Die Übertragung ist noch widersprüchlich. Bitte prüfe die markierten Ziffern oder übertrage sie manuell.";
         }
+
+        customPuzzleStatus.textContent = "Korrekturprüfung abgeschlossen. Ergänze oder korrigiere das Raster und wähle danach „Rätsel prüfen“.";
+
         render();
         focusBoard();
     }
@@ -1826,7 +2022,13 @@
                 tessedit_char_whitelist: "123456789",
                 tessedit_pageseg_mode: "10"
             });
-            const recognitionPromise = recognizeSudokuCells(worker, prepared.source, ocrProgressTarget);
+            resetOcrLiveGrid();
+            const recognitionPromise = recognizeSudokuCells(
+                worker,
+                prepared.source,
+                ocrProgressTarget,
+                updateOcrLiveCell
+            );
             recognitionPromise.catch(() => {});
             let timeoutId;
             const timeout = new Promise((_, reject) => {
@@ -1865,21 +2067,37 @@
             // feststeht, Tesseract aber keine passende Alternativziffer nennt.
             const solverConflictIndexes = findPuzzleConflictIndexes(state.puzzle);
             const solverConflictItems = createConflictReviewItems(solverConflictIndexes);
-            const reviewItems = mergeReviewItems([...recognition.uncertain, ...solverConflictItems, ...conflicts]);
-            state.conflictIndexes = [...new Set([
+            const conflictIndexes = [...new Set([
                 ...conflicts.map(item => item.row * 9 + item.col),
                 ...solverConflictIndexes
             ])];
+            state.conflictIndexes = conflictIndexes;
+            // OCR-Unsicherheiten ohne Kandidaten bleiben im editierbaren Raster.
+            // Nur Felder, für die OCR mindestens eine konkrete Ziffer anbietet,
+            // werden in der schnellen Bild-Korrektur angezeigt.
+            const reviewItems = mergeReviewItems([
+                ...recognition.uncertain.filter(item =>
+                    item.candidates.length && item.inkScore >= .045
+                ),
+                ...solverConflictItems,
+                ...conflicts
+            ]);
             SudokuStorage.save(state);
             finishOcrProgress("OCR-Import abgeschlossen");
-            if (state.conflictIndexes.length) {
-                const count = state.conflictIndexes.length;
-                customPuzzleStatus.textContent = `Die OCR-Übertragung ist widersprüchlich. Die Korrekturprüfung startet für ${count} markierte Ziffer${count === 1 ? "" : "n"}.`;
+            state.preview = false;
+            state.started = false;
+            state.customPhase = "entry";
+            if (conflictIndexes.length) {
+                customPuzzleStatus.textContent = `OCR übertragen. ${conflictIndexes.length} widersprüchliche Felder sind markiert.`;
             } else {
                 customPuzzleStatus.textContent = mapped.size
-                    ? `${mapped.size} Ziffern ${prepared.corrected ? "nach Rasterkorrektur" : "im Sudoku-Raster"} erkannt. Bitte prüfe und korrigiere die Übertragung.`
-                        : "Keine sicheren Ziffern erkannt. Bitte übertrage das Rätsel manuell.";
+                    ? `${mapped.size} Ziffern ${prepared.corrected ? "nach Rasterkorrektur" : "im Sudoku-Raster"} erkannt.`
+                    : "Keine sicheren Ziffern erkannt.";
             }
+            if (reviewItems.length) {
+                customPuzzleStatus.textContent += ` ${reviewItems.length} unsichere Ziffer${reviewItems.length === 1 ? "" : "n"} werden jetzt zur schnellen Prüfung angezeigt.`;
+            }
+            customPuzzleStatus.textContent += " Ergänze oder korrigiere das Raster und wähle danach „Rätsel prüfen“.";
             if (prepared.quality && prepared.quality.score < 75) {
                 customPuzzleStatus.textContent += " Fotoqualität " + prepared.quality.label.toLowerCase()
                     + " (" + prepared.quality.score + "/100) – bitte unsichere Leerfelder und Ziffern besonders prüfen.";
@@ -1891,6 +2109,7 @@
             customPuzzleStatus.textContent = error.message || "Die Fotoerkennung ist fehlgeschlagen. Bitte übertrage das Rätsel manuell.";
             finishOcrProgress("OCR-Import fehlgeschlagen");
         } finally {
+            hideOcrLiveGrid();
             if (worker) await worker.terminate().catch(() => {});
             customImportButton.disabled = false;
             customValidateButton.disabled = false;
