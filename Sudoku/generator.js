@@ -49,8 +49,11 @@
 
     function createPuzzle(level) {
         const profile = root.SudokuSettings.clues[level] || root.SudokuSettings.clues.Leicht;
+        const difficultyProfile = root.SudokuSettings.difficultyProfiles[level]
+            || root.SudokuSettings.difficultyProfiles.Leicht;
         let best = null;
-        for (let attempt = 0; attempt < 5; attempt++) {
+        let bestScore = Number.POSITIVE_INFINITY;
+        for (let attempt = 0; attempt < difficultyProfile.attempts; attempt++) {
             const solution = createSolution();
             const puzzle = solution.slice();
             const target = range(profile.min, profile.max);
@@ -62,10 +65,22 @@
                 if (root.SudokuSolver.countSolutions(puzzle.slice(), 2) !== 1) puzzle[index] = previous;
             }
             const clues = puzzle.filter(Boolean).length;
-            if (!best || Math.abs(clues - target) < Math.abs(best.puzzle.filter(Boolean).length - target)) {
+            const rating = root.SudokuDifficulty.rate(puzzle);
+            const techniqueDistance = rating.techniqueRank < difficultyProfile.minTechniqueRank
+                ? difficultyProfile.minTechniqueRank - rating.techniqueRank
+                : rating.techniqueRank > difficultyProfile.maxTechniqueRank
+                    ? rating.techniqueRank - difficultyProfile.maxTechniqueRank
+                    : 0;
+            const preferenceDistance = Math.max(0,
+                difficultyProfile.preferredTechniqueRank - rating.techniqueRank);
+            const score = techniqueDistance * 100
+                + preferenceDistance * 25
+                + Math.abs(clues - target);
+            if (!best || score < bestScore) {
                 best = { puzzle, solution };
+                bestScore = score;
             }
-            if (clues === target) break;
+            if (clues === target && techniqueDistance === 0) break;
         }
         return best;
     }
