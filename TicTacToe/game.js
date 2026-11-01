@@ -125,17 +125,12 @@ screenController?.watchResponsiveMode?.((isMobile) => {
     mobilePrototype = isMobile;
 });
 /* --- Sound System --- */
-const boardClickSound = new Audio("../assets/sounds/Click.mp3");
-boardClickSound.volume = 0.4;
-
 function playUiClick(volume = 0.35) {
     window.AndisSound?.playUiClick?.(volume);
 }
 
 function playBoardClick(volume = 0.4) {
-    boardClickSound.volume = volume;
-    boardClickSound.currentTime = 0;
-    boardClickSound.play().catch(() => {});
+    window.AndisSound?.playSmallChipDrop?.(volume);
 }
 
 let cells = Array(9).fill(null);
@@ -197,7 +192,7 @@ function saveCurrentGame() {
         window.TicTacToeStorage?.clear?.();
         return;
     }
-    window.TicTacToeStorage?.save?.({
+    return window.TicTacToeStorage?.save?.({
         schemaVersion: 1,
         gameId: "tictactoe",
         savedAt: new Date().toISOString(),
@@ -222,14 +217,25 @@ function saveCurrentGame() {
 
 function leaveToMenu() {
     if (leavingToMenu) return;
-    leavingToMenu = true;
-    cancelPendingBotMove();
-    cancelNextRoundCountdown();
     if (savedInSetup) {
+        leavingToMenu = true;
         window.location.href = "../index.html?menu=1";
         return;
     }
-    saveCurrentGame();
+    if (!hasSavableGame()) {
+        leavingToMenu = true;
+        cancelPendingBotMove();
+        cancelNextRoundCountdown();
+        window.location.href = "../index.html?menu=1";
+        return;
+    }
+    if (saveCurrentGame() !== true) {
+        window.AndisSavedGameNotice?.show?.("Speichern fehlgeschlagen. Das Spiel bleibt geöffnet.", 3000);
+        return;
+    }
+    leavingToMenu = true;
+    cancelPendingBotMove();
+    cancelNextRoundCountdown();
     window.AndisSavedGameNotice?.show?.("Spiel gespeichert", 1000, () => {
         window.location.href = "../index.html?menu=1";
     });
@@ -249,6 +255,9 @@ function isValidSavedState(saved) {
         && saved.gameId === "tictactoe"
         && Array.isArray(saved.cells) && saved.cells.length === 9
         && saved.cells.every(value => value === null || value === "X" || value === "O")
+        && Math.abs(saved.cells.filter(value => value === "X").length - saved.cells.filter(value => value === "O").length) <= 1
+        && ["scoreX", "scoreO", "scoreDraw", "roundsPlayed"].every(key => saved[key] == null || (Number.isInteger(saved[key]) && saved[key] >= 0))
+        && (!saved.waitingForNextRound || saved.gameOver)
         && (saved.current === "X" || saved.current === "O"));
 }
 
@@ -685,7 +694,6 @@ function resetGame(full = true) {
 
 function showSetupScreen() {
     if (!mobilePrototype) return;
-    fullscreenController?.exit();
     cancelPendingBotMove();
     cancelNextRoundCountdown();
     screenController?.showSetup();
@@ -706,7 +714,10 @@ function saveAndReturnToSetup() {
         showSetupScreen();
         return;
     }
-    saveCurrentGame();
+    if (saveCurrentGame() !== true) {
+        window.AndisSavedGameNotice?.show?.("Speichern fehlgeschlagen. Das Spiel bleibt geöffnet.", 3000);
+        return;
+    }
     savedInSetup = true;
     returningToSetup = true;
         window.AndisSavedGameNotice?.show?.("Spiel gespeichert", 1000, () => {
@@ -806,7 +817,8 @@ reset.addEventListener('click', () => {
     playUiClick(0.2);
 });
 
-window.addEventListener("beforeunload", saveCurrentGame);
+function saveOnPageExit() { if (hasSavableGame()) saveCurrentGame(); }
+window.addEventListener("beforeunload", saveOnPageExit);
 
 resumeDecline.addEventListener("click", () => {
     playUiClick(0.2);

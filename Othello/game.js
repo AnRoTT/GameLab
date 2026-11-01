@@ -172,10 +172,9 @@ const adaptiveStrengthPanel = document.getElementById("adaptiveStrengthPanel");
 const adaptiveStrengthValue = document.getElementById("adaptiveStrengthValue");
 const adaptiveStrengthBar = document.getElementById("adaptiveStrengthBar");
 
-const soundMove = new Audio("../assets/sounds/Click.mp3");
 const soundError = new Audio("../assets/sounds/Error_Tock.mp3");
 
-[soundMove, soundError].forEach(sound => {
+[soundError].forEach(sound => {
     sound.volume = 0.25;
     sound.preload = "auto";
 });
@@ -308,7 +307,7 @@ function isValidSavedState(saved) {
 }
 
 function writeSavedGame() {
-    if (hasSavableGame()) OthelloStorage.save(createSavedState());
+    if (hasSavableGame()) return OthelloStorage.save(createSavedState());
     else OthelloStorage.clear();
 }
 
@@ -451,7 +450,6 @@ moveHintsBtn.classList.remove("disabled"); // nur Zughilfe wieder frei
 
 function showSetupScreen() {
     if (!mobilePrototype) return;
-    fullscreenController?.exit();
     screenController?.showSetup();
 }
 
@@ -462,7 +460,6 @@ function showGameScreen() {
 }
 
 function showSetupAfterSavedGame() {
-    fullscreenController?.exit();
     cancelPendingTurnTimers();
     document.body.classList.remove("game-active");
     gameStarted = false;
@@ -496,7 +493,7 @@ function saveAndReturnToSetup() {
         showSetupScreen();
         return;
     }
-    writeSavedGame();
+    if (writeSavedGame() !== true) { window.AndisSavedGameNotice?.show?.("Speichern fehlgeschlagen. Das Spiel bleibt geöffnet.", 3000); return; }
     cancelPendingTurnTimers();
     savedInSetup = true;
     returningToSetup = true;
@@ -508,19 +505,21 @@ function saveAndReturnToSetup() {
 
 function leaveToMenu() {
     if (leavingToMenu) return;
-    leavingToMenu = true;
     if (savedInSetup) {
+        leavingToMenu = true;
         window.location.href = "../index.html?menu=1";
         return;
     }
     if (hasSavableGame()) {
-        writeSavedGame();
+        if (writeSavedGame() !== true) { window.AndisSavedGameNotice?.show?.("Speichern fehlgeschlagen. Das Spiel bleibt geöffnet.", 3000); return; }
+        leavingToMenu = true;
         cancelPendingTurnTimers();
         window.AndisSavedGameNotice?.show?.("Spiel gespeichert", 1000, () => {
             window.location.href = "../index.html?menu=1";
         });
         return;
     }
+    leavingToMenu = true;
     OthelloStorage.clear();
     window.location.href = "../index.html?menu=1";
 }
@@ -547,10 +546,10 @@ function restoreSavedGame(saved) {
     currentPlayer = saved.currentPlayer;
     gameOver = Boolean(saved.gameOver);
     gameStarted = true;
-    turnTransitionActive = Boolean(saved.turnTransitionActive);
     pendingTransitionKind = saved.pendingTransitionKind === "pass" || saved.pendingTransitionKind === "move"
         ? saved.pendingTransitionKind
         : null;
+    turnTransitionActive = Boolean(saved.turnTransitionActive && pendingTransitionKind);
     playerOneColor = saved.playerOneColor === "white" ? "white" : "black";
     matchRound = Math.max(1, Number(saved.matchRound) || 1);
     matchWins = {
@@ -815,7 +814,7 @@ function botMove(token = gameToken) { // Bot zieht und ruft dann nextTurn
         scheduleNextTurn(0, token);
         return;
     }
-    playSound(soundMove, 0.28);
+    window.AndisSound?.playSmallChipDrop?.(0.28);
     updateScore();
     turnTransitionActive = true;
     renderBoard();
@@ -923,7 +922,7 @@ boardEl.addEventListener("click", (e) => {
 
     const result = makeMove(r, c, currentPlayer);
     if(result) {
-        playSound(soundMove, 0.28);
+        window.AndisSound?.playSmallChipDrop?.(0.28);
         if (vsComputer && window.othelloPlayerProfile && currentPlayer === playerOneColor) {
             const learningState = { board, playerProfile: window.othelloPlayerProfile };
             const pressureForMove = learningOpponentMoves.length <= 4;
@@ -1009,7 +1008,8 @@ document.addEventListener("keydown", event => {
     focusable[nextIndex]?.focus();
 });
 
-window.addEventListener("beforeunload", saveCurrentGame);
+function saveOnPageExit() { if (hasSavableGame()) saveCurrentGame(); }
+window.addEventListener("beforeunload", saveOnPageExit);
 
 const menuButton = document.getElementById("backIcon");
 menuButton?.addEventListener("click", event => {

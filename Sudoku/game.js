@@ -1000,11 +1000,18 @@ function normalizeLocalIllumination(image) {
     }
 
     function isValidSavedState(saved) {
+        const digit = value => Number.isInteger(value) && value >= 0 && value <= 9;
         return Boolean(saved && !saved.completed
             && Array.isArray(saved.puzzle) && saved.puzzle.length === 81
+            && saved.puzzle.every(digit)
             && (saved.solution === null || (Array.isArray(saved.solution) && saved.solution.length === 81))
+            && (saved.solution === null || saved.solution.every(value => digit(value) && value > 0))
             && Array.isArray(saved.values) && saved.values.length === 81
+            && saved.values.every(digit)
+            && saved.puzzle.every((value, index) => !value || value === saved.values[index])
             && Array.isArray(saved.notes) && saved.notes.length === 81
+            && saved.notes.every(note => !Array.isArray(note) || note.every(value => digit(value) && value > 0))
+            && (!saved.checked || saved.solution !== null)
             && (!saved.mode || saved.mode === "generated" || saved.mode === "custom"));
     }
 
@@ -2420,9 +2427,8 @@ function normalizeLocalIllumination(image) {
 
     function saveAndReturnToSetup() {
         if (returningToSetup) return;
-        fullscreenController?.exit?.();
         if (!state || state.preview || state.completed) return abortToSetup();
-        SudokuStorage.save(state);
+        if (!SudokuStorage.save(state)) { window.AndisSavedGameNotice?.show?.("Speichern fehlgeschlagen. Das Spiel bleibt geöffnet.", 3000); return; }
         savedInSetup = true;
         returningToSetup = true;
         window.AndisSavedGameNotice?.show?.("Spiel gespeichert", 1000, () => {
@@ -2441,7 +2447,6 @@ function normalizeLocalIllumination(image) {
     function abortToSetup() {
         returningToSetup = false;
         window.AndisSavedGameNotice?.hide?.();
-        fullscreenController?.exit?.();
         SudokuStorage.clear();
         savedInSetup = false;
         state = null;
@@ -2498,24 +2503,30 @@ function normalizeLocalIllumination(image) {
 
     function leaveToMenu() {
         if (leavingToMenu) return;
-        leavingToMenu = true;
-        fullscreenController?.exit?.();
         if (!state || state.preview || (state.mode === "custom" && state.customPhase === "entry")) {
+            leavingToMenu = true;
+            fullscreenController?.exit?.();
             SudokuStorage.clear();
             window.location.href = "../index.html?menu=1";
             return;
         }
         if (savedInSetup) {
+            leavingToMenu = true;
+            fullscreenController?.exit?.();
             window.location.href = "../index.html?menu=1";
             return;
         }
         if (state && !state.completed) {
-            SudokuStorage.save(state);
+            if (!SudokuStorage.save(state)) { window.AndisSavedGameNotice?.show?.("Speichern fehlgeschlagen. Das Spiel bleibt geöffnet.", 3000); return; }
+            leavingToMenu = true;
+            fullscreenController?.exit?.();
             window.AndisSavedGameNotice?.show?.("Spiel gespeichert", 1000, () => {
                 window.location.href = "../index.html?menu=1";
             });
             return;
         }
+        leavingToMenu = true;
+        fullscreenController?.exit?.();
         window.location.href = "../index.html?menu=1";
     }
 
@@ -2523,7 +2534,10 @@ function normalizeLocalIllumination(image) {
         click();
         leaveToMenu();
     });
-    window.addEventListener("beforeunload", () => { if (state) SudokuStorage.save(state); });
+    function saveOnPageExit() {
+        if (state && !state.preview && !state.completed && !savedInSetup && !pendingSavedState) SudokuStorage.save(state);
+    }
+    window.addEventListener("beforeunload", saveOnPageExit);
 
     updateSetup();
     makeNumberPad();

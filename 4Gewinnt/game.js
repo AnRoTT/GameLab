@@ -41,10 +41,9 @@ let savedInSetup = false;
 let returningToSetup = false;
 
 // === SOUNDS ===
-const soundChip = new Audio('../assets/sounds/Chip_Drop.mp3');
 const soundError = new Audio('../assets/sounds/Error_Tock.mp3');
 
-[soundChip, soundError].forEach(s => {
+[soundError].forEach(s => {
     s.volume = 0.25;
     s.preload = 'auto';
 });
@@ -189,11 +188,13 @@ function isValidSavedState(saved) {
         && saved.board.every(row => Array.isArray(row)
             && row.length === COLS
             && row.every(value => value === 0 || value === PLAYER_RED || value === PLAYER_YELLOW))
+        && saved.board.every((row, r) => row.every((value, c) => !value || r === ROWS - 1 || saved.board[r + 1][c] !== 0))
         && (saved.currentPlayer === PLAYER_RED || saved.currentPlayer === PLAYER_YELLOW)
         && (saved.startingPlayer === PLAYER_RED || saved.startingPlayer === PLAYER_YELLOW)
         && saved.scores
         && Number.isFinite(Number(saved.scores[PLAYER_RED]))
         && Number.isFinite(Number(saved.scores[PLAYER_YELLOW]))
+        && Number(saved.scores[PLAYER_RED]) >= 0 && Number(saved.scores[PLAYER_YELLOW]) >= 0
         && Number.isInteger(saved.modeIndex)
         && saved.modeIndex >= 0 && saved.modeIndex < MODE_OPTIONS.length
         && Number.isInteger(saved.matchModeIndex)
@@ -202,7 +203,7 @@ function isValidSavedState(saved) {
 }
 
 function writeSavedGame() {
-    if (hasSavableGame()) ConnectFourStorage.save(createSavedState());
+    if (hasSavableGame()) return ConnectFourStorage.save(createSavedState());
     else ConnectFourStorage.clear();
 }
 
@@ -353,7 +354,6 @@ settingsResetGameButton.addEventListener("click", () => {
     } else {
         resetMatchOnly();
         if (mobilePrototype) {
-            fullscreenController?.exit();
             screenController?.showSetup();
         }
         setResetButtonForRound(false);
@@ -923,8 +923,7 @@ function animateChipDrop(row, col, player) {
     chipDropTimer = window.setTimeout(() => {
         chip.classList.remove("drop-pending", "landing");
         chip.classList.add("visible", "landed");
-        soundChip.currentTime = 0;
-        soundChip.play().catch(() => {});
+        window.AndisSound?.playFallingChipDrop?.(0.25);
         chipDropActive = false;
         chipDropTimer = null;
     }, CHIP_DROP_DURATION);
@@ -1075,7 +1074,6 @@ function resetMatchOnly() {
 }
 
 function showSetupAfterSavedGame() {
-    fullscreenController?.exit();
     gameOver = true;
     matchActive = false;
     roundResultProcessed = false;
@@ -1092,7 +1090,6 @@ function abortMatchToSetup() {
     window.AndisSavedGameNotice?.hide?.();
     resetMatchOnly();
     ConnectFourStorage.clear();
-    fullscreenController?.exit();
     if (mobilePrototype) screenController?.showSetup();
     setResetButtonForRound(false);
     setMatchInProgressLocked(false);
@@ -1106,10 +1103,10 @@ function saveAndReturnToSetup() {
         showSetupAfterSavedGame();
         return;
     }
+    if (writeSavedGame() !== true) { window.AndisSavedGameNotice?.show?.("Speichern fehlgeschlagen. Das Spiel bleibt geöffnet.", 3000); return; }
     cancelPendingBotMove();
     clearDropAnimation();
     roundToken += 1;
-    writeSavedGame();
     savedInSetup = true;
     returningToSetup = true;
     window.AndisSavedGameNotice?.show?.("Spiel gespeichert", 1000, () => {
@@ -1120,21 +1117,26 @@ function saveAndReturnToSetup() {
 
 function leaveToMenu() {
     if (leavingToMenu) return;
-    leavingToMenu = true;
-    cancelPendingBotMove();
-    clearDropAnimation();
-    roundToken += 1;
     if (savedInSetup) {
+        leavingToMenu = true;
         window.location.href = "../index.html?menu=1";
         return;
     }
     if (hasSavableGame()) {
-        writeSavedGame();
+        if (writeSavedGame() !== true) { window.AndisSavedGameNotice?.show?.("Speichern fehlgeschlagen. Das Spiel bleibt geöffnet.", 3000); return; }
+        leavingToMenu = true;
+        cancelPendingBotMove();
+        clearDropAnimation();
+        roundToken += 1;
         window.AndisSavedGameNotice?.show?.("Spiel gespeichert", 1000, () => {
             window.location.href = "../index.html?menu=1";
         });
         return;
     }
+    leavingToMenu = true;
+    cancelPendingBotMove();
+    clearDropAnimation();
+    roundToken += 1;
     ConnectFourStorage.clear();
     window.location.href = "../index.html?menu=1";
 }
@@ -1231,7 +1233,8 @@ document.addEventListener("keydown", event => {
     }
 });
 
-window.addEventListener("beforeunload", saveCurrentGame);
+function saveOnPageExit() { if (hasSavableGame()) saveCurrentGame(); }
+window.addEventListener("beforeunload", saveOnPageExit);
 
 updateResumeAction();
 const savedConnectFour = ConnectFourStorage.load();

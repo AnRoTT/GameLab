@@ -73,7 +73,14 @@
             && saved.state.board.length === 24
             && saved.state.board.every(value => value === 0 || value === 1 || value === 2)
             && (saved.state.currentPlayer === 1 || saved.state.currentPlayer === 2)
-            && typeof saved.state.phase === "string"
+            && ["placing", "select-source", "select-target", "flying", "remove-opponent", "round-ended", "match-ended", "draw"].includes(saved.state.phase)
+            && saved.state.placed && saved.state.toPlace
+            && [1, 2].every(player => Number.isInteger(saved.state.placed[player]) && saved.state.placed[player] >= 0
+                && saved.state.placed[player] <= 9 && saved.state.placed[player] === saved.state.board.filter(value => value === player).length
+                && Number.isInteger(saved.state.toPlace[player]) && saved.state.toPlace[player] >= 0
+                && saved.state.toPlace[player] + saved.state.placed[player] <= 9)
+            && (saved.state.phase !== "select-target" || (Number.isInteger(saved.state.selectedSource)
+                && saved.state.board[saved.state.selectedSource] === saved.state.currentPlayer))
             && saved.settings
             && (saved.settings.mode === "computer" || saved.settings.mode === "human")
             && (saved.settings.botType === "manual" || saved.settings.botType === "adaptive")
@@ -85,7 +92,7 @@
     }
 
     function writeSavedGame() {
-        if (hasSavableGame()) MuehleStorage.save(createSavedState());
+        if (hasSavableGame()) return MuehleStorage.save(createSavedState());
         else MuehleStorage.clear();
     }
 
@@ -99,7 +106,7 @@
         resumeSavedButton.hidden = !mobilePrototype || !isValidSavedState(saved);
     }
 
-    function playMoveSound() { window.AndisSound?.playUiClick?.(0.18); }
+    function playMoveSound() { window.AndisSound?.playSmallChipDrop?.(0.18); }
     function cancelBot() { if (botTimer !== null) { clearTimeout(botTimer); botTimer = null; } gameToken += 1; }
     function phaseLabel() { return ({ placing: "Aufbauphase", "select-source": "Stein auswählen", "select-target": "Zielpunkt auswählen", flying: "Flugphase", "remove-opponent": "Stein entfernen", "round-ended": "Runde beendet", draw: "Remis" })[state?.phase] || "Aufbauphase"; }
     function playerName(player) { return player === 1 ? "Spieler 1" : (isComputer() ? "Bot" : "Spieler 2"); }
@@ -179,14 +186,13 @@
         else render();
     }
     function render() {
+        const restoreBoardFocus = boardEl.contains(document.activeElement);
         const keyboardEnabled = gameStarted && state && humanTurn();
         const boardLocked = !gameStarted || !state || state.winner || state.draw;
         boardEl.classList.toggle("board-disabled", boardLocked);
         boardEl.tabIndex = keyboardEnabled ? 0 : -1;
         if (!keyboardEnabled) {
-            keyboardMode = false;
             boardEl.classList.remove("keyboard-active");
-            if (boardEl.contains(document.activeElement)) document.activeElement.blur();
         }
         boardEl.innerHTML = "";
         core.MILLS.forEach(line => { for (let segment = 0; segment < 2; segment += 1) { const a = pointPositions[line[segment]]; const b = pointPositions[line[segment + 1]]; const length = Math.hypot(b[0] - a[0], b[1] - a[1]); const angle = Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI; const el = document.createElement("span"); el.className = "mill-line"; el.style.left = `${a[0]}%`; el.style.top = `${a[1]}%`; el.style.width = `${length}%`; el.style.transform = `rotate(${angle}deg)`; boardEl.appendChild(el); } });
@@ -222,10 +228,13 @@
             button.addEventListener("pointerdown", () => { keyboardMode = false; boardEl.classList.remove("keyboard-active"); });
             button.addEventListener("focus", () => { pointLayer.querySelectorAll(".keyboard-focus").forEach(element => element.classList.remove("keyboard-focus")); if (keyboardMode) { keyboardPoint = point; boardEl.classList.add("keyboard-active"); button.classList.add("keyboard-focus"); } });
             button.addEventListener("keydown", event => handleKeyboardPointKeydown(event, point));
-            button.addEventListener("click", () => handlePoint(point));
+            button.addEventListener("click", () => { keyboardPoint = point; handlePoint(point); });
             pointLayer.appendChild(button);
         }
-        if (keyboardMode) focusKeyboardPoint();
+        if (restoreBoardFocus && gameStarted && !boardLocked) {
+            if (keyboardEnabled) focusKeyboardPoint();
+            else boardEl.focus({ preventScroll: true });
+        }
         document.getElementById("playerOneCount").textContent = String(state?.placed?.[1] ?? 0); document.getElementById("playerTwoCount").textContent = String(state?.placed?.[2] ?? 0); document.getElementById("playerOneCount").parentElement.classList.toggle("winner", state?.winner === 1); document.getElementById("playerTwoCount").parentElement.classList.toggle("winner", state?.winner === 2); statusEl.textContent = statusText(); phaseEl.textContent = phaseLabel(); hintEl.textContent = hintText(); updateAdaptiveBadge(); updateLabels(); updateMatchScore(); updateMobileGameAction();
     }
     function humanTurn() { return !isComputer() || state.currentPlayer === humanPlayer(); }
@@ -235,13 +244,12 @@
     function scheduleBot() { cancelBot(); const token = gameToken; const delay = botTypeSelect.value === "adaptive" ? window.MuehleAdaptiveBot.getThinkTime() : window.MuehleManualBot.getThinkTime(Number(botLevelSelect.value)); botTimer = setTimeout(() => { botTimer = null; if (token !== gameToken) return; botAction(); }, window.getBotMoveDelay(delay, state.moveNumber === 0)); }
     function startRound() { const startPlayer = matchSelect.value === "match" ? (matchRound % 2 === 1 ? 1 : 2) : 1; savedInSetup = false; returningToSetup = false; cancelBot(); state = core.createInitialState(startPlayer); gameStarted = true; matchRunning = matchSelect.value === "match" || matchRunning; roundResultRecorded = false; updateSettings(); document.body.classList.add("game-active"); if (mobilePrototype) { screens?.showGame?.(); fullscreen?.requestIfChosen?.(); } else { setupScreen.hidden = false; gameScreen.hidden = false; } render(); stabilizeMuehleGeometry(); startButton.textContent = "Spiel abbrechen"; window.MuehleAdaptiveBot?.beginRound?.({ enabled: isComputer() && botTypeSelect.value === "adaptive", adaptSpeed: speedSelect.value }); if (state.currentPlayer === botPlayer() && isComputer()) scheduleBot(); saveCurrentGame(); }
     function finishRound() { cancelBot(); gameStarted = false; state.roundStatus = state.draw ? "draw" : "ended"; if (isComputer() && botTypeSelect.value === "adaptive") window.MuehleAdaptiveBot.recordRoundResult(state.winner === 1 ? "playerWin" : state.winner === 2 ? "botWin" : "draw"); if (matchSelect.value === "match") { if (!roundResultRecorded && state.winner) matchWins[state.winner] += 1; roundResultRecorded = true; matchRound += 1; startButton.textContent = "Nächste Runde"; statusEl.textContent += state.winner ? ` Matchstand ${matchWins[1]}:${matchWins[2]}.` : " Nächste Runde."; } else { matchRunning = false; startButton.textContent = "Neues Spiel"; } updateSettings(); render(); saveCurrentGame(); }
-    function abortGame() { cancelBot(); savedInSetup = false; returningToSetup = false; gameStarted = false; matchRunning = false; roundResultRecorded = false; state = null; document.body.classList.remove("game-active"); if (mobilePrototype) { screens?.showSetup?.(); fullscreen?.exit?.(); } else { setupScreen.hidden = false; gameScreen.hidden = false; } startButton.textContent = "Jetzt spielen"; updateSettings(); render(); MuehleStorage.clear(); updateResumeAction(); }
+    function abortGame() { cancelBot(); savedInSetup = false; returningToSetup = false; gameStarted = false; matchRunning = false; roundResultRecorded = false; state = null; document.body.classList.remove("game-active"); if (mobilePrototype) { screens?.showSetup?.(); } else { setupScreen.hidden = false; gameScreen.hidden = false; } startButton.textContent = "Jetzt spielen"; updateSettings(); render(); MuehleStorage.clear(); updateResumeAction(); }
     function startButtonClick() { if (!gameStarted) { const continueMatch = matchSelect.value === "match" && matchRunning && (state?.winner || state?.draw); if (!continueMatch) { matchWins = { 1: 0, 2: 0 }; matchRound = 1; matchRunning = matchSelect.value === "match"; } startRound(); } else { abortGame(); } }
 
     function showSetupAfterSavedGame() {
         cancelBot();
         window.MuehleAdaptiveBot?.cancelRound?.();
-        fullscreen?.exit?.();
         document.body.classList.remove("game-active");
         gameStarted = false;
         matchRunning = false;
@@ -256,7 +264,7 @@
     function saveAndReturnToSetup() {
         if (returningToSetup) return;
         if (!hasSavableGame()) { showSetupAfterSavedGame(); return; }
-        writeSavedGame();
+        if (writeSavedGame() !== true) { window.AndisSavedGameNotice?.show?.("Speichern fehlgeschlagen. Das Spiel bleibt geöffnet.", 3000); return; }
         cancelBot();
         savedInSetup = true;
         returningToSetup = true;
@@ -268,14 +276,15 @@
 
     function leaveToMenu() {
         if (leavingToMenu) return;
-        leavingToMenu = true;
-        if (savedInSetup) { window.location.href = "../index.html?menu=1"; return; }
+        if (savedInSetup) { leavingToMenu = true; window.location.href = "../index.html?menu=1"; return; }
         if (hasSavableGame()) {
-            writeSavedGame();
+            if (writeSavedGame() !== true) { window.AndisSavedGameNotice?.show?.("Speichern fehlgeschlagen. Das Spiel bleibt geöffnet.", 3000); return; }
+            leavingToMenu = true;
             cancelBot();
             window.AndisSavedGameNotice?.show?.("Spiel gespeichert", 1000, () => { window.location.href = "../index.html?menu=1"; });
             return;
         }
+        leavingToMenu = true;
         MuehleStorage.clear();
         window.location.href = "../index.html?menu=1";
     }
@@ -391,7 +400,8 @@
         const saved = MuehleStorage.load();
         if (isValidSavedState(saved)) restoreSavedGame(saved);
     });
-    window.addEventListener("beforeunload", saveCurrentGame);
+    function saveOnPageExit() { if (hasSavableGame()) saveCurrentGame(); }
+    window.addEventListener("beforeunload", saveOnPageExit);
     updateResumeAction();
     const savedMuehle = MuehleStorage.load();
     const returnedFromGuide = new URLSearchParams(window.location.search).get("guide") === "1";

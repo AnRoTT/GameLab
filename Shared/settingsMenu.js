@@ -34,6 +34,7 @@
         }
         window.AndisSound?.playUiClick?.();
         previouslyFocused = document.activeElement;
+        window.AndisMobileLayout?.fullscreenController?.update();
         panel.hidden = false;
         backdrop.hidden = false;
         document.body.classList.add("settings-open");
@@ -51,7 +52,7 @@
             return;
         }
         if (event.key === "Tab" && !panel.hidden) {
-            const focusable = [...panel.querySelectorAll("button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled])")];
+            const focusable = [...panel.querySelectorAll("button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled])")].filter(element => !element.closest("[hidden]"));
             if (!focusable.length) return;
             const first = focusable[0];
             const last = focusable[focusable.length - 1];
@@ -88,6 +89,16 @@
     // Gemeinsamer Löschdialog für alle Spiele. Die jeweilige Seite liefert nur
     // den Namen ihres Storage-Moduls über data-game-storage.
     const closeButton = document.getElementById("settingsClose");
+    const fullscreenController = window.AndisMobileLayout?.fullscreenController;
+    if (fullscreenController && closeButton) {
+        const fullscreenButton = document.createElement("button");
+        fullscreenButton.id = "settingsFullscreen";
+        fullscreenButton.className = "settings-action";
+        fullscreenButton.type = "button";
+        fullscreenButton.hidden = true;
+        closeButton.before(fullscreenButton);
+        fullscreenController.addButton(fullscreenButton, { mobileOnly: true });
+    }
     const hasPlayerValues = Boolean(document.body.dataset.adaptiveBot);
     const storage = window[document.body.dataset.gameStorage];
 
@@ -126,7 +137,8 @@
         const botName = document.body.dataset.adaptiveBot;
         window[botName]?.resetForLab?.(35);
         window[botName]?.clearPersistentState?.(35);
-        const profileCore = botName === "ConnectFourAdaptiveBot" ? window.ConnectFourAICore
+        const profileCore = botName === "DeutscheDameAdaptiveBot" ? window.DeutscheDameAICore
+            : botName === "ConnectFourAdaptiveBot" ? window.ConnectFourAICore
             : botName === "OthelloAdaptiveBot" ? window.OthelloAICore
             : botName === "QuartoAdaptiveBot" ? window.QuartoAICore
             : null;
@@ -136,6 +148,7 @@
         window.updateAdaptiveStrengthUI?.();
         window.updateQuartoAdaptiveStrengthUI?.();
         window.updateOthelloAdaptiveStrengthUI?.(35);
+        window.updateDeutscheDameAdaptiveBadge?.();
     };
 
     if (!hasPlayerValues) choicePanel.querySelector('[data-delete-kind="player"]')?.remove();

@@ -21,6 +21,7 @@
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify({
                 adaptiveSkill: state.adaptiveSkill,
+                drawStreak: state.drawStreak,
                 adaptiveAI: state.adaptiveAI,
                 playerProfile: state.playerProfile
             }));
@@ -34,6 +35,7 @@
             const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
             if (!stored) return;
             if (Number.isFinite(stored.adaptiveSkill)) state.adaptiveSkill = adaptiveClamp(stored.adaptiveSkill);
+            if (Number.isSafeInteger(stored.drawStreak) && stored.drawStreak >= 0) state.drawStreak = stored.drawStreak;
             if (stored.adaptiveAI && typeof stored.adaptiveAI === "object") {
                 state.adaptiveAI = { ...state.adaptiveAI, ...stored.adaptiveAI };
             }

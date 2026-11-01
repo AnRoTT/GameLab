@@ -15,12 +15,14 @@ Die Spiele können direkt über GitHub Pages gespielt werden:
 - **Othello** – Botgegner und adaptive Schwierigkeit
 - **Quarto** – Botgegner und adaptive Schwierigkeit
 - **Mühle** – Botgegner und adaptive Schwierigkeit
+- **Deutsche Dame** – Botgegner, adaptive Schwierigkeit und Mehrfachrunden
 - **Sudoku** – Generator, Solver, eigene Rätsel und Fotoimport per OCR
 
 ## Gemeinsame Funktionen
 
 - Desktop- und mobile Darstellung
 - Unterstützung für Hoch- und Querformat
+- Mobiler Vollbildmodus über das Einstellungsmenü oder die Spielansicht
 - Responsive Spielfeld- und Buttongrößen
 - Spielstände speichern und fortsetzen
 - Lokale Speicherung im Browser

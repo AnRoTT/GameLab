@@ -4,7 +4,7 @@
     const KEY = "andis-game-foundry-muehle-current-v1";
 
     function save(value) {
-        try { localStorage.setItem(KEY, JSON.stringify(value)); } catch (_) { /* Spiel bleibt spielbar. */ }
+        try { localStorage.setItem(KEY, JSON.stringify(value)); return true; } catch (_) { return false; }
     }
 
     function load() {

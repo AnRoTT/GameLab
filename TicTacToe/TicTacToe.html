@@ -57,16 +57,7 @@
         <button id="settingsClose" class="settings-action settings-close" type="button">Schließen</button>
     </section>
 
-    <div id="resumeConfirmBackdrop" class="tictactoe-confirm-backdrop" hidden>
-        <section class="tictactoe-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="resumeConfirmTitle">
-            <h2 id="resumeConfirmTitle">Laufendes Spiel gefunden</h2>
-            <p id="resumeProgress">Es wurde ein gespeichertes Spiel gefunden.</p>
-            <div class="tictactoe-confirm-actions">
-                <button id="resumeDecline" class="settings-action" type="button">Nein, Einstellungen</button>
-                <button id="resumeAccept" class="settings-action" type="button">Ja, fortsetzen</button>
-            </div>
-        </section>
-    </div>
+    <div id="resumeConfirmBackdrop" class="tictactoe-confirm-backdrop" data-dialog-prefix="tictactoe" hidden></div>
 
     <section id="gameScreen" class="screen game-screen" hidden aria-live="polite">
     <div class="game-screen-header">
@@ -105,7 +96,7 @@
 
     </section>
 
-    <footer class="footer">Andis Game Foundry | TicTacToe | by Andreas Rollinger | 2026.09.13</footer>
+    <footer class="footer">Andis Game Foundry | TicTacToe | by Andreas Rollinger | 2026.10.31</footer>
 
     <script src="../Shared/soundManager.js"></script>
     <script src="../Shared/difficultyCore.js?v=20260902-4"></script>
@@ -117,7 +108,7 @@
     <script src="storage.js"></script>
 <script src="../Shared/mobileLayout.js"></script>
 <script src="../Shared/navigationGuard.js"></script>
-<script src="../Shared/savedGameNotice.js"></script>
+<script src="../Shared/savedGameNotice.js"></script><script src="../Shared/resumeGameDialog.js"></script>
 <script src="../Shared/boardLayout.js"></script>
 <script src="game.js?v=20260902-8"></script>
     <script src="../Shared/matchConfirm.js"></script>
@@ -128,9 +119,7 @@
             new URLSearchParams(location.search).get('menu') === '1' ? 'block' : 'none';
         document.getElementById("helpIcon").addEventListener("click", (event) => {
             event.preventDefault();
-            const sound = new Audio("../assets/sounds/Button_Click.mp3");
-            sound.volume = 0.22;
-            sound.play().catch(() => {});
+            window.AndisSound?.playUiClick?.(0.22);
             setTimeout(() => {
                 window.location.href = document.getElementById("helpIcon").href;
             }, 100);
