@@ -26,7 +26,7 @@ function harness(mobile, saved = null) {
     x.DeutscheDameStorage = { load: () => stored, save: value => { stored = structuredClone(value); return true; }, clear: () => { stored = null; } };
     x.DeutscheDameAICore = { initialState: () => ({ board: Array(64).fill(null), currentPlayer: 1, chainFrom: null, winner: null, draw: false, moves: 0 }),
         positionKey: state => `position-${state.currentPlayer}`, clone: value => structuredClone(value), legalActions: state => state && !state.winner && !state.draw ? (state.chainFrom !== null ? [{ type: "capture", from: 28, over: 21, to: 14 }] : [{ type: "move", from: 41, to: 32 }]) : [],
-        applyAction: state => ({ ...state, winner: 1, currentPlayer: 2 }), evaluateOutcome: state => state };
+        applyAction: state => ({ ...state, chainFrom: null, winner: 1, currentPlayer: 2 }), evaluateOutcome: state => state };
     x.DeutscheDameManualBot = {}; x.DeutscheDameAdaptiveBot = { cancelRound() {}, getAdaptiveSkill: () => 35 };
     x.AndisMobileLayout = { detectMobileSession: () => mobile, createScreenController: () => ({ showGame() {}, showSetup() {}, applyMode() {}, watchResponsiveMode() {}, bindFullscreen() { return {}; } }) };
     x.AndisSavedGameNotice = { show(message, duration, callback) { x.lastNotice = message; callback?.(); }, hide() {} };
@@ -76,8 +76,18 @@ for (const mobile of [false, true]) {
     capture.click("resumeAccept");
     assert.ok(capture.timers.length > 0, "einzige Schlagfortsetzung wird eingeplant");
     capture.timers.at(-1)();
-    assert.match(capture.elements.get("status").textContent, /gewinnt das Match/);
-    assert.equal(capture.saved, null);
+    assert.match(capture.elements.get("status").textContent, /Zwischenstand 2:0/);
+    assert.equal(capture.elements.get("start").textContent, "Nächste Runde");
+    assert.equal(capture.elements.get("mobileGameAction").textContent, "Nächste Runde");
+    assert.equal(capture.saved.matchWins[1], 2);
+    assert.equal(capture.saved.matchRound, 3);
+    const thirdRound = harness(mobile, capture.saved);
+    thirdRound.click("resumeAccept");
+    assert.equal(thirdRound.elements.get("start").textContent, "Nächste Runde");
+    thirdRound.click("start");
+    assert.equal(thirdRound.saved.matchWins[1], 2);
+    assert.equal(thirdRound.saved.matchRound, 3);
+    assert.equal(thirdRound.saved.state.currentPlayer, 1);
     chain.state.chainFrom = 99;
     const invalid = harness(mobile, chain);
     assert.equal(invalid.elements.get("resumeConfirmBackdrop").hidden, true);

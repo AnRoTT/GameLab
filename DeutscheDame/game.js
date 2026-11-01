@@ -237,9 +237,8 @@ let resumePreviouslyFocused = null, pendingSavedState = null, savedInSetup = fal
         $("whiteCount").parentElement.classList.toggle("winner", state?.winner === 1);
         $("blackCount").parentElement.classList.toggle("winner", state?.winner === 2);
         const roundEnded = Boolean(state && (state.winner || state.draw));
-        const matchWinner = matchWins[1] >= 2 ? 1 : matchWins[2] >= 2 ? 2 : null;
         $("status").textContent = roundEnded && matchSelect.value === "match" && roundResultRecorded
-            ? (matchWinner ? `Spieler ${matchWinner} gewinnt das Match!` : `${state.winner ? `Spieler ${state.winner} gewinnt die Runde` : "Remis"} · Zwischenstand ${matchWins[1]}:${matchWins[2]}`)
+            ? `${state.winner ? `Spieler ${state.winner} gewinnt die Runde` : "Remis"} · Zwischenstand ${matchWins[1]}:${matchWins[2]}`
             : state && state.winner ? "Spieler " + state.winner + " gewinnt!" : state && state.draw ? "Remis" : "Spieler " + (state ? state.currentPlayer : 1) + (mode === "bot" && state && state.currentPlayer === 2 ? " (Bot)" : "") + " ist am Zug";
         $("hint").textContent = pathPreview ? `Schlag: Feld ${pathPreview.from + 1} über Feld ${pathPreview.over + 1} nach Feld ${pathPreview.to + 1}.` : state && state.winner ? (state.endReason === "blockiert" ? "Der Gegner kann keinen legalen Zug mehr ausführen." : "Alle gegnerischen Steine wurden geschlagen.") : state && state.draw ? (state.drawReason === "wiederholung" ? "Dreifache Stellungswiederholung." : "25 vollständige Züge ohne Schlag oder Krönung.") : state && state.chainFrom !== null ? "Mehrfachschlag fortsetzen." : actions.some(action => action.type === "capture") ? "Schlagzwang: wähle einen Schlag." : "Wähle einen Stein.";
         if (mobileGameAction) mobileGameAction.textContent = state && !state.winner && !state.draw ? "Spiel abbrechen" : roundEnded && matchRunning ? "Nächste Runde" : "Neues Spiel";
@@ -292,11 +291,10 @@ let resumePreviouslyFocused = null, pendingSavedState = null, savedInSetup = fal
         if (matchSelect.value === "match") {
             if (!roundResultRecorded && state.winner) matchWins[state.winner] += 1;
             roundResultRecorded = true;
-            const matchWinner = matchWins[1] >= 2 ? 1 : matchWins[2] >= 2 ? 2 : null;
             matchRound += 1;
-            matchRunning = !matchWinner;
-            $("status").textContent = matchWinner ? `Spieler ${matchWinner} gewinnt das Match!` : `${state.winner ? `Spieler ${state.winner} gewinnt die Runde` : "Remis"} · Zwischenstand ${matchWins[1]}:${matchWins[2]}`;
-            $("start").textContent = matchWinner ? "Neues Spiel" : "Nächste Runde";
+            matchRunning = true;
+            $("status").textContent = `${state.winner ? `Spieler ${state.winner} gewinnt die Runde` : "Remis"} · Zwischenstand ${matchWins[1]}:${matchWins[2]}`;
+            $("start").textContent = "Nächste Runde";
         } else {
             matchRunning = false;
             $("start").textContent = "Neues Spiel";
@@ -306,7 +304,7 @@ let resumePreviouslyFocused = null, pendingSavedState = null, savedInSetup = fal
     }
     function perform(action) { const before = state; const next = core.applyAction(state, action); if (!next) return; if (mode === "bot" && before.currentPlayer === 1) core.trackPlayerAction?.(window.deutscheDamePlayerProfile, before, action, next); playMoveSound(); selectedFrom = null; lastMove = action; state = next; setTimeout(() => { if (lastMove === action) { lastMove = null; render(); } }, 380); if (state.winner || state.draw) { finishRound(); return; } render(); save(); if (state.chainFrom !== null) { const continuations = core.legalActions(state); if (continuations.length === 1) { scheduleCapture(continuations[0], true); return; } } scheduleBotTurn(); }
     function startRound() { cancelBot(); adaptiveBot.cancelRound?.(); adaptiveResultRecorded = false; roundResultRecorded = false; savedInSetup = false; returningToSetup = false; leavingToMenu = false; lastMove = null; mode = $("mode").value; roundAdaptive = mode === "bot" && $("botType").value === "adaptive"; if (mode === "bot") window.deutscheDamePlayerProfile.gamesAgainstBot += 1; state = core.initialState(); if (matchSelect.value === "match" && matchRound % 2 === 0) { state.currentPlayer = 2; state.positionHistory = [core.positionKey(state)]; } document.body.classList.add("game-active"); if (roundAdaptive) adaptiveBot.beginRound({ adaptSpeed: $("adaptSpeed").value }); if (isMobile()) { screens?.showGame?.(); fullscreen?.requestIfChosen?.(); } else { setup.hidden = false; game.hidden = false; } render(); save(); updateResumeAction(); scheduleBotTurn(); }
-    function start() { const continueMatch = matchSelect.value === "match" && matchRunning && state && (state.winner || state.draw) && matchWins[1] < 2 && matchWins[2] < 2; if (!continueMatch) { matchWins = { 1: 0, 2: 0 }; matchRound = 1; matchRunning = matchSelect.value === "match"; } startRound(); }
+    function start() { const continueMatch = matchSelect.value === "match" && matchRunning && state && (state.winner || state.draw); if (!continueMatch) { matchWins = { 1: 0, 2: 0 }; matchRound = 1; matchRunning = matchSelect.value === "match"; } startRound(); }
     function abort() { cancelBot(); adaptiveBot.cancelRound?.(); adaptiveResultRecorded = false; savedInSetup = false; returningToSetup = false; leavingToMenu = false; matchWins = { 1: 0, 2: 0 }; matchRound = 1; matchRunning = false; roundResultRecorded = false; state = null; document.body.classList.remove("game-active"); if (isMobile()) screens?.showSetup?.(); else { setup.hidden = false; game.hidden = false; } DeutscheDameStorage.clear(); window.AndisSavedGameNotice?.hide?.(); render(); updateResumeAction(); }
     function showSetupAfterSavedGame() {
         state = null;

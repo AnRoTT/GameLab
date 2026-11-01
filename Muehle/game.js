@@ -119,9 +119,8 @@
             return;
         }
         const nextRoundPending = matchSelect.value === "match"
-            && (state?.winner || state?.draw)
-            && matchWins[1] < 2
-            && matchWins[2] < 2;
+            && matchRunning
+            && (state?.winner || state?.draw);
         mobileGameAction.textContent = nextRoundPending ? "Neue Runde" : "Neues Spiel";
     }
     function updateMatchScore() {
