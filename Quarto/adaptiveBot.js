@@ -19,7 +19,7 @@
     }
 
     function savePersistentState() {
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ skill, speed })); } catch (_) {}
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ skill, speed, drawStreak })); } catch (_) {}
     }
 
     function loadPersistentState() {
@@ -27,6 +27,7 @@
             const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
             if (stored && Number.isFinite(stored.skill)) skill = clamp(stored.skill, 10, 100);
             if (stored && SPEED_FACTORS[stored.speed]) speed = stored.speed;
+            if (stored && Number.isSafeInteger(stored.drawStreak) && stored.drawStreak >= 0) drawStreak = stored.drawStreak;
         } catch (_) {}
     }
     loadPersistentState();
@@ -100,10 +101,10 @@
         if (observedMoves < MIN_OBSERVATION_MOVES) return null;
 
         const selections = Math.max(1, diff(profile, roundSnapshot, "selectionCount"));
-        const winningMoves = diff(profile.tactics, roundSnapshot.tactics, "winningMoves");
-        const missedWins = diff(profile.tactics, roundSnapshot.tactics, "missedWins");
-        const dangerousGifts = diff(profile.tactics, roundSnapshot.tactics, "dangerousGifts");
-        const safeGifts = diff(profile.tactics, roundSnapshot.tactics, "safeGifts");
+        const winningMoves = diff(profile.tactics, roundSnapshot, "winningMoves");
+        const missedWins = diff(profile.tactics, roundSnapshot, "missedWins");
+        const dangerousGifts = diff(profile.tactics, roundSnapshot, "dangerousGifts");
+        const safeGifts = diff(profile.tactics, roundSnapshot, "safeGifts");
 
         let performance = 50;
         performance += (winningMoves / observedMoves) * 30;
@@ -144,7 +145,7 @@
         pendingResult = null;
     }
 
-    function beginRound({ enabled = false, adaptSpeed = "normal" } = {}) {
+    function beginRound({ enabled = false, adaptSpeed = "normal", savedRoundSnapshot = null } = {}) {
         setAdaptSpeed(adaptSpeed);
         const profile = getProfile();
         if (!enabled) {
@@ -153,7 +154,9 @@
             return getAdaptiveSkill();
         }
         applyPendingResult(profile);
-        roundSnapshot = snapshotProfile(profile);
+        const keys = ["totalMoves", "selectionCount", "winningMoves", "missedWins", "dangerousGifts", "safeGifts"];
+        roundSnapshot = savedRoundSnapshot && keys.every(key => Number.isFinite(savedRoundSnapshot[key]) && savedRoundSnapshot[key] >= 0)
+            ? Object.fromEntries(keys.map(key => [key, savedRoundSnapshot[key]])) : snapshotProfile(profile);
         return getAdaptiveSkill();
     }
 
@@ -271,6 +274,7 @@
         choosePiece,
         chooseCell,
         beginRound,
+        getRoundSnapshot() { return roundSnapshot ? { ...roundSnapshot } : null; },
         recordRoundResult,
         cancelRound,
         resetForLab,

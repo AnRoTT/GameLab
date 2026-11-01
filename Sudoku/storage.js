@@ -3,7 +3,7 @@
     const key = () => root.SudokuSettings.storageKey;
 
     function save(state) {
-        try { localStorage.setItem(key(), JSON.stringify(state)); } catch (_) { /* private mode */ }
+        try { localStorage.setItem(key(), JSON.stringify(state)); return true; } catch (_) { return false; }
     }
     function load() {
         try {

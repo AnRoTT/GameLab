@@ -34,16 +34,22 @@
             }
             this.updateButton();
         },
-        playUiClick(volume = 0.22) {
-            if (this.muted) return;
+        soundUrl(fileName) {
             const script = document.querySelector('script[src*="soundManager.js"]');
-            const soundUrl = script
-                ? new URL("../assets/sounds/Button_Click.mp3", script.src).href
-                : new URL("assets/sounds/Button_Click.mp3", document.baseURI).href;
-            const sound = new Audio(soundUrl);
+            return script
+                ? new URL(`../assets/sounds/${fileName}`, script.src).href
+                : new URL(`assets/sounds/${fileName}`, document.baseURI).href;
+        },
+        playFile(fileName, volume = 0.22) {
+            if (this.muted) return;
+            const sound = new Audio(this.soundUrl(fileName));
             sound.volume = volume;
             sound.play().catch(() => {});
         },
+        playUiClick(volume = 0.22) { this.playFile("Button_Click.mp3", volume); },
+        playSmallChipDrop(volume = 0.18) { this.playFile("Small_Chip_Drop.mp3", volume); },
+        playBigChipDrop(volume = 0.3) { this.playFile("Big_Chip_Drop.mp3", volume); },
+        playFallingChipDrop(volume = 0.25) { this.playFile("Falling_Chip_Drop.mp3", volume); },
         updateButton() {
             const button = document.getElementById("soundToggle");
             if (!button) return;

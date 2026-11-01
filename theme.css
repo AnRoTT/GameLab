@@ -110,6 +110,11 @@ button {
 .settings-action { min-height: 32px; padding: 4px 9px; border: 1px solid #30364c; border-radius: 6px; background: #1c2134; color: var(--text-main); font-size: .78rem; }
 .settings-action.danger { color: #ffb4b4; }
 .settings-action.settings-close { color: var(--text-muted); }
+.extra-settings > .settings-close {
+    box-sizing: border-box;
+    flex: 0 0 100px;
+    margin-inline: calc((100% - 100px) / 2);
+}
 .reset-confirm { width: 100%; margin-top: 2px; padding-top: 8px; border-top: 1px solid #30364c; text-align: center; }
 .reset-confirm p { margin: 0 0 7px; color: var(--text-muted); font-size: .78rem; }
 .reset-confirm > div { display: flex; justify-content: center; gap: 6px; }

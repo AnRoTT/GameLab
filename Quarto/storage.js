@@ -6,8 +6,9 @@
     function save(state) {
         try {
             localStorage.setItem(KEY, JSON.stringify(state));
+            return true;
         } catch (_) {
-            // Lokale Speicherung darf das laufende Spiel nicht blockieren.
+            return false;
         }
     }
 

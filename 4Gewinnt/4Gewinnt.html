@@ -108,19 +108,9 @@
     </section>
     </main>
 
-    <div id="resumeConfirmBackdrop" class="connect-four-confirm-backdrop" hidden>
-        <section class="connect-four-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="resumeConfirmTitle">
-            <h2 id="resumeConfirmTitle">Laufendes Spiel gefunden</h2>
-            <p>Es gibt bereits ein begonnenes Spiel. Möchtest du es fortsetzen?</p>
-            <p id="resumeProgress" class="resume-progress"></p>
-            <div class="connect-four-confirm-actions">
-                <button id="resumeDecline" class="settings-action" type="button">Nein, Einstellungen</button>
-                <button id="resumeAccept" class="settings-action" type="button">Ja, fortsetzen</button>
-            </div>
-        </section>
-    </div>
+    <div id="resumeConfirmBackdrop" class="connect-four-confirm-backdrop" data-dialog-prefix="connect-four" hidden></div>
 
-    <footer class="footer">Andis Game Foundry | 4 Gewinnt | by Andreas Rollinger | 2026.09.13</footer>
+    <footer class="footer">Andis Game Foundry | 4 Gewinnt | by Andreas Rollinger | 2026.10.31</footer>
 
 </div>
 
@@ -133,7 +123,7 @@
 <script src="../Shared/botTiming.js"></script>
 <script src="../Shared/mobileLayout.js"></script>
 <script src="../Shared/navigationGuard.js"></script>
-<script src="../Shared/savedGameNotice.js"></script>
+<script src="../Shared/savedGameNotice.js"></script><script src="../Shared/resumeGameDialog.js"></script>
 <script src="../Shared/boardLayout.js"></script>
 <script src="storage.js"></script>
 <script src="game.js?v=20260814-24"></script>
@@ -146,9 +136,7 @@ document.getElementById("backIcon").style.display =
 
 document.getElementById("helpIcon").addEventListener("click", (event) => {
     event.preventDefault();
-    const sound = new Audio("../assets/sounds/Button_Click.mp3");
-    sound.volume = 0.22;
-    sound.play().catch(() => {});
+    window.AndisSound?.playUiClick?.(0.22);
     setTimeout(() => {
         window.location.href = document.getElementById("helpIcon").href;
     }, 100);

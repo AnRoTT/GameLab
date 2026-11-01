@@ -2,8 +2,8 @@
     "use strict";
     const core = window.MuehleAICore; const clamp = window.SharedDifficulty.clamp; const SPEED = { slow: 0.5, normal: 1, fast: 1.5 }; const KEY = "andis-game-foundry-muehle-adaptive";
     let skill = 35, speed = "normal", drawStreak = 0, roundSnapshot = null;
-    try { const saved = JSON.parse(localStorage.getItem(KEY) || "null"); if (saved) { skill = Math.max(10, Math.min(100, Number(saved.skill) || 35)); speed = SPEED[saved.speed] ? saved.speed : "normal"; } } catch (_) {}
-    function save() { try { localStorage.setItem(KEY, JSON.stringify({ skill, speed })); } catch (_) {} }
+    try { const saved = JSON.parse(localStorage.getItem(KEY) || "null"); if (saved) { skill = Math.max(10, Math.min(100, Number(saved.skill) || 35)); speed = SPEED[saved.speed] ? saved.speed : "normal"; drawStreak = Number.isSafeInteger(saved.drawStreak) && saved.drawStreak >= 0 ? saved.drawStreak : 0; } } catch (_) {}
+    function save() { try { localStorage.setItem(KEY, JSON.stringify({ skill, speed, drawStreak })); } catch (_) {} }
     function curve() { return window.SharedDifficulty.createProfile({ mode: "adaptive", skill, ...window.MuehleSettings.difficulty, habitInfluence: window.MuehleSettings.adaptiveHabitInfluence, searchConfig: window.MuehleSettings.searchConfig }); }
     function actionPoint(action) { return action.type === "move" ? action.to : action.point; }
     function profileBias(state, action, player, playerProfile, difficulty, searchCache = null) {

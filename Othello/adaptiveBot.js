@@ -5,13 +5,14 @@ let adaptiveDrawStreak = 0;
 const ADAPTIVE_STORAGE_KEY = "andis-game-foundry-othello-adaptive";
 
 function saveAdaptivePersistentState() {
-    try { localStorage.setItem(ADAPTIVE_STORAGE_KEY, JSON.stringify({ adaptiveStrength })); } catch (_) {}
+    try { localStorage.setItem(ADAPTIVE_STORAGE_KEY, JSON.stringify({ adaptiveStrength, adaptiveDrawStreak })); } catch (_) {}
 }
 
 function loadAdaptivePersistentState() {
     try {
         const stored = JSON.parse(localStorage.getItem(ADAPTIVE_STORAGE_KEY) || "null");
         if (stored && Number.isFinite(stored.adaptiveStrength)) adaptiveStrength = Math.max(10, Math.min(100, stored.adaptiveStrength));
+        if (stored && Number.isSafeInteger(stored.adaptiveDrawStreak) && stored.adaptiveDrawStreak >= 0) adaptiveDrawStreak = stored.adaptiveDrawStreak;
     } catch (_) {}
 }
 loadAdaptivePersistentState();

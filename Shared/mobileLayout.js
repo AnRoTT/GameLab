@@ -60,6 +60,7 @@
 
         function bindFullscreen({ button, isMobile = () => body.classList.contains("mobile-prototype") }) {
             let chosenThisSession = false;
+            const buttons = new Set();
 
             async function request() {
                 if (!isMobile() || document.fullscreenElement || !document.documentElement.requestFullscreen) return;
@@ -70,8 +71,8 @@
             async function toggle() {
                 window.AndisSound?.playUiClick?.();
                 if (!document.fullscreenElement) {
-                    chosenThisSession = true;
                     await request();
+                    chosenThisSession = Boolean(document.fullscreenElement);
                 } else if (document.exitFullscreen) {
                     await document.exitFullscreen().catch(() => {});
                     chosenThisSession = false;
@@ -82,16 +83,31 @@
             function update() {
                 const active = Boolean(document.fullscreenElement);
                 body.classList.toggle("is-fullscreen", active);
-                if (!button) return;
-                button.textContent = active ? "⛶ Vollbild aus" : "⛶ Vollbild";
-                button.setAttribute("aria-label", active ? "Vollbild verlassen" : "Vollbild aktivieren");
-                button.setAttribute("aria-pressed", String(active));
+                for (const item of buttons) {
+                    const control = item.button;
+                    if (item.mobileOnly) control.hidden = !isMobile();
+                    control.textContent = active ? "⛶ Vollbild aus" : "⛶ Vollbild";
+                    control.setAttribute("aria-label", active ? "Vollbild verlassen" : "Vollbild aktivieren");
+                    control.setAttribute("aria-pressed", String(active));
+                }
             }
 
-            button?.addEventListener("click", toggle);
-            document.addEventListener("fullscreenchange", update);
+            function addButton(control, { mobileOnly = false } = {}) {
+                if (!control || [...buttons].some(item => item.button === control)) return;
+                buttons.add({ button: control, mobileOnly });
+                control.addEventListener("click", toggle);
+                update();
+            }
+            addButton(button);
+            document.addEventListener("fullscreenchange", () => {
+                if (!document.fullscreenElement) chosenThisSession = false;
+                update();
+            });
+            window.addEventListener("resize", update, { passive: true });
+            window.addEventListener("orientationchange", update, { passive: true });
 
-            return {
+            const controller = {
+                addButton,
                 requestIfChosen() {
                     if (chosenThisSession) request();
                 },
@@ -102,6 +118,8 @@
                 },
                 update
             };
+            window.AndisMobileLayout.fullscreenController = controller;
+            return controller;
         }
 
         /*

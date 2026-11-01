@@ -83,10 +83,8 @@
     let botLevelIndex = 0;
     let adaptSpeedIndex = 1;
 
-    const soundSelect = new Audio("../assets/sounds/Click.mp3");
-    const soundPlace = new Audio("../assets/sounds/chess_piece_place.mp3");
     const soundError = new Audio("../assets/sounds/Error_Tock.mp3");
-    [soundSelect, soundPlace, soundError].forEach((sound) => {
+    [soundError].forEach((sound) => {
         sound.volume = 0.25;
         sound.preload = "auto";
     });
@@ -136,6 +134,7 @@
             scores: scores.slice(),
             winningLine: winningLine.slice(),
             keyboardMode,
+            adaptiveRoundSnapshot: QuartoAdaptiveBot.getRoundSnapshot?.() ?? null,
             settings: {
                 onePlayer,
                 botLevelIndex,
@@ -156,6 +155,11 @@
             && validList(saved.remainingPieces)
             && (saved.selectedPiece === null || (Number.isInteger(saved.selectedPiece) && saved.selectedPiece >= 0 && saved.selectedPiece < 16))
             && (saved.selectedPiece === null || !saved.remainingPieces.includes(saved.selectedPiece))
+            && (() => {
+                const pieces = [...saved.board.filter(piece => piece !== null), ...saved.remainingPieces];
+                if (saved.selectedPiece !== null) pieces.push(saved.selectedPiece);
+                return pieces.length === 16 && new Set(pieces).size === 16;
+            })()
             && Number.isInteger(saved.chooser) && (saved.chooser === 0 || saved.chooser === 1)
             && Number.isInteger(saved.startingChooser) && (saved.startingChooser === 0 || saved.startingChooser === 1)
             && Number.isInteger(saved.matchModeIndex) && saved.matchModeIndex >= 0 && saved.matchModeIndex < MATCH_OPTIONS.length
@@ -166,7 +170,7 @@
     }
 
     function writeSavedGame() {
-        if (hasSavableGame()) QuartoStorage.save(createSavedState());
+        if (hasSavableGame()) return QuartoStorage.save(createSavedState());
         else QuartoStorage.clear();
     }
 
@@ -222,15 +226,19 @@
     }
 
     function focusElement(element) {
-        if (!element || element.disabled) return;
+        if (!element || element.disabled || element.getAttribute("aria-disabled") === "true") return;
         element.classList.toggle("keyboard-focus", keyboardMode);
         element.focus({ preventScroll: true });
     }
 
-    function focusFirstAvailable(container) {
-        if (!keyboardMode) return;
-        const element = [...container.children].find((child) => !child.disabled);
-        focusElement(element);
+    function focusFirstAvailable(container, preserveFocus = false) {
+        if (!keyboardMode && !preserveFocus) return;
+        const element = [...container.children].find((child) => !child.disabled && child.getAttribute("aria-disabled") !== "true");
+        if (element) focusElement(element);
+        else if (preserveFocus) {
+            container.tabIndex = -1;
+            container.focus({ preventScroll: true });
+        }
     }
 
     function gridColumnCount(container, fallback) {
@@ -249,7 +257,7 @@
             column = (column + columnDelta + columns) % columns;
             const nextIndex = row * columns + column;
             const next = container.children[nextIndex];
-            if (next && !next.disabled) {
+            if (next && !next.disabled && next.getAttribute("aria-disabled") !== "true") {
                 focusElement(next);
                 return;
             }
@@ -277,6 +285,9 @@
     }
 
     function render() {
+        const preserveGameFocus = boardElement.contains(document.activeElement) || poolElement.contains(document.activeElement);
+        const focusedIndex = boardElement.contains(document.activeElement) ? document.activeElement.dataset?.index : undefined;
+        const focusedPiece = poolElement.contains(document.activeElement) ? document.activeElement.dataset?.piece : undefined;
         boardElement.classList.toggle("board-disabled", !gameStarted || gameOver);
         boardElement.innerHTML = "";
         board.forEach((piece, index) => {
@@ -336,6 +347,15 @@
                 inline: "center"
             });
         }
+        if (preserveGameFocus && gameStarted && !gameOver) {
+            const target = selectedPiece !== null ? boardElement : poolElement;
+            const prior = target === boardElement && focusedIndex !== undefined
+                ? target.querySelector(`[data-index="${focusedIndex}"]`)
+                : target === poolElement && focusedPiece !== undefined
+                    ? target.querySelector(`[data-piece="${focusedPiece}"]`) : null;
+            if (prior && !prior.disabled && prior.getAttribute("aria-disabled") !== "true") focusElement(prior);
+            else focusFirstAvailable(target, true);
+        }
         botLevelButton.textContent = onePlayer ? BOT_LEVELS[botLevelIndex] : "2 Spieler Modus";
         botLevelButton.disabled = !onePlayer || (gameStarted && (matchModeIndex > 0 || !gameOver));
         botLevelButton.classList.toggle("button-disabled", botLevelButton.disabled);
@@ -393,12 +413,11 @@
             const state = QuartoAICore.createInitialState(board, remainingPieces, chooser, selectedPiece);
             QuartoAICore.trackPlayerSelection(playerProfile, piece, state, 1);
         }
-        if (!fromBot) playSound(soundSelect, 0.2);
+        if (!fromBot) window.AndisSound?.playUiClick?.(0.2);
         selectedPiece = piece;
         remainingPieces = remainingPieces.filter((item) => item !== piece);
         setStatus(`${playerName(1 - chooser)} ist am Zug und platziert den Spielstein.`);
         render();
-        focusFirstAvailable(boardElement);
         if (isBot(1 - chooser)) scheduleBotMove();
         saveCurrentGame();
     }
@@ -409,7 +428,7 @@
             const state = QuartoAICore.createInitialState(board, remainingPieces, chooser, selectedPiece);
             QuartoAICore.trackPlayerPlacement(playerProfile, selectedPiece, index, state);
         }
-        playSound(soundPlace, 0.3);
+        window.AndisSound?.playBigChipDrop?.(0.3);
         board[index] = selectedPiece;
         selectedPiece = null;
         const winningLine = QuartoAICore.findWinningLine(board);
@@ -424,7 +443,6 @@
         chooser = 1 - chooser;
         setStatus(`${playerName(chooser)} wählt einen Spielstein für ${playerName(1 - chooser)}.`);
         render();
-        focusFirstAvailable(poolElement);
         if (isBot(chooser)) scheduleBotMove();
         saveCurrentGame();
     }
@@ -499,7 +517,6 @@
         gameStarted = false;
         if (mobilePrototype) {
             screenController?.showSetup?.();
-            fullscreenController?.exit();
         }
         gameOver = true;
         document.body.classList.remove("game-active");
@@ -554,7 +571,6 @@
         window.clearTimeout(botTimer);
         botTimer = null;
         QuartoAdaptiveBot.cancelRound();
-        fullscreenController?.exit();
         document.body.classList.remove("game-active");
         gameStarted = false;
         gameOver = true;
@@ -571,7 +587,7 @@
             showSetupAfterSavedGame();
             return;
         }
-        writeSavedGame();
+        if (writeSavedGame() !== true) { window.AndisSavedGameNotice?.show?.("Speichern fehlgeschlagen. Das Spiel bleibt geöffnet.", 3000); return; }
         window.clearTimeout(botTimer);
         botTimer = null;
         returningToSetup = true;
@@ -584,13 +600,14 @@
 
     function leaveToMenu() {
         if (leavingToMenu) return;
-        leavingToMenu = true;
         if (savedInSetup) {
+            leavingToMenu = true;
             window.location.href = "../index.html?menu=1";
             return;
         }
         if (hasSavableGame()) {
-            writeSavedGame();
+            if (writeSavedGame() !== true) { window.AndisSavedGameNotice?.show?.("Speichern fehlgeschlagen. Das Spiel bleibt geöffnet.", 3000); return; }
+            leavingToMenu = true;
             window.clearTimeout(botTimer);
             botTimer = null;
             window.AndisSavedGameNotice?.show?.("Spiel gespeichert", 1000, () => {
@@ -598,6 +615,7 @@
             });
             return;
         }
+        leavingToMenu = true;
         QuartoStorage.clear();
         window.location.href = "../index.html?menu=1";
     }
@@ -632,7 +650,7 @@
         keyboardMode = Boolean(saved.keyboardMode);
         botSearchCache = QuartoAICore.createSearchCache();
         document.body.classList.add("game-active");
-        if (isAdaptiveBot()) QuartoAdaptiveBot.beginRound({ enabled: true, adaptSpeed: adaptiveSpeed() });
+        if (isAdaptiveBot() && !gameOver) QuartoAdaptiveBot.beginRound({ enabled: true, adaptSpeed: adaptiveSpeed(), savedRoundSnapshot: saved.adaptiveRoundSnapshot });
         renderScores();
         render();
         setStatus(saved.status || `${playerName(chooser)} wählt einen Spielstein für ${playerName(1 - chooser)}.`);
@@ -760,7 +778,8 @@
         focusable[nextIndex]?.focus();
     });
 
-    window.addEventListener("beforeunload", saveCurrentGame);
+    function saveOnPageExit() { if (hasSavableGame()) saveCurrentGame(); }
+    window.addEventListener("beforeunload", saveOnPageExit);
 
     resumeSavedButton?.addEventListener("click", () => {
         window.AndisSound?.playUiClick?.(0.22);

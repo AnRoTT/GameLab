@@ -4,7 +4,7 @@
     const KEY = "andis-game-foundry-connect-four-current-v1";
 
     function save(state) {
-        try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (_) { /* private mode */ }
+        try { localStorage.setItem(KEY, JSON.stringify(state)); return true; } catch (_) { return false; }
     }
 
     function load() {
