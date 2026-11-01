@@ -81,7 +81,7 @@ let resumePreviouslyFocused = null, pendingSavedState = null, savedInSetup = fal
     function playUiSound() { window.AndisSound?.playUiClick?.(0.22); }
     function updateMatchUI() {
         const active = matchSelect.value === "match";
-        matchButton.textContent = active ? "Mehrfachrunde" : "Einzelrunde";
+        matchButton.textContent = active ? "Abwechselnd" : "Einzelrunde";
         matchScore.textContent = `${matchWins[1]}:${matchWins[2]}`;
         matchScore.hidden = !active;
     }
@@ -167,6 +167,7 @@ let resumePreviouslyFocused = null, pendingSavedState = null, savedInSetup = fal
             }
         }
         const sources = new Set(actions.map(action => action.from));
+        board.classList.toggle("turn-player-two", state?.currentPlayer === 2);
         for (let i = 0; i < 64; i += 1) {
             const cell = document.createElement("button");
             cell.type = "button";
@@ -183,7 +184,7 @@ let resumePreviouslyFocused = null, pendingSavedState = null, savedInSetup = fal
             if (captureSteps.has(i)) cell.classList.add("capture-step");
             if (lastMove && lastMove.to === i) cell.classList.add(lastMove.type === "capture" ? "capture-arrival" : "move-arrival");
             if (botPreview && botPreview.from === i) cell.classList.add("bot-source");
-            if (botPreview && botPreview.to === i) cell.classList.add("bot-target");
+            if (botPreview && botPreview.to === i) cell.classList.add(botPreview.type === "capture" ? "bot-target" : "target");
             if (botPreview && botPreview.over === i) cell.classList.add("capture-over");
             if (pathPreview && pathPreview.from === i) cell.classList.add("bot-source");
             if (pathPreview && pathPreview.to === i) {
@@ -245,7 +246,15 @@ let resumePreviouslyFocused = null, pendingSavedState = null, savedInSetup = fal
         board.classList.toggle("game-over", Boolean(state && (state.winner || state.draw)));
         board.classList.toggle("winner-white", state?.winner === 1);
         board.classList.toggle("winner-black", state?.winner === 2);
-        $("start").textContent = roundEnded ? (matchRunning ? "Nächste Runde" : "Neues Spiel") : "Jetzt spielen";
+        const playing = Boolean(state && !roundEnded);
+        $("start").textContent = playing ? "Spiel abbrechen" : roundEnded ? (matchRunning ? "Nächste Runde" : "Neues Spiel") : "Jetzt spielen";
+        const computer = $("mode").value === "bot";
+        const adaptive = $("botType").value === "adaptive";
+        $("modeButton").disabled = playing;
+        matchButton.disabled = playing;
+        $("botButton").disabled = playing || !computer;
+        $("adaptiveButton").disabled = playing || !computer || !adaptive;
+        [$("modeButton"), matchButton, $("botButton"), $("adaptiveButton")].forEach(button => button.classList.toggle("button-disabled", button.disabled));
         updateMatchUI();
         updateAdaptiveBadge();
     }
@@ -389,7 +398,8 @@ let resumePreviouslyFocused = null, pendingSavedState = null, savedInSetup = fal
         const saved = DeutscheDameStorage.load();
         if (isResumable(saved)) requestResume(saved);
     }
-    $("start").addEventListener("click", () => { playUiSound(); start(); });
+    $("start").addEventListener("click", () => { playUiSound(); if (state && !state.winner && !state.draw) abort(); else start(); });
+    [$("modeButton"), $("botButton")].forEach(button => button.addEventListener("click", () => queueMicrotask(render)));
     resumeSavedButton?.addEventListener("click", () => { playUiSound(); const saved = DeutscheDameStorage.load(); if (isValidSavedState(saved)) restoreSavedGame(saved); });
     resumeDecline?.addEventListener("click", () => { playUiSound(); DeutscheDameStorage.clear(); closeResumeConfirm(); updateResumeAction(); $("mode")?.focus(); });
     resumeAccept?.addEventListener("click", () => { playUiSound(); const saved = pendingSavedState; closeResumeConfirm(); restoreSavedGame(saved); });
