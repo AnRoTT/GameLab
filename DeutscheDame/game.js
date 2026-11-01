@@ -249,6 +249,7 @@ let resumePreviouslyFocused = null, pendingSavedState = null, savedInSetup = fal
         $("start").textContent = playing ? "Spiel abbrechen" : roundEnded ? (matchRunning ? "Nächste Runde" : "Neues Spiel") : "Jetzt spielen";
         const computer = $("mode").value === "bot";
         const adaptive = $("botType").value === "adaptive";
+        $("botButton").textContent = !computer ? "2 Spieler Modus" : adaptive ? "Adaptiv" : ({ 1: "Anfänger", 2: "Hobbyspieler", 3: "Vereinsspieler", 4: "Meister" }[$("botLevel").value] || "Anfänger");
         $("modeButton").disabled = playing;
         matchButton.disabled = playing;
         $("botButton").disabled = playing || !computer;
@@ -257,6 +258,7 @@ let resumePreviouslyFocused = null, pendingSavedState = null, savedInSetup = fal
         updateMatchUI();
         updateAdaptiveBadge();
     }
+    window.updateDeutscheDameSetupUI = render;
     function handleCell(index) { if (!state || state.winner || state.draw || pathPreview || (mode === "bot" && state.currentPlayer === 2)) return; const actions = legal(); if (selectedFrom === null && state.chainFrom !== null) { const continuation = actions.find(candidate => candidate.from === state.chainFrom && candidate.to === index); if (continuation) scheduleCapture(continuation); return; } if (selectedFrom === null) { const sourceActions = actions.filter(action => action.from === index); if (sourceActions.length === 1 && sourceActions[0].type === "capture") { playUiSound(); scheduleCapture(sourceActions[0], true); return; } if (sourceActions.length) { playUiSound(); selectedFrom = index; render(); } return; } const action = actions.find(candidate => candidate.from === selectedFrom && candidate.to === index); if (action) { selectedFrom = null; if (action.type === "capture") scheduleCapture(action); else perform(action); } else if (actions.some(candidate => candidate.from === index)) { playUiSound(); selectedFrom = index; render(); } }
     function scheduleBotTurn() {
         if (!state || state.winner || state.draw || mode !== "bot" || state.currentPlayer !== 2) return;
@@ -397,7 +399,6 @@ let resumePreviouslyFocused = null, pendingSavedState = null, savedInSetup = fal
         if (isResumable(saved)) requestResume(saved);
     }
     $("start").addEventListener("click", () => { playUiSound(); if (state && !state.winner && !state.draw) abort(); else start(); });
-    [$("modeButton"), $("botButton")].forEach(button => button.addEventListener("click", () => queueMicrotask(render)));
     resumeSavedButton?.addEventListener("click", () => { playUiSound(); const saved = DeutscheDameStorage.load(); if (isValidSavedState(saved)) restoreSavedGame(saved); });
     resumeDecline?.addEventListener("click", () => { playUiSound(); DeutscheDameStorage.clear(); closeResumeConfirm(); updateResumeAction(); $("mode")?.focus(); });
     resumeAccept?.addEventListener("click", () => { playUiSound(); const saved = pendingSavedState; closeResumeConfirm(); restoreSavedGame(saved); });
