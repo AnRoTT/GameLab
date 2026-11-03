@@ -233,7 +233,7 @@ function clearConnectFourPlayerProfile(profile) {
 }
 function loadConnectFourPlayerProfile(profile) { try { mergeConnectFourProfile(profile, JSON.parse(localStorage.getItem(CONNECT_FOUR_PLAYER_PROFILE_KEY) || "null")); } catch (_) {} return profile; }
 
-function createConnectFourPlayerProfile() {
+function createConnectFourPlayerProfile(loadStored = true) {
     const profile = {
         totalMoves: 0,
         gamesAgainstBot: 0,
@@ -268,7 +268,7 @@ function createConnectFourPlayerProfile() {
         angriffsZuege: { get: () => profile.style.risky, set: value => { profile.style.risky = value; }, configurable: true }
     });
 
-    return loadConnectFourPlayerProfile(profile);
+    return loadStored ? loadConnectFourPlayerProfile(profile) : profile;
 }
 
 function resetConnectFourPlayerProfile(profile) {
@@ -372,7 +372,7 @@ try {
     const stored = JSON.parse(localStorage.getItem("gamelab-4gewinnt-manual-profiles") || "{}");
     ["1", "2", "3", "4"].forEach((key) => delete stored[key]);
     Object.assign(connectFourManualOverrides, stored);
-    localStorage.setItem("gamelab-4gewinnt-manual-profiles", JSON.stringify(connectFourManualOverrides));
+    if (!window.AndisBotLab) localStorage.setItem("gamelab-4gewinnt-manual-profiles", JSON.stringify(connectFourManualOverrides));
 } catch {}
 
 function clearConnectFourManualProfileOverrides() {

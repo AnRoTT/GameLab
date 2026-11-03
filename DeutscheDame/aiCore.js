@@ -212,7 +212,7 @@
 
     function createPlayerProfile(loadStored = true) {
         const profile = {
-            totalMoves: 0, gamesAgainstBot: 0, captures: 0, captureChains: 0, chainSteps: 0,
+            totalMoves: 0, actionSamples: 0, gamesAgainstBot: 0, captures: 0, captureChains: 0, chainSteps: 0,
             promotions: 0, menMoves: 0, kingMoves: 0,
             destinations: Array(64).fill(0), sources: Array(64).fill(0),
             phases: { opening: 0, midgame: 0, endgame: 0 },
@@ -242,6 +242,9 @@
                 });
             };
             merge(profile, stored);
+            if (!Number.isFinite(stored?.actionSamples) || stored.actionSamples < 0) {
+                profile.actionSamples = profile.sources.reduce((sum, count) => sum + Math.max(0, count), 0);
+            }
         } catch (_) {}
         return profile;
     }
@@ -275,6 +278,7 @@
             else if (moveNumber < 24) profile.phases.midgame += 1;
             else profile.phases.endgame += 1;
         }
+        profile.actionSamples = Math.max(0, Number(profile.actionSamples) || 0) + 1;
         if (destination !== null) profile.destinations[destination] += 1;
         if (source !== null) profile.sources[source] += 1;
         if (source !== null && destination !== null) {

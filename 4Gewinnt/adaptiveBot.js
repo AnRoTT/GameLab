@@ -37,8 +37,10 @@ var adaptiveAI = {
     creativity: 0.42
 };
 const ADAPTIVE_STORAGE_KEY = "andis-game-foundry-4gewinnt-adaptive";
+let labState = null;
 
 function saveAdaptivePersistentState() {
+    if (labState) return;
     try {
         localStorage.setItem(ADAPTIVE_STORAGE_KEY, JSON.stringify({
             adaptiveSkill, adaptiveMomentum, adaptiveMoveCounter, adaptiveRoundDelta,
@@ -80,7 +82,7 @@ const ADAPTIVE_COLS = typeof COLS !== "undefined" ? COLS : 7;
 
 // Das Spielerprofil wird zentral in aiCore.js angelegt. Die alten deutschen
 // Feldnamen sind dort nur noch kompatible Verweise auf dieselben Werte.
-const playerProfile = window.connectFourPlayerProfile;
+let playerProfile = window.connectFourPlayerProfile;
 let adaptiveLabBoard = null;
 
 function getAdaptiveBoard() {
@@ -170,7 +172,7 @@ function getAdaptiveBotSkillBand() {
     return "ruthless";
 }
 
-function resetAdaptiveState() {
+function resetAdaptiveState(resetProfile = true) {
     adaptiveMomentum = 0;
     adaptiveMoveCounter = 0;
     adaptiveRoundDelta = 0;
@@ -206,7 +208,7 @@ function resetAdaptiveState() {
         mistakeChance: 0.12,
         creativity: 0.42
     };
-    window.ConnectFourAICore.resetPlayerProfile(playerProfile);
+    if (resetProfile) window.ConnectFourAICore.resetPlayerProfile(playerProfile);
 }
 
 function getAdaptivePhase() {
@@ -217,6 +219,8 @@ function getAdaptivePhase() {
 }
 
 function getAdaptiveLearningStage() {
+    // Im Labor gibt es kein Spielerprofil und damit keine Beobachtungsphase.
+    if (labState) return "apply";
     const moves = playerProfile.gesamtZuege;
     if (moves < 12) return "observe";
     if (moves < 20) return "learn";
@@ -682,7 +686,7 @@ function finalizeAdaptiveRound(resultSign) {
     // Die Anpassung bleibt ergebnisbasiert und wird nicht ueber die Grenzen
     // hinaus verstaerkt.
     const stageRate = learningStage === "observe" ? 0.65 : learningStage === "learn" ? 0.9 : 1;
-    const speedRate = Number(window.currentAdaptSpeedFactor) || 1;
+    const speedRate = labState ? 1 : Number(window.currentAdaptSpeedFactor) || 1;
     const skillUpdate = window.SharedDifficulty.applyAdaptiveResult(
         adaptiveSkill,
         resultSign > 0 ? "playerWin" : resultSign < 0 ? "botWin" : "draw",
@@ -702,15 +706,29 @@ function finalizeAdaptiveRound(resultSign) {
 }
 
 function resetAdaptiveForLab(initialSkill = 35) {
-    resetAdaptiveState();
+    if (!labState) labState = { adaptiveSkill, adaptiveMomentum, adaptiveMoveCounter, adaptiveRoundDelta, adaptiveLearn, adaptiveAI, adaptiveLabBoard, playerProfile, globalProfile: window.connectFourPlayerProfile };
+    playerProfile = window.ConnectFourAICore.createPlayerProfile(false);
+    window.connectFourPlayerProfile = playerProfile;
+    resetAdaptiveState(false);
     adaptiveSkill = Math.max(10, Math.min(100, Number(initialSkill) || 35));
     adaptiveLearn.skill = adaptiveSkill;
     saveAdaptivePersistentState();
 }
 
+function finishAdaptiveLab() {
+    if (!labState) return;
+    ({ adaptiveSkill, adaptiveMomentum, adaptiveMoveCounter, adaptiveRoundDelta, adaptiveLearn, adaptiveAI, adaptiveLabBoard, playerProfile } = labState);
+    window.connectFourPlayerProfile = labState.globalProfile;
+    labState = null;
+}
+
 function clearAdaptivePersistentState(initialSkill = 35) {
+    if (labState) finishAdaptiveLab();
     try { localStorage.removeItem(ADAPTIVE_STORAGE_KEY); } catch (_) {}
-    resetAdaptiveForLab(initialSkill);
+    resetAdaptiveState();
+    adaptiveSkill = Math.max(10, Math.min(100, Number(initialSkill) || 35));
+    adaptiveLearn.skill = adaptiveSkill;
+    saveAdaptivePersistentState();
 }
 
 function getAdaptiveMoveForLab(testBoard) {
@@ -732,6 +750,7 @@ window.ConnectFourAdaptiveBot = {
     getMove: getAdaptiveMoveForLab,
     getSkill: () => Math.round(adaptiveSkill),
     resetForLab: resetAdaptiveForLab,
+    finishLab: finishAdaptiveLab,
     clearPersistentState: clearAdaptivePersistentState,
     recordLabResult: recordAdaptiveLabResult
 };

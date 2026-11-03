@@ -164,7 +164,8 @@ function getTicTacToeProfilePreferredMove(board, profile) {
     const total = Math.max(1, profile.totalMoves);
     const score = (index) => {
         const favorite = (profile.favoriteCells?.[index] || 0) / total;
-        const opening = (profile.openingCells?.[index] || 0) / Math.max(1, Math.min(2, total));
+        const openingTotal = Math.max(1, Number(profile.openingObservations) || (profile.openingCells || []).reduce((sum, value) => sum + (Number(value) || 0), 0));
+        const opening = (profile.openingCells?.[index] || 0) / openingTotal;
         const row = (profile.rowPreference?.[Math.floor(index / 3)] || 0) / total;
         const col = (profile.colPreference?.[index % 3] || 0) / total;
         return favorite * 0.55 + opening * 0.25 + row * 0.10 + col * 0.10;
@@ -199,6 +200,7 @@ function createTicTacToePlayerProfile(loadStored = true) {
         gamesAgainstBot: 0,
         favoriteCells: Array(9).fill(0),
         openingCells: Array(9).fill(0),
+        openingObservations: 0,
         rowPreference: Array(3).fill(0),
         colPreference: Array(3).fill(0),
         positionPreference: { center: 0, corner: 0, edge: 0 },
@@ -215,12 +217,13 @@ function createTicTacToePlayerProfile(loadStored = true) {
     try {
         const stored = JSON.parse(localStorage.getItem(TICTACTOE_PLAYER_PROFILE_KEY) || "null");
         if (!stored || typeof stored !== "object") return profile;
-        for (const key of ["totalMoves", "gamesAgainstBot", "mistakes", "missedBlocks", "missedWins", "forksSeen", "forksMissed", "tacticalGood", "tacticalBad"]) {
+        for (const key of ["totalMoves", "gamesAgainstBot", "openingObservations", "mistakes", "missedBlocks", "missedWins", "forksSeen", "forksMissed", "tacticalGood", "tacticalBad"]) {
             if (Number.isFinite(Number(stored[key]))) profile[key] = Number(stored[key]);
         }
         for (const key of ["favoriteCells", "openingCells", "rowPreference", "colPreference"]) {
             if (Array.isArray(stored[key]) && stored[key].length === profile[key].length) profile[key] = stored[key].map(value => Number(value) || 0);
         }
+        if (!Number.isFinite(Number(stored.openingObservations))) profile.openingObservations = profile.openingCells.reduce((sum, value) => sum + Math.max(0, Number(value) || 0), 0);
         for (const key of ["positionPreference", "style"]) {
             if (stored[key] && typeof stored[key] === "object") {
                 Object.keys(profile[key]).forEach(child => {
@@ -255,7 +258,11 @@ function trackTicTacToePlayerMove(profile, move, boardBefore, player = "X") {
     if (!profile || move < 0 || move > 8) return;
     profile.totalMoves++;
     profile.favoriteCells[move]++;
-    if (profile.totalMoves <= 2) profile.openingCells[move]++;
+    if (Array.isArray(boardBefore) && boardBefore.filter(cell => cell === player).length < 2) {
+        if (!Number.isFinite(Number(profile.openingObservations))) profile.openingObservations = profile.openingCells.reduce((sum, value) => sum + Math.max(0, Number(value) || 0), 0);
+        profile.openingCells[move]++;
+        profile.openingObservations++;
+    }
     profile.rowPreference[Math.floor(move / 3)]++;
     profile.colPreference[move % 3]++;
     profile.positionPreference[getTicTacToePositionType(move)]++;

@@ -1,9 +1,11 @@
 (function () {
     const TicTacToeAdaptiveCore = window.TicTacToeAICore;
     const STORAGE_KEY = "andis-game-foundry-tictactoe-adaptive";
+    let labState = null;
     const state = {
         adaptiveRoundStatus: "",
         adaptiveRoundSnapshot: null,
+        labCells: null,
         drawStreak: 0,
         adaptiveSkill: 0.35,
         adaptiveAI: {
@@ -18,6 +20,7 @@
     };
 
     function savePersistentState() {
+        if (labState) return;
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify({
                 adaptiveSkill: state.adaptiveSkill,
@@ -53,7 +56,7 @@
         }
     }
 
-    loadPersistentState();
+    if (!window.AndisBotLab) loadPersistentState();
 
     function getLearningRate() {
         const baseRate = (() => {
@@ -142,6 +145,7 @@
         const keep = 0.98 + (getLearningRate() - 1) * 0.01;
         state.playerProfile.favoriteCells = state.playerProfile.favoriteCells.map(v => v * keep);
         state.playerProfile.openingCells = state.playerProfile.openingCells.map(v => v * keep);
+        if (Number.isFinite(Number(state.playerProfile.openingObservations))) state.playerProfile.openingObservations *= keep;
         state.playerProfile.rowPreference = state.playerProfile.rowPreference.map(v => v * keep);
         state.playerProfile.colPreference = state.playerProfile.colPreference.map(v => v * keep);
         state.playerProfile.positionPreference.center *= keep;
@@ -200,8 +204,10 @@
     }
 
     function getAdaptiveHabitScore(move) {
+        if (labState) return 0;
         const favorite = state.playerProfile.favoriteCells[move] || 0;
-        const opening = state.playerProfile.openingCells[move] || 0;
+        const openingTotal = Math.max(1, Number(state.playerProfile.openingObservations) || state.playerProfile.openingCells.reduce((sum, value) => sum + (Number(value) || 0), 0));
+        const opening = (state.playerProfile.openingCells[move] || 0) / openingTotal * 2;
         const row = state.playerProfile.rowPreference[Math.floor(move / 3)] || 0;
         const col = state.playerProfile.colPreference[move % 3] || 0;
         const type = state.playerProfile.positionPreference[adaptiveCellType(move)] || 0;
@@ -322,6 +328,10 @@
         state.adaptiveAI.mistakeChance = adaptiveClamp(state.adaptiveAI.mistakeChance + (winner === "X" ? -0.0015 : 0.0008) * rate);
         state.adaptiveAI.creativity = adaptiveClamp(state.adaptiveAI.creativity + (winner === "draw" ? 0 : 0.0005) * rate);
 
+        if (labState) {
+            savePersistentState();
+            return;
+        }
         if (winner === "X") {
             state.playerProfile.style.aggressive += 0.6;
         } else if (winner === "O") {
@@ -336,6 +346,7 @@
     }
 
     function resetForLab(initialSkill = 35) {
+        if (!labState) labState = { state: { ...state }, playerProfile: window.ticTacToePlayerProfile };
         state.adaptiveSkill = adaptiveClamp(initialSkill / 100);
         state.adaptiveAI = {
             accuracy: 0.60,
@@ -352,7 +363,15 @@
         savePersistentState();
     }
 
+    function finishLab() {
+        if (!labState) return;
+        Object.assign(state, labState.state);
+        window.ticTacToePlayerProfile = labState.playerProfile;
+        labState = null;
+    }
+
     function clearPersistentState(initialSkill = 35) {
+        labState = null;
         try {
             localStorage.removeItem(STORAGE_KEY);
         } catch (_) {
@@ -360,6 +379,8 @@
         }
         TicTacToeAdaptiveCore.clearPlayerProfile?.(window.ticTacToePlayerProfile);
         resetForLab(initialSkill);
+        labState = null;
+        savePersistentState();
     }
 
     function getBotMoveForLab(board) {
@@ -377,6 +398,7 @@
     }
 
     function observePlayerMove(move, stateBeforeMove, player) {
+        if (labState) return;
         if (player !== "X") return;
         registerAdaptiveForkSignals(move, stateBeforeMove);
         const missedWin = registerAdaptiveMissedWin(move, stateBeforeMove);
@@ -412,6 +434,7 @@
         getBotMove,
         getBotMoveForLab,
         resetForLab,
+        finishLab,
         clearPersistentState,
         recordLabResult,
         getBotDelay,

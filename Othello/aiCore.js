@@ -286,6 +286,17 @@ function othelloScoreMove(state, move, player, profile = null, weights = {}) {
     return score;
 }
 
+function othelloPlayerHabitBonus(move, profile, influence = 0) {
+    const total = Number(profile?.movesPlayed) || 0;
+    if (total < 12 || !move || !profile.positions) return 0;
+    const count = value => Math.max(0, Math.min(total, Number(value) || 0));
+    const favorites = count(profile.positions.favorites?.[move.r * 8 + move.c]) / total;
+    const row = count(profile.positions.rowBias?.[move.r]) / total;
+    const column = count(profile.positions.colBias?.[move.c]) / total;
+    const maturity = Math.min(1, total / 48);
+    return (favorites * 4 + row + column) * maturity * Math.max(0, Math.min(1, Number(influence) || 0));
+}
+
 function othelloStableEdgeCount(state, player) {
     const edges = [
         [[0,0],[0,1],[0,2],[0,3],[0,4],[0,5],[0,6],[0,7]],
@@ -390,7 +401,7 @@ function othelloEvaluateState(state, player, weights = {}, turn = null) {
     return score;
 }
 
-function othelloChooseMinimaxMove(state, player, depth = 3, randomness = 0, weights = {}, selectionCurve = null, selectionMode = "soft") {
+function othelloChooseMinimaxMove(state, player, depth = 3, randomness = 0, weights = {}, selectionCurve = null, selectionMode = "soft", rootBonus = null) {
     const opponent = player === "black" ? "white" : "black";
     const rootMoves = getAllValidMovesForState(player, state);
     if (!rootMoves.length) return null;
@@ -501,6 +512,7 @@ function othelloChooseMinimaxMove(state, player, depth = 3, randomness = 0, weig
     const scored = rootMoves.map(move => ({
         move,
         score: search(getCachedNextState(state, move, player), opponent, depth - 1, -Infinity, Infinity, false)
+            + (typeof rootBonus === "function" ? Number(rootBonus(move)) || 0 : 0)
     })).sort((a, b) => b.score - a.score);
 
     // Der adaptive Bot behält die zentrale Auswahl. Manuelle Othello-Bots
@@ -605,6 +617,7 @@ window.OthelloAICore = {
     othelloApplyMoveToState,
     applyMove: othelloApplyMove,
     othelloScoreMove,
+    othelloPlayerHabitBonus,
     othelloStableEdgeCount,
     othelloStableCount,
     othelloPotentialMobility,

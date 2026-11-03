@@ -1,13 +1,13 @@
 (function () {
     "use strict";
     const core = window.MuehleAICore; const clamp = window.SharedDifficulty.clamp; const SPEED = { slow: 0.5, normal: 1, fast: 1.5 }; const KEY = "andis-game-foundry-muehle-adaptive";
-    let skill = 35, speed = "normal", drawStreak = 0, roundSnapshot = null;
+    let skill = 35, speed = "normal", drawStreak = 0, roundSnapshot = null, labState = null;
     try { const saved = JSON.parse(localStorage.getItem(KEY) || "null"); if (saved) { skill = Math.max(10, Math.min(100, Number(saved.skill) || 35)); speed = SPEED[saved.speed] ? saved.speed : "normal"; drawStreak = Number.isSafeInteger(saved.drawStreak) && saved.drawStreak >= 0 ? saved.drawStreak : 0; } } catch (_) {}
-    function save() { try { localStorage.setItem(KEY, JSON.stringify({ skill, speed, drawStreak })); } catch (_) {} }
+    function save() { if (labState) return; try { localStorage.setItem(KEY, JSON.stringify({ skill, speed, drawStreak })); } catch (_) {} }
     function curve() { return window.SharedDifficulty.createProfile({ mode: "adaptive", skill, ...window.MuehleSettings.difficulty, habitInfluence: window.MuehleSettings.adaptiveHabitInfluence, searchConfig: window.MuehleSettings.searchConfig }); }
     function actionPoint(action) { return action.type === "move" ? action.to : action.point; }
     function profileBias(state, action, player, playerProfile, difficulty, searchCache = null) {
-        if (!playerProfile?.observationReady) return 0;
+        if (labState || !playerProfile?.observationReady) return 0;
         const point = actionPoint(action);
         if (!Number.isInteger(point)) return 0;
         const total = Math.max(1, playerProfile.totalMoves);
@@ -97,7 +97,7 @@
     }
     function applyResult(result) {
         if (result !== "playerWin" && result !== "botWin" && result !== "draw") return;
-        const performance = playerPerformance(window.muehlePlayerProfile);
+        const performance = labState ? null : playerPerformance(window.muehlePlayerProfile);
         const update = window.SharedDifficulty.applyAdaptiveResult(skill, result, {
             performance: performance ?? 50,
             drawStreak,
@@ -108,7 +108,8 @@
         roundSnapshot = null;
         save();
     }
-    function resetForLab(initial = 35) { skill = Math.max(10, Math.min(100, Number(initial) || 35)); speed = "normal"; drawStreak = 0; roundSnapshot = null; save(); }
-    function clearPersistentState(initial = 35) { try { localStorage.removeItem(KEY); } catch (_) {} resetForLab(initial); }
-    window.MuehleAdaptiveBot = { enabled: true, chooseAction, choosePlace: chooseAction, chooseSource: chooseAction, chooseTarget: chooseAction, chooseRemove: chooseAction, beginRound(options = {}) { if (options.adaptSpeed) speed = SPEED[options.adaptSpeed] ? options.adaptSpeed : "normal"; roundSnapshot = snapshotProfile(window.muehlePlayerProfile); save(); return Math.round(skill); }, recordRoundResult: applyResult, recordLabResult(result) { applyResult(result); return Math.round(skill); }, cancelRound() { roundSnapshot = null; }, resetForLab, clearPersistentState, setAdaptSpeed(value) { speed = SPEED[value] ? value : "normal"; save(); }, getAdaptSpeed() { return speed; }, getAdaptiveSkill() { return Math.round(skill); }, getSkill() { return Math.round(skill); }, getAdaptiveCurve: curve, getProfile: () => null, getThinkTime() { return Math.round((350 + curve().curve * 650) * ({ slow: 1.25, normal: 1, fast: 0.75 }[speed] || 1)); }, getUiState() { return { skill: Math.round(skill), speed, speedLabel: speed === "slow" ? "Langsam" : speed === "fast" ? "Schnell" : "Normal" }; } };
+    function resetForLab(initial = 35) { if (!labState) labState = { skill, speed, drawStreak, roundSnapshot }; skill = Math.max(10, Math.min(100, Number(initial) || 35)); speed = "normal"; drawStreak = 0; roundSnapshot = null; }
+    function finishLab() { if (!labState) return; ({ skill, speed, drawStreak, roundSnapshot } = labState); labState = null; }
+    function clearPersistentState(initial = 35) { labState = null; try { localStorage.removeItem(KEY); } catch (_) {} resetForLab(initial); labState = null; save(); }
+    window.MuehleAdaptiveBot = { enabled: true, chooseAction, choosePlace: chooseAction, chooseSource: chooseAction, chooseTarget: chooseAction, chooseRemove: chooseAction, beginRound(options = {}) { if (options.adaptSpeed) speed = SPEED[options.adaptSpeed] ? options.adaptSpeed : "normal"; roundSnapshot = labState ? null : snapshotProfile(window.muehlePlayerProfile); save(); return Math.round(skill); }, recordRoundResult: applyResult, recordLabResult(result) { applyResult(result); return Math.round(skill); }, cancelRound() { roundSnapshot = null; }, resetForLab, finishLab, clearPersistentState, setAdaptSpeed(value) { speed = SPEED[value] ? value : "normal"; save(); }, getAdaptSpeed() { return speed; }, getAdaptiveSkill() { return Math.round(skill); }, getSkill() { return Math.round(skill); }, getAdaptiveCurve: curve, getProfile: () => null, getThinkTime() { return Math.round((350 + curve().curve * 650) * ({ slow: 1.25, normal: 1, fast: 0.75 }[speed] || 1)); }, getUiState() { return { skill: Math.round(skill), speed, speedLabel: speed === "slow" ? "Langsam" : speed === "fast" ? "Schnell" : "Normal" }; } };
 })();
