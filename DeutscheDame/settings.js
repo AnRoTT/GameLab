@@ -2,9 +2,9 @@
     "use strict";
     root.DeutscheDameSettings = Object.freeze({
         manualStrengths: Object.freeze({
-            1: 0.78,
-            2: 0.82,
-            3: 0.86,
+            1: 0.68,
+            2: 0.77,
+            3: 0.83,
             4: 0.93,
             reference: 1.00
         }),

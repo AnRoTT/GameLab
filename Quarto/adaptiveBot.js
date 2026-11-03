@@ -5,6 +5,8 @@
     const core = window.QuartoAICore;
     const BOT_PLAYER = 1;
     const MIN_OBSERVATION_MOVES = core.MIN_OBSERVATION_MOVES || 12;
+    const MIN_ROUND_PLACEMENTS = 3;
+    const MAX_ROUND_PLACEMENTS = 8;
     const SPEED_FACTORS = { slow: 0.5, normal: 1, fast: 1.5 };
     const SPEED_LABELS = { slow: "Langsam", normal: "Normal", fast: "Schnell" };
     let skill = 35;
@@ -12,6 +14,7 @@
     let pendingResult = null;
     let roundSnapshot = null;
     let drawStreak = 0;
+    let labState = null;
     const STORAGE_KEY = "andis-game-foundry-quarto-adaptive";
 
     function clamp(value, min, max) {
@@ -19,6 +22,7 @@
     }
 
     function savePersistentState() {
+        if (labState) return;
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ skill, speed, drawStreak })); } catch (_) {}
     }
 
@@ -33,7 +37,7 @@
     loadPersistentState();
 
     function getProfile() {
-        return window.quartoPlayerProfile || null;
+        return labState ? null : (window.quartoPlayerProfile || null);
     }
 
     function getAdaptiveCurve(value = skill) {
@@ -96,9 +100,9 @@
     }
 
     function evaluatePlayerPerformance(profile) {
-        if (!profile || !roundSnapshot) return null;
+        if (!profile || !roundSnapshot || profile.totalMoves < MIN_OBSERVATION_MOVES) return null;
         const observedMoves = diff(profile, roundSnapshot, "totalMoves");
-        if (observedMoves < MIN_OBSERVATION_MOVES) return null;
+        if (observedMoves < MIN_ROUND_PLACEMENTS) return null;
 
         const selections = Math.max(1, diff(profile, roundSnapshot, "selectionCount"));
         const winningMoves = diff(profile.tactics, roundSnapshot, "winningMoves");
@@ -111,7 +115,8 @@
         performance -= (missedWins / observedMoves) * 35;
         performance -= (dangerousGifts / selections) * 22;
         performance += (safeGifts / selections) * 8;
-        return clamp(performance, 0, 100);
+        const confidence = Math.min(1, observedMoves / MAX_ROUND_PLACEMENTS);
+        return clamp(50 + (performance - 50) * confidence, 0, 100);
     }
 
     function fadeProfile(profile) {
@@ -127,9 +132,8 @@
     function applyPendingResult(profile) {
         if (!pendingResult) return;
         const performance = evaluatePlayerPerformance(profile);
-        // Quarto-Partien enden oft vor 12 Zügen. Auch dann soll das Ergebnis
-        // die adaptive Stärke begrenzt beeinflussen; die Lernprofildaten
-        // werden weiterhin nur bei ausreichender Beobachtungsmenge bewertet.
+        // Kurze Runden und noch junge Profile bleiben bei der zusätzlichen
+        // Leistungsbewertung neutral; das Rundenergebnis zählt trotzdem.
         const measuredPerformance = performance === null ? 50 : performance;
 
         const factor = SPEED_FACTORS[speed];
@@ -174,21 +178,30 @@
     }
 
     function resetForLab(initialSkill = 35) {
+        if (!labState) labState = { skill, speed, pendingResult, roundSnapshot, drawStreak };
         skill = clamp(initialSkill, 10, 100);
         speed = "normal";
         pendingResult = null;
         roundSnapshot = null;
         drawStreak = 0;
-        savePersistentState();
+    }
+
+    function finishLab() {
+        if (!labState) return;
+        ({ skill, speed, pendingResult, roundSnapshot, drawStreak } = labState);
+        labState = null;
     }
 
     function clearPersistentState(initialSkill = 35) {
+        labState = null;
         try { localStorage.removeItem(STORAGE_KEY); } catch (_) {}
         resetForLab(initialSkill);
+        labState = null;
+        savePersistentState();
     }
 
     function recordLabResult(result, opponentPerformance = 50) {
-        const performance = clamp(Number(opponentPerformance) || 50, 0, 100);
+        const performance = labState ? 50 : clamp(Number(opponentPerformance) || 50, 0, 100);
         const factor = SPEED_FACTORS[speed];
         const update = window.SharedDifficulty.applyAdaptiveResult(skill, result, {
             performance,
@@ -278,6 +291,7 @@
         recordRoundResult,
         cancelRound,
         resetForLab,
+        finishLab,
         clearPersistentState,
         recordLabResult,
         setAdaptSpeed,

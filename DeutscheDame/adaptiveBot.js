@@ -41,22 +41,24 @@
     function profileBias(state, action, player, difficulty, next, observedProfile = playerProfile) {
         if (!observedProfile?.observationReady) return 0;
         const total = Math.max(1, observedProfile.totalMoves);
+        const actionSamples = Math.max(1, Number(observedProfile.actionSamples) || (observedProfile.sources || []).reduce((sum, count) => sum + Math.max(0, Number(count) || 0), 0) || total);
         const tactics = observedProfile.tactics || {};
         const weakness = ((tactics.weakChoices || 0) * 5 + (tactics.allowedCaptures || 0) * 4 + (tactics.missedPromotions || 0) * 4) / total;
         const aggression = (observedProfile.style?.aggressive || 0) / total;
         const carefulness = (observedProfile.style?.careful || 0) / total;
         const defensiveness = (observedProfile.style?.defensive || 0) / total;
-        const targetHabit = Number.isInteger(action.to) ? (observedProfile.destinations?.[action.to] || 0) / total : 0;
-        const sourceHabit = Number.isInteger(action.from) ? (observedProfile.sources?.[action.from] || 0) / total : 0;
         const maturity = Math.min(1, total / 48);
         let bonus = 0;
         if (action.type === "capture") bonus += weakness * 18 * difficulty.habitInfluence;
-        // Wiederkehrende Felder und Figuren liefern nur einen begrenzten,
-        // reinen Tie-Breaker. Grundtaktik und die Difficulty-Kurve bleiben
-        // weiterhin die dominierenden Faktoren.
-        bonus += (targetHabit * 8 + sourceHabit * 4) * maturity * difficulty.habitInfluence;
         if (next && next.currentPlayer !== state.currentPlayer) {
             const humanActions = root.DeutscheDameAICore.getActionsForPlayer(next, 1);
+            // Bewerte die möglichen Antworten des Menschen anhand seiner
+            // bisherigen Felder, nicht die eigenen Start- und Zielfelder.
+            const frequency = value => Math.max(0, Math.min(1, (Number(value) || 0) / actionSamples));
+            const familiarReply = humanActions.reduce((best, candidate) => Math.max(best,
+                frequency(observedProfile.destinations?.[candidate.to]) * 4
+                + frequency(observedProfile.sources?.[candidate.from]) * 2), 0);
+            bonus -= familiarReply * maturity * difficulty.habitInfluence;
             if (humanActions.some(candidate => candidate.type === "capture")) bonus -= 35 * (1 + carefulness) * difficulty.habitInfluence;
             const humanPromotions = humanActions.filter(candidate => {
                 const piece = next.board[candidate.from];
@@ -81,6 +83,7 @@
     }
 
     function playerPerformance() {
+        if (labState) return null;
         const playerProfile = observedProfile || root.deutscheDamePlayerProfile;
         if (!playerProfile?.observationReady) return null;
         const baseline = roundSnapshot || { totalMoves: 0, promotions: 0, tactics: {}, style: {}, mobility: {} };
@@ -99,7 +102,7 @@
 
     function chooseAction(state, player = 2, suppliedProfile = null) {
         const difficulty = profile();
-        const observedProfile = suppliedProfile || playerProfile;
+        const observedProfile = labState ? null : (suppliedProfile || playerProfile);
         return core.chooseDifficultyAction(state, player, difficulty, {
             scoreBonus: (currentState, action, currentPlayer, currentDifficulty, next) =>
                 profileBias(currentState, action, currentPlayer, currentDifficulty, next, observedProfile)
@@ -109,7 +112,7 @@
     function beginRound(options = {}) {
         if (options.adaptSpeed && SPEED[options.adaptSpeed]) speed = options.adaptSpeed;
         roundStarted = true;
-        observedProfile = options.playerProfile || playerProfile;
+        observedProfile = labState ? null : (options.playerProfile || playerProfile);
         roundSnapshot = options.roundSnapshot && typeof options.roundSnapshot === "object"
             ? snapshotProfile(options.roundSnapshot) : snapshotProfile(observedProfile);
         save();

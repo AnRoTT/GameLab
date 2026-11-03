@@ -79,6 +79,7 @@ let resumePreviouslyFocused = null, pendingSavedState = null, savedInSetup = fal
     }
     function playMoveSound() { window.AndisSound?.playSmallChipDrop?.(0.18); }
     function playUiSound() { window.AndisSound?.playUiClick?.(0.22); }
+    function playerName(player) { return player === 2 && mode === "bot" ? "Bot" : `Spieler ${player}`; }
     function updateMatchUI() {
         const active = matchSelect.value === "match";
         matchButton.textContent = active ? "Abwechselnd" : "Einzelrunde";
@@ -238,8 +239,8 @@ let resumePreviouslyFocused = null, pendingSavedState = null, savedInSetup = fal
         $("blackCount").parentElement.classList.toggle("winner", state?.winner === 2);
         const roundEnded = Boolean(state && (state.winner || state.draw));
         $("status").textContent = roundEnded && matchSelect.value === "match" && roundResultRecorded
-            ? `${state.winner ? `Spieler ${state.winner} gewinnt die Runde` : "Remis"} · Zwischenstand ${matchWins[1]}:${matchWins[2]}`
-            : state && state.winner ? "Spieler " + state.winner + " gewinnt!" : state && state.draw ? "Remis" : "Spieler " + (state ? state.currentPlayer : 1) + (mode === "bot" && state && state.currentPlayer === 2 ? " (Bot)" : "") + " ist am Zug";
+            ? `${state.winner ? `${playerName(state.winner)} gewinnt die Runde` : "Remis"} · Zwischenstand ${matchWins[1]}:${matchWins[2]}`
+            : state && state.winner ? `${playerName(state.winner)} gewinnt!` : state && state.draw ? "Remis" : `${playerName(state ? state.currentPlayer : 1)} ist am Zug`;
         $("hint").textContent = pathPreview ? `Schlag: Feld ${pathPreview.from + 1} über Feld ${pathPreview.over + 1} nach Feld ${pathPreview.to + 1}.` : state && state.winner ? (state.endReason === "blockiert" ? "Der Gegner kann keinen legalen Zug mehr ausführen." : "Alle gegnerischen Steine wurden geschlagen.") : state && state.draw ? (state.drawReason === "wiederholung" ? "Dreifache Stellungswiederholung." : "25 vollständige Züge ohne Schlag oder Krönung.") : state && state.chainFrom !== null ? "Mehrfachschlag fortsetzen." : actions.some(action => action.type === "capture") ? "Schlagzwang: wähle einen Schlag." : "Wähle einen Stein.";
         if (mobileGameAction) mobileGameAction.textContent = state && !state.winner && !state.draw ? "Spiel abbrechen" : roundEnded && matchRunning ? "Nächste Runde" : "Neues Spiel";
         board.classList.toggle("game-over", Boolean(state && (state.winner || state.draw)));
@@ -295,7 +296,7 @@ let resumePreviouslyFocused = null, pendingSavedState = null, savedInSetup = fal
             roundResultRecorded = true;
             matchRound += 1;
             matchRunning = true;
-            $("status").textContent = `${state.winner ? `Spieler ${state.winner} gewinnt die Runde` : "Remis"} · Zwischenstand ${matchWins[1]}:${matchWins[2]}`;
+            $("status").textContent = `${state.winner ? `${playerName(state.winner)} gewinnt die Runde` : "Remis"} · Zwischenstand ${matchWins[1]}:${matchWins[2]}`;
             $("start").textContent = "Nächste Runde";
         } else {
             matchRunning = false;

@@ -2,9 +2,11 @@ const OthelloAdaptiveCore = window.OthelloAICore;
 
 let adaptiveStrength = 35;
 let adaptiveDrawStreak = 0;
+let labState = null;
 const ADAPTIVE_STORAGE_KEY = "andis-game-foundry-othello-adaptive";
 
 function saveAdaptivePersistentState() {
+    if (labState) return;
     try { localStorage.setItem(ADAPTIVE_STORAGE_KEY, JSON.stringify({ adaptiveStrength, adaptiveDrawStreak })); } catch (_) {}
 }
 
@@ -100,17 +102,18 @@ function getAdaptiveBotMove(state, player = "white", profile = null) {
         potentialMobility: 2 + curve * 5
     };
     const depth = difficulty.depth;
+    const habitBonus = move => core.othelloPlayerHabitBonus(move, labState ? null : profile, difficulty.habitInfluence);
 
     if (depth === 0 || Math.random() >= difficulty.searchChance || Math.random() < difficulty.errorRate) {
         const scored = moves.map(move => ({
             move,
-            score: core.othelloScoreMove(state, move, player, null, weights)
+            score: core.othelloScoreMove(state, move, player, null, weights) + habitBonus(move)
         })).sort((a, b) => b.score - a.score);
         return window.SharedDifficulty.selectSoftCandidate(scored, difficulty.curve, true)?.move || scored[0].move;
     }
 
     const randomness = Math.max(0, difficulty.randomChance * 35);
-    return core.othelloChooseMinimaxMove(state, player, depth, randomness, weights, difficulty.curve) || moves[0];
+    return core.othelloChooseMinimaxMove(state, player, depth, randomness, weights, difficulty.curve, "soft", habitBonus) || moves[0];
 }
 
 function getAdaptiveBotThinkTime() {
@@ -121,18 +124,27 @@ function getAdaptiveBotThinkTime() {
 }
 
 function resetAdaptiveForLab(initialSkill = 35) {
+    if (!labState) labState = { adaptiveStrength, adaptiveDrawStreak };
     adaptiveStrength = window.SharedDifficulty.clamp(Number(initialSkill) || 35, 10, 100);
     adaptiveDrawStreak = 0;
-    saveAdaptivePersistentState();
+}
+
+function finishAdaptiveLab() {
+    if (!labState) return;
+    ({ adaptiveStrength, adaptiveDrawStreak } = labState);
+    labState = null;
 }
 
 function clearAdaptivePersistentState(initialSkill = 35) {
+    labState = null;
     try { localStorage.removeItem(ADAPTIVE_STORAGE_KEY); } catch (_) {}
     resetAdaptiveForLab(initialSkill);
+    labState = null;
+    saveAdaptivePersistentState();
 }
 
 function recordAdaptiveLabResult(result, opponentPerformance = 50) {
-    const performance = Math.max(0, Math.min(100, Number(opponentPerformance) || 50));
+    const performance = labState ? 50 : Math.max(0, Math.min(100, Number(opponentPerformance) || 50));
     const update = window.SharedDifficulty.applyAdaptiveResult(adaptiveStrength, result, {
         performance,
         drawStreak: adaptiveDrawStreak
@@ -147,6 +159,7 @@ window.OthelloAdaptiveBot = {
     getBotMove: getAdaptiveBotMove,
     getSkill: getAdaptiveStrength,
     resetForLab: resetAdaptiveForLab,
+    finishLab: finishAdaptiveLab,
     clearPersistentState: clearAdaptivePersistentState,
     recordLabResult: recordAdaptiveLabResult
 };
